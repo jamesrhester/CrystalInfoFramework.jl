@@ -1,0 +1,6 @@
+authors = ["James.Hester <jxh@ansto.gov.au>"]
+name = "JuliaCif"
+uuid = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
+version = "0.1.0"
+
+[deps]

@@ -1,0 +1,19 @@
+#\#CIF_2.0
+
+data_simple_data
+
+_unknown_value   ?
+_na_value        .
+_unquoted_string unquoted
+_sq_string       'sq'
+_dq_string       "dq"
+_text_string
+;text
+;
+_numb_plain      1.25e+03
+_numb_su         0.0625(2)
+_numb_tz         17.12500
+_numb_quoted     '1.0'
+_query_quoted    "?"
+_dot_quoted      '.'
+
