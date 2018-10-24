@@ -2,6 +2,10 @@ module JuliaCif
 #= This module provides ways of interacting with a Crystallographic Information
  file using Julia. It currently wraps the C CIF API.
 =#
+export cif,cif_block,get_all_blocks,get_block_code,get_block,get_value
+export get_all_blocks,get_loop, iterate
+
+
 include("cif_errors.jl")
 
 import Base.Libc:FILE
@@ -28,8 +32,14 @@ cif(x::cif_tp_ptr) = cif(x.p)
 
 """A finalizer for a C-allocated CIF object"""
 cif_destroy!(x) =  begin
+    #q = time_ns()
+    #error_string = "$q: Finalizing CIF object $x"
+    #t = @task println(error_string)
+    #schedule(t)
     val = ccall((:cif_destroy,"libcif"),Cint,(Ptr{cif_tp},),x.handle)
-    #check val if necessary
+    if val != 0
+        error(error_codes[val])
+    end
 end
 
 """Construct a new CIF object"""
@@ -38,7 +48,9 @@ cif()= begin
     val=ccall((:cif_create,"libcif"),Cint,(Ref{cif_tp_ptr},),Ref(dpp))
     # Can error-check val if necessary
     r = cif(dpp)
-    finalizer(cif_destroy!,r) #this will be called when finished
+    #finalizer(cif_destroy!,r) #this will be called when finished
+    println("Created cif ptr: $r for empty CIF")  #for debugging later
+    return r
 end
 
 """Parse input stream and return a CIF object"""
@@ -59,6 +71,9 @@ end
 
 """Free C resources for parse options"""
 pos_destroy!(x::cpo_ptr) = begin
+    error_string = "Finalizing parse options $x"
+    t = @task println(error_string)
+    schedule(t)
     ccall((:free,"libc"),Cvoid,(cpo_ptr,),x.handle)
 end
 
@@ -79,6 +94,9 @@ cif(s::AbstractString)=begin
     end
     r = cif(dpp)
     finalizer(cif_destroy!,r)
+    #q = time_ns()
+    #println("$q: Created cif ptr:$r for file $s")
+    return r
 end
 
 #==
@@ -96,24 +114,31 @@ end
 """A pointer to a CIF block, set by libcif"""
 mutable struct cif_block_tp_ptr
     handle::Ptr{cif_block_tp}  # *cif_block_tp
-    # Need to register a finalizer as well
 end
 
-"""A simple wrapper for external use"""
+"""A simple wrapper for external use.
+
+We must keep a reference to the CIF that contains this
+block, otherwise it could be finalised once it is no
+longer referenced in a program.  This will cause a
+segmentation fault whenever the block is subsequently
+referenced."""
 struct cif_block
     handle::cif_block_tp_ptr   #*cif_block_libcif
+    cif_handle::cif            #keep a reference to this
 end
 
 cb_destroy!(cb::cif_block_tp_ptr) =  begin
-    val = ccall((:cif_container_free,"libcif"),Cvoid,(Ptr{cif_block_tp},),cb.handle)
-    if val != 0
-        error("Failed to free cif block storage: $(error_codes[val])")
-    end
+    #error_string = "Finalizing cif block ptr $cb"
+    #t = @task println(error_string)
+    #schedule(t)
+    ccall((:cif_container_free,"libcif"),Cvoid,(Ptr{cif_block_tp},),cb.handle)
 end
 
 get_block(c::cif,block_name::AbstractString) = begin
     cbt = cif_block_tp_ptr(0)
     bn_as_uchar = transcode(UInt16,block_name)
+    append!(bn_as_uchar,0)
     val = ccall((:cif_get_block,"libcif"),Cint,(Ptr{cif_tp},Ptr{UInt16},Ptr{cif_block_tp_ptr}),
     c.handle,bn_as_uchar,Ref(cbt))
     # check val
@@ -121,7 +146,9 @@ get_block(c::cif,block_name::AbstractString) = begin
         error(error_codes[val])
     end
     finalizer(cb_destroy!,cbt)
-    return cbt
+    #q = time_ns()
+    #println("$q: Created cif block ptr: $cbt")
+    return cif_block(cbt,c)
 end
 
 # Libcif requires a pointer to a location where it can store a pointer to an array of block handles.
@@ -130,41 +157,41 @@ mutable struct block_list_ptr
     handle::Ptr{cif_block_tp_ptr}  #**cif_block_tp
 end
 
-"""Free the memory associated with each block"""
-destroy_block_list!(p::Vector{cif_block_tp_ptr}) = begin
-    foreach(cb_destroy!,p)
-end
-
 """Get handles to all blocks in a data file"""
 get_all_blocks(c::cif) = begin
     array_address = block_list_ptr(0)  #**cif_block_tp
-    println("Array address before: $array_address")
+    #println("Array address before: $array_address")
     val = ccall((:cif_get_all_blocks,"libcif"),Cint,(Ptr{cif_tp},Ptr{block_list_ptr}),c.handle,Ref(array_address))
     if val!=0
         error(error_codes[val])
     end
-    println("Array address after: $array_address")
+    #println("Array address after: $array_address")
     if array_address.handle == C_NULL
         error("Unable to get block array address")
     end
-    # Now loop over the values we have
+    # Now count how many values we have
     n = 1
     b = unsafe_load(array_address.handle,n)
-    println("Start of actual array: $(b.handle)")
+    #println("Start of actual array: $(b.handle)")
     while b.handle!=C_NULL
         n = n + 1
         b = unsafe_load(array_address.handle,n)
-        println("Ptr is $(b.handle)")
+        #println("Ptr is $(b.handle)")
     end
     n = n - 1
-    println("Number of blocks: $n")
+    #println("Number of blocks: $n")
     # Total length is n
     block_list = Vector{cif_block_tp_ptr}(undef,n)
     for j=1:n
         block_list[j]=unsafe_load(array_address.handle,j)
+        finalizer(cb_destroy!,block_list[j])
     end
-    finalizer(destroy_block_list!,block_list)
-    return block_list
+    # Now create an array of cif_blocks
+    cif_blocks = Vector{cif_block}()
+    for p in block_list
+        push!(cif_blocks,cif_block(p,c))
+    end
+    return cif_blocks
 end
 
 """The type external Unicode strings from libicu"""
@@ -180,9 +207,9 @@ make_jl_string(s::Uchar) = begin
 end
 
 """Obtain the name of a block"""
-get_block_code(b::cif_block_tp_ptr) = begin
+get_block_code(b::cif_block) = begin
     s = Uchar(0)
-    val = ccall((:cif_container_get_code,"libcif"),Cint,(Ptr{cif_block_tp},Ptr{Cvoid}),b.handle,Ref(s))
+    val = ccall((:cif_container_get_code,"libcif"),Cint,(cif_block_tp_ptr,Ptr{Cvoid}),b.handle,Ref(s))
     if val != 0
         error(error_codes[val])
     end
@@ -190,29 +217,190 @@ get_block_code(b::cif_block_tp_ptr) = begin
 end
 
 """The general value type of a CIF file"""
-struct cif_value_tp
+mutable struct cif_value_tp
 end
 
 mutable struct cif_value_tp_ptr
     handle::Ptr{cif_value_tp}
 end
 
+# Do we have to finalize this? Yes indeedy.
+
+value_free!(x::cif_value_tp_ptr) = begin
+    ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
+end
+
+# Now define conversions
+Base.Number(t::cif_value_tp_ptr) = begin
+    dd = Ref{Cdouble}(0)
+    val = ccall((:cif_value_get_number,"libcif"),Cint,(Ptr{cif_value_tp},Ref{Cdouble}),t.handle,dd)
+    if val != 0
+        error(error_code[val])
+    end
+    return dd[]
+end
+
+Base.String(t::cif_value_tp_ptr) = begin
+   #Get the textual representation
+   s = Uchar(0)
+   val = ccall((:cif_value_get_text,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),t.handle,Ref(s))
+   if val != 0
+       error(error_codes[val])
+   end
+   new_string = make_jl_string(s)
+end
+
 """Return the value of an item"""
-get_value(b::cif_block_tp_ptr,name::AbstractString) = begin
+get_value(b::cif_block,name::AbstractString) = begin
     new_val = cif_value_tp_ptr(0)
     uname = transcode(UInt16,name)
-    val = ccall((:cif_container_get_value,"libcif"),Cint,(Ptr{cif_block_tp_ptr},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
+    append!(uname,0)
+    q = time_ns()
+    #println("$q: Transcoded to $uname")
+    val = ccall((:cif_container_get_value,"libcif"),Cint,(cif_block_tp_ptr,Ptr{UInt16},Ptr{cif_value_tp_ptr}),
     b.handle,uname,Ref(new_val))
     if val != 0
         error(error_codes[val])
     end
-    # Set the textual representation
-    s = Uchar(0)
-    val = ccall((:cif_value_get_text,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),new_val.handle,Ref(s))
+    q = time_ns()
+    #rintln("$q: Successfully found value $name")
+    #end
+    finalizer(value_free!,new_val)
+    return new_val
+end
+#==
+   Loops.
+
+   We need to define loop types, packet types, and iteration over them
+
+   ==#
+
+mutable struct cif_loop_tp
+end
+
+mutable struct cif_loop_tp_ptr
+    handle::Ptr{cif_loop_tp}
+end
+
+mutable struct cif_loop
+    handle::cif_loop_tp_ptr
+    block::cif_block    #to avoid early garbage collection
+end
+
+loop_free!(cl::cif_loop_tp_ptr) = begin
+    ccall((:cif_loop_free,"libcif"),Cvoid,(Ptr{cif_loop_tp},),cl.handle)
+end
+
+get_loop(b::cif_block,name) = begin
+    loop = cif_loop_tp_ptr(0)
+    utfname = transcode(UInt16,name)
+    append!(utfname,0)
+    val = ccall((:cif_container_get_item_loop,"libcif"),Cint,(cif_block_tp_ptr,Ptr{UInt16},Ptr{cif_loop_tp_ptr}),
+     b.handle,utfname,Ref(loop))
+    if val != 0
+         error(error_codes[val])
+    end
+    finalizer(loop_free!,loop)
+    return cif_loop(loop,b)
+end
+
+#==
+ Loop packets. These are not linked with other resources, so we do not
+ need to keep a loop, block or CIF object alive while the packet is alive.
+ ==#
+
+struct cif_packet_tp
+end
+
+mutable struct cif_packet
+    handle::Ptr{cif_packet_tp}
+end
+
+packet_free!(cif_packet) = begin
+    val = ccall((:cif_packet_free,"libcif"),Cint,(Ptr{cif_packet_tp},),cif_packet.handle)
     if val != 0
         error(error_codes[val])
     end
-    new_string = make_jl_string(s)
+end
+
+Base.getindex(p::cif_packet,key) = begin
+    new_val = cif_value_tp_ptr(0)
+    uname = transcode(UInt16,key)
+    append!(uname,0)   #null terminated just in case
+    val = ccall((:cif_packet_get_item,"libcif"),Cint,(Ptr{cif_packet_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
+       p.handle,uname,Ref(new_val))
+    if val == 35
+        KeyError(key)
+    end
+    if val != 0
+        error(error_code[val])
+    end
+    return new_val
+end
+
+#==
+Loops can be iterated
+==#
+
+struct cif_pktitr_tp
+end
+
+mutable struct cif_pktitr_tp_ptr
+    handle::Ptr{cif_pktitr_tp}
+end
+
+mutable struct loop_iterator
+    handle::cif_pktitr_tp_ptr
+    loop::cif_loop
+end
+
+close_pktitr!(t::cif_pktitr_tp_ptr) = begin
+    val = ccall((:cif_pktitr_close,"libcif"),Cint,(Ptr{cif_pktitr_tp},),t.handle)
+    if val != 0
+        error(error_codes[val])
+    end
+end
+
+Base.iterate(cl::cif_loop) = begin
+    pktptr = cif_pktitr_tp_ptr(0)
+    val = ccall((:cif_loop_get_packets,"libcif"),Cint,(cif_loop_tp_ptr,Ptr{cif_pktitr_tp_ptr}),
+        cl.handle,Ref(pktptr))
+    if val != 0
+        error(error_codes[val])
+    end
+    finalizer(close_pktitr!,pktptr)
+    final_iter = loop_iterator(pktptr,cl)
+    # We should return the first item
+    new_packet = cif_packet(0)
+    val = ccall((:cif_pktitr_next_packet,"libcif"),Cint,(cif_pktitr_tp_ptr,Ptr{cif_packet}),
+        final_iter.handle,Ref(new_packet))
+    # If iteration has finished already, return the appropriate Julia value
+    if val > 1
+        error(error_codes[val])
+    end
+    if val == 1
+        return nothing
+    end
+    finalizer(packet_free!,new_packet)
+    return (new_packet,final_iter)
+end
+
+Base.iterate(cl,pktitr) = begin
+    # Make sure that the iterator belongs to the loop
+    if pktitr.loop != cl
+        error("Iterator $pktitr belongs to loop $(pktitr.cif_loop) not $cl!")
+    end
+    new_packet = cif_packet(0)
+    val = ccall((:cif_pktitr_next_packet,"libcif"),Cint,(cif_pktitr_tp_ptr,Ptr{cif_packet}),
+        pktitr.handle,Ref(new_packet))
+    if val > 1
+        error(error_codes[val])
+    end
+    if val == 1
+        return nothing
+    end
+    finalizer(packet_free!,new_packet)
+    return (new_packet,pktitr)
 end
 
 """Utility routine to get the length of a C null-terminated array"""
@@ -223,7 +411,7 @@ get_c_length(s::Ptr,max=-1) = begin
     while b!=0 && (max == -1 || (max != -1 && n < max))
         n = n + 1
         b = unsafe_load(s,n)
-        # println("Ptr is $b")
+        #println("Char is $b")
     end
     n = n - 1
     #println("Length of string: $n")
