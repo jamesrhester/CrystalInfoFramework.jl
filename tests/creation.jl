@@ -5,8 +5,8 @@ testdir = @__DIR__
 
 @test begin
     p = cif(joinpath(testdir,"simple_data.cif"))
-    b = get_block(p,"simple_data")
-    t = get_value(b,"_numb_su")
+    b = p["simple_data"]
+    t = b["_numb_su"]
     true
 end
 
@@ -22,7 +22,7 @@ end
 
 @test begin
     p = cif(joinpath(testdir,"simple_data.cif"))
-    b = get_block(p,"simple_data")
+    b = p["simple_data"]
     bname = get_block_code(b)
     println("Block name is " * bname)
     bname == "simple_data"
@@ -30,7 +30,7 @@ end
 
 @test begin
     p = cif(joinpath(testdir,"simple_loops.cif"))
-    b = get_block(p,"simple_loops")
+    b = p["simple_loops"]
     l = get_loop(b,"_col2")
     true
 end
