@@ -39,6 +39,7 @@ b = prepare_block("table_data.cif","table_data")
 l = cif_table(b["_type_examples"])
 @test Number(l["numb"])≈-123.4e+67
 @test String(l["char"])=="char"
+@test "unknown" in keys(l)
 end
 
 # Get the blocks

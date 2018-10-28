@@ -199,6 +199,11 @@ mutable struct Uchar
     string::Ptr{UInt16}
 end
 
+"""A list of strings"""
+mutable struct Uchar_list
+    strings::Ptr{Uchar}
+end
+
 """Turning an ICU string into a Jula string"""
 make_jl_string(s::Uchar) = begin
     n = get_c_length(s.string,-1)  # short for testing
@@ -227,6 +232,13 @@ end
 # Do we have to finalize this? Yes indeedy.
 
 value_free!(x::cif_value_tp_ptr) = begin
+    #error_string = "Finalizing cif block ptr $cb"
+    #t = @task println(error_string)
+    #schedule(t)
+    q = time_ns()
+    error_string = "$q: Fly, be free $x"
+    t = @task println(error_string)
+    schedule(t)
     ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
@@ -265,6 +277,7 @@ Base.getindex(b::cif_block,name::AbstractString) = begin
     q = time_ns()
     #rintln("$q: Successfully found value $name")
     #end
+    println("$q:Allocated new cif value $new_val")
     finalizer(value_free!,new_val)
     return new_val
 end
@@ -488,6 +501,43 @@ struct cif_table
     end
 end
 
+Base.keys(ct::cif_table) = begin
+    ukeys = Uchar_list(0)
+    q = time_ns()
+    println("$q: accessing keys for $(ct.handle.handle)")
+    val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle.handle,Ref(ukeys))
+    if val != 0
+        error(error_codes[val])
+    end
+    # ukeys will actually be a **UInt16, that is, after return it will hold a pointer to an array of UInt16
+    if ukeys.strings == C_NULL
+        error("Unable to get key list address")
+    end
+    # Now count how many values we have
+    n = 1
+    b = unsafe_load(ukeys.strings,n)
+    #println("Start of actual array: $(b.handle)")
+    while b.string!=C_NULL
+        n = n + 1
+        b = unsafe_load(ukeys.strings,n)
+        #println("Ptr is $(b.handle)")
+    end
+    n = n - 1
+    #println("Number of keys: $n")
+    if n != ct.length
+        error("Number of keys does not match stated length")
+    end
+    # Load in the UChar string pointers
+    ukey_list = Vector{Uchar}(undef,n)
+    for j=1:n
+        ukey_list[j]=unsafe_load(ukeys.strings,j)
+    end
+    # Now actually turn them into ordinary strings
+    # This is not strictly necessary in the context of iteration
+    # but will probably help in debugging and error messages
+    key_list = make_jl_string.(ukey_list)
+end
+
 Base.iterate(ct::cif_table,keys) = begin
     if length(keys) == 0
         return nothing
@@ -499,39 +549,7 @@ end
 # To start the iteration we need a list of keys
 
 Base.iterate(ct::cif_table) = begin
-    ukeys = UChar(0)
-    val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{UInt16}),cl.handle.handle,Ref(ukeys))
-    if val != 0
-        error(error_codes[val])
-    end
-    # ukeys will actually be a **UInt16, that is, after return it will hold a pointer to an array of UInt16
-    if ukeys.handle == C_NULL
-        error("Unable to get key list address")
-    end
-    # Now count how many values we have
-    n = 1
-    b = unsafe_load(ukeys.handle,n)
-    #println("Start of actual array: $(b.handle)")
-    while b.handle!=C_NULL
-        n = n + 1
-        b = unsafe_load(array_address.handle,n)
-        #println("Ptr is $(b.handle)")
-    end
-    n = n - 1
-    #println("Number of keys: $n")
-    if n != ct.length
-        error("Number of keys does not match stated length")
-    end
-    # Load in the UChar string pointers
-    ukey_list = Vector{UChar}(undef,n)
-    for j=1:n
-        key_list[j]=unsafe_load(ukeys.handle,j)
-    end
-    # Now actually turn them into ordinary strings
-    # This is not strictly necessary in the context of iteration
-    # but will probably help in debugging and error messages
-    key_list = make_jl_string.(ukey_list)
-    iterate(ct,key_list)
+    iterate(ct,keys(ct))
 end
 
 Base.length(ct::cif_table) = ct.length
