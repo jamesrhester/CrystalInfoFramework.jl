@@ -1,0 +1,11 @@
+#\#CIF_2.0
+
+data_has_save
+
+_nesting_level 0
+
+save_nested
+
+_nesting_level 1
+
+save_
