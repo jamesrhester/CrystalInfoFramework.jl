@@ -162,7 +162,7 @@ mutable struct container_list_ptr
 end
 
 """Get handles to all blocks in a data file"""
-get_all_blocks(c::cif) = begin
+Base.values(c::cif) = begin
     array_address = container_list_ptr(0)  #**cif_block_tp
     #println("Array address before: $array_address")
     val = ccall((:cif_get_all_blocks,"libcif"),Cint,(Ptr{cif_tp},Ptr{container_list_ptr}),c.handle,Ref(array_address))
@@ -207,6 +207,8 @@ get_block_code(b::cif_container) = begin
     end
     make_jl_string(s)
 end
+
+Base.keys(c::cif) = get_block_code.(values(c))
 
 struct cif_frame <: cif_container
     handle::cif_container_tp_ptr
@@ -290,10 +292,10 @@ value_free!(x::cif_value_tp_ptr) = begin
     #error_string = "Finalizing cif block ptr $cb"
     #t = @task println(error_string)
     #schedule(t)
-    q = time_ns()
-    error_string = "$q: Fly, be free $x"
-    t = @task println(error_string)
-    schedule(t)
+    #q = time_ns()
+    #error_string = "$q: Fly, be free $x"
+    #t = @task println(error_string)
+    #schedule(t)
     ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
@@ -332,7 +334,7 @@ Base.getindex(b::cif_container,name::AbstractString) = begin
     q = time_ns()
     #rintln("$q: Successfully found value $name")
     #end
-    println("$q:Allocated new cif value $new_val")
+    #println("$q:Allocated new cif value $new_val")
     finalizer(value_free!,new_val)
     return new_val
 end

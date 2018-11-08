@@ -1,9 +1,4 @@
 # Data access tests
-# This just sets up access to a particular block
-prepare_block(filename,blockname) = begin
-    t = cif(joinpath(@__DIR__,filename))
-    b = t[blockname]
-end
 
 # Simple value tests
 @testset "Simple data values" begin

@@ -31,6 +31,35 @@ error_codes = Dict(   0 =>     "no error",
   62 => "wrong value type for a table index",
   72 => "the specified string could not be parsed as a number",
   73 => "the specified string is not a valid table index",
-  74 => "a data value that must be quoted was encountered bare")
+  74 => "a data value that must be quoted was encountered bare",
+  102 => "invalid encoded character",
+  103 => "unmappable character",
+  104 => "encountered a character that is not allowed to appear in CIF",
+  105 => "required whitespace separation was missing",
+  106 => "encountered an un-terminated inline quoted string",
+  107 => "a multi-line string was not terminated before the end of the file",
+  108 => "encountered an input line exceeding the length limit",
+  109 => "the first character of the input is disallowed at that position",
+  110 => "while parsing CIF 2.0, the character encoding is not UTF-8",
+
+  113 => "non-whitespace was encountered outside any data block",
+  122 => "a save frame was encountered, but save frame parsing is disabled",
+  123 => "a save frame terminator is missing at the apparent end of a frame",
+  124 => "a save frame terminator was encountered where none was expected",
+
+  126 => "the end of the input was encountered inside a save frame",
+
+  132 => "a CIF reserved word was encountered as an unquoted data value",
+  133 => "missing data value",
+  134 => "unexpected data value",
+  135 => "misplaced list or table delimiter",
+  136 => "missing list or table delimiter",
+  137 => "missing a key for a table entry",
+  138 => "an unquoted table key was encountered",
+  139 => "encountered a text block used as a table key",
+  140 => "a null table key was encountered",
+  141 => "a line of a prefixed text field body omitted the prefix")
+
+
 
 print_cif_error(code) = println(error_codes[code])
