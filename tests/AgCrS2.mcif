@@ -1,0 +1,211 @@
+#\#CIF_2.0
+########## Non-standard setting
+# Relative to the chosen parent structure, this structure has both
+# both displacive and magnetic order parameters.  This setting is 
+# the standard setting of the purely-displacive superstructure 
+# (non-magnetic space group #8 Cm) realized when all of the 
+# magnetic moments are set to zero.
+
+data_AgCrS2_non-standard
+
+_space_group.magn_number_BNS         8.35
+_space_group.magn_name_BNS           "I_c m"
+_space_group.magn_number_OG          8.4.41
+_space_group.magn_name_OG            "C_2c m"
+_space_group.magn_point_group_name   "m 1'"
+_space_group.magn_point_group_number "4.2.10"
+_space_group.magn_transform_BNS_Pp_abc    '-a-c,-b,c;0,0,0'
+_space_group.magn_transform_OG_Pp_abc     '-a-c,-b,1/2c;0,0,0'
+
+_cell_length_a                 13.7861
+_cell_length_b                 3.5042
+_cell_length_c                 28.4528
+_cell_angle_alpha              90.00
+_cell_angle_beta               155.276
+_cell_angle_gamma              90.00
+
+loop_
+_space_group_symop_magn_operation.id
+_space_group_symop_magn_operation.xyz
+1 x,y,z,+1
+2 x,-y,z,+1
+
+loop_
+_space_group_symop_magn_centering.id
+_space_group_symop_magn_centering.xyz
+1 x,y,z,+1
+2 x+1/2,y+1/2,z+1/2,+1
+3 x+1/2,y+1/2,z,-1
+4 x,y,z+1/2,-1
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Cr1_1 Cr 0.00000 0.00000 0.00000  1
+Cr1_2 Cr 0.50000 0.50000 0.25000  1
+Ag1_1 Ag 0.84590 0.00000 0.03810  1
+Ag1_2 Ag 0.34590 0.50000 0.28810  1
+S1_1  S  0.72630 0.00000 0.06650  1
+S1_2  S  0.22630 0.50000 0.31650  1
+S2_1  S  0.26880 0.00000 0.18410  1
+S2_2  S  0.76880 0.50000 0.43410  1
+
+loop_
+_atom_site_moment_label
+_atom_site_moment.crystalaxis_x
+_atom_site_moment.crystalaxis_y
+_atom_site_moment.crystalaxis_z
+_atom_site_moment.symmform
+Cr1_1  0.0  2.66  0.0  0,my,0
+Cr1_2  0.0  2.66  0.0  0,my,0
+
+_parent_space_group.name_H-M_alt   'R 3 m'
+_parent_space_group.IT_number   160
+_parent_space_group.reference_setting   '160:R 3 -2"'
+_parent_space_group.transform_Pp_abc   'a,b,c;0,0,0'
+_parent_space_group.child_transform_Pp_abc   '-1/3a+1/3b-2/3c,-a-b,-4/3a+4/3b+4/3c;0,0,0'
+loop_
+  _parent_propagation_vector.id
+  _parent_propagation_vector.kxkykz
+  k1 [-0.75 0.75 -0.75]
+
+########## Standard BNS setting
+data_AgCrS2_BNS
+
+_space_group.magn_number_BNS         8.35
+_space_group.magn_name_BNS           "C_c m"
+_space_group.magn_number_OG          8.4.41
+_space_group.magn_name_OG            "C_2c m"
+_space_group.magn_point_group_name   "m 1'"
+_space_group.magn_point_group_number "4.2.10"
+_space_group.magn_transform_BNS_Pp_abc    'a,b,c;0,0,0'
+_space_group.magn_transform_OG_Pp_abc     'a,b,1/2c;0,0,0'
+
+_cell_length_a                 16.9418
+_cell_length_b                 3.5042
+_cell_length_c                 28.4528
+_cell_angle_alpha              90.00
+_cell_angle_beta               160.102
+_cell_angle_gamma              90.00
+
+loop_
+_space_group_symop_magn_operation.id
+_space_group_symop_magn_operation.xyz
+1 x,y,z,+1
+2 x,-y,z,+1
+
+loop_
+_space_group_symop_magn_centering.id
+_space_group_symop_magn_centering.xyz
+1 x,y,z,+1
+2 x+1/2,y+1/2,z,+1
+3 x+1/2,y+1/2,z+1/2,-1
+4 x,y,z+1/2,-1
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Cr1_1 Cr  0.00000  0.00000  0.00000  1
+Cr1_2 Cr -0.50000 -0.50000 -0.25000  1
+Ag1_1 Ag -0.84590  0.00000 -0.80780  1
+Ag1_2 Ag -0.34590 -0.50000 -0.05780  1
+S1_1  S  -0.72630  0.00000 -0.65980  1
+S1_2  S  -0.22630 -0.50000  0.09020  1
+S2_1  S  -0.26880  0.00000 -0.08470  1
+S2_2  S  -0.76880 -0.50000 -0.33470  1
+
+loop_
+_atom_site_moment_label
+_atom_site_moment.crystalaxis_x
+_atom_site_moment.crystalaxis_y
+_atom_site_moment.crystalaxis_z
+_atom_site_moment.symmform
+Cr1_1  0.0  2.66  0.0  0,my,0
+Cr1_2  0.0  2.66  0.0  0,my,0
+
+_parent_space_group.name_H-M_alt   'R 3 m'
+_parent_space_group.IT_number   160
+_parent_space_group.reference_setting   '160:R 3 -2"'
+_parent_space_group.transform_Pp_abc   'a,b,c;0,0,0'
+_parent_space_group.child_transform_Pp_abc   '5/3a-5/3b-2/3c,a+b,-4/3a+4/3b+4/3c;0,0,0'
+loop_
+  _parent_propagation_vector.id
+  _parent_propagation_vector.kxkykz
+  k1 [-0.75 0.75 -0.75]
+
+########## Standard OG setting
+# OG cell is different from chosen parent cell and from BNS cell.
+data_AgCrS2_OG
+
+_space_group.magn_number_BNS         8.35
+_space_group.magn_name_BNS           "C_c m"
+_space_group.magn_number_OG          8.4.41
+_space_group.magn_name_OG            "C_2c m"
+_space_group.magn_point_group_name   "m 1'"
+_space_group.magn_point_group_number "4.2.10"
+_space_group.magn_transform_BNS_Pp_abc    'a,b,2c;0,0,0'
+_space_group.magn_transform_OG_Pp_abc     'a,b,c;0,0,0'
+
+_cell_length_a                 16.9418
+_cell_length_b                 3.5042
+_cell_length_c                 14.2264
+_cell_angle_alpha              90.00
+_cell_angle_beta               160.102
+_cell_angle_gamma              90.00
+
+loop_
+_space_group_symop_magn_operation.id
+_space_group_symop_magn_operation.xyz
+1 x,y,z,+1
+2 x,-y,z,+1
+
+loop_
+_space_group_symop_magn_OG_centering.id
+_space_group_symop_magn_OG_centering.xyz
+1 x,y,z
+2 x+1/2,y+1/2,z
+
+_space_group.magn_OG_wavevector_kxkykz [0 0 1/2]
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Cr1_1 Cr  0.00000  0.00000  0.00000  1
+Cr1_2 Cr -0.50000 -0.50000 -0.50000  1
+Ag1_1 Ag -0.84590  0.00000 -1.61560  1
+Ag1_2 Ag -0.34590 -0.50000 -0.11560  1
+S1_1  S  -0.72630  0.00000 -1.31960  1
+S1_2  S  -0.22630 -0.50000  0.18040  1
+S2_1  S  -0.26880  0.00000 -0.16940  1
+S2_2  S  -0.76880 -0.50000 -0.66940  1
+
+loop_
+_atom_site_moment_label
+_atom_site_moment.crystalaxis_x
+_atom_site_moment.crystalaxis_y
+_atom_site_moment.crystalaxis_z
+_atom_site_moment.symmform
+Cr1_1  0.0  2.66  0.0  0,my,0
+Cr1_2  0.0  2.66  0.0  0,my,0
+
+_parent_space_group.name_H-M_alt   'R 3 m'
+_parent_space_group.IT_number   160
+_parent_space_group.reference_setting   '160:R 3 -2"'
+_parent_space_group.transform_Pp_abc   'a,b,c;0,0,0'
+_parent_space_group.child_transform_Pp_abc   '5/3a-5/3b-2/3c,a+b,-2/3a+2/3b+2/3c;0,0,0'
+loop_
+  _parent_propagation_vector.id
+  _parent_propagation_vector.kxkykz
+  k1 [-0.75 0.75 -0.75]
