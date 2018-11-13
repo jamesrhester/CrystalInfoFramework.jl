@@ -1,6 +1,8 @@
 #== Definitions for running dREL code in Julia
 ==#
 
+export get_julia_type,CategoryObject
+
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
 
@@ -79,43 +81,6 @@ Base.iterate(c::CategoryObject,ci) = begin
     iterate(ci)
 end
 
-#== Type annotation ==#
-const type_mapping = Dict( "Text" => String,        
-                           "Code" => String,                                                
-                           "Name" => String,        
-                           "Tag"  => String,         
-                           "Uri"  => String,         
-                           "Date" => String,  #change later        
-                           "DateTime" => String,     
-                           "Version" => String,     
-                           "Dimension" => Number,   
-                           "Range"  => Range,       
-                           "Count"  => Number,     
-                           "Index"  => Number,       
-                           "Integer" => Number,     
-                           "Real" =>    Number,        
-                           "Imag" =>    Number,  #really?        
-                           "Complex" => Complex,     
-                           # Symop       
-                           # Implied     
-                           # ByReference
-                           "Array" => Array,
-                           "Matrix" => Matrix,
-                           "List" => Array{Any}
-                           )
-
-
-"""Get the julia type for a given category and object"""
-get_julia_type(cifdic,cat,obj) = begin
-    definition = get_by_cat_obj(cifdic,(cat,obj))
-    base_type = definition["_type.contents"]
-    cont_type = get(definition,"_type.container","Single")
-    julia_base_type = get(type_mapping,base_type,Any)
-    final_type = julia_base_type
-    if cont_type != "Single"
-        final_type = :($(type_mapping[cont_type]){$julia_base_type})
-    return final_type
-end
 
 """For simplicity, the Python-Lark transformer does not annotate
 any types except for the function return type. The following routine
