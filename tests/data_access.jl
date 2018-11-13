@@ -3,10 +3,10 @@
 # Simple value tests
 @testset "Simple data values" begin
     b = prepare_block("simple_data.cif","simple_data")
-    @test print(b["_numb_su"]) == "0.0625(2)"
-    @test print(b["_unquoted_string"]) == "unquoted"
-    @test print(b["_text_string"]) == "text"
-    @test convert(Float64,b["_numb_su"]) ≈ 0.0625
+    @test String(b["_numb_su"]) == "0.0625(2)"
+    @test String(b["_unquoted_string"]) == "unquoted"
+    @test String(b["_text_string"]) == "text"
+    @test Number(b["_numb_su"]) ≈ 0.0625
     known_dnames =  Set(["_unknown_value",
 "_na_value",
 "_unquoted_string",
@@ -31,7 +31,7 @@ end
   l = get_loop(b,"_col2")
   vals = []
   for p in l
-      push!(vals,print(p["_col2"]))
+      push!(vals,String(p["_col2"]))
   end
   @test Set(vals) == Set(["v1","v2","v3"])
 end
@@ -42,15 +42,15 @@ end
     l = b["_digit_list"]
     println("digit list is $l")
     r = collect(l)
-    @test print.(r) == ["0","1","2","3","4","5","6","7","8","9"]
+    @test String.(r) == ["0","1","2","3","4","5","6","7","8","9"]
 end
 
 # Test tables
 @testset "Table values" begin
 b = prepare_block("table_data.cif","table_data")
 l = b["_type_examples"]
-@test convert(Float64,l["numb"])≈-123.4e+67
-@test print(l["char"])=="char"
+@test Number(l["numb"])≈-123.4e+67
+@test String(l["char"])=="char"
 @test "unknown" in keys(l)
 end
 

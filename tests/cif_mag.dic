@@ -221,7 +221,7 @@ _description.text
 ;
 _type.contents                          Integer
 _type.container                         Array
-_type.dimension                         []
+_type.dimension                         "[]"
 save_
 
 ######################
@@ -267,7 +267,7 @@ _description.text
      completing a right-hand set.
 ;
 _type.contents                          Real
-_type.dimension                         [3]
+_type.dimension                         "[3]"
 _type.container                         Matrix
 _type.purpose                           Measurand
 _units.code                             Bohr_magnetons
@@ -365,7 +365,7 @@ _description.text
 ;
 _type.contents                          Real
 _type.container                         Matrix
-_type.dimension                         [3]
+_type.dimension                         "[3]"
 _type.purpose                           Measurand
 _units.code                             Bohr_magnetons
 loop_
@@ -679,7 +679,7 @@ _description.text
      completing a right-hand set.
 ;
 _type.contents                          Real
-_type.dimension                         [3]
+_type.dimension                         "[3]"
 _type.container                         Matrix
 _type.purpose                           Measurand
 _units.code                             radians
@@ -777,7 +777,7 @@ _description.text
 ;
 _type.contents                          Real
 _type.container                         Matrix
-_type.dimension                         [3]
+_type.dimension                         "[3]"
 _type.purpose                           Measurand
 _units.code                             radians
 loop_
@@ -2529,7 +2529,7 @@ _description.text
 ;
 _type.contents                          Real
 _type.container                         Matrix
-_type.dimension                        [3]
+_type.dimension                        "[3]"
 
 save_
 

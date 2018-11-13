@@ -313,7 +313,7 @@ value_free!(x::cif_value_tp_ptr) = begin
     ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
-Base.convert(::Type{Float64},t::cif_value_tp_ptr) = begin
+Base.Number(t::cif_value_tp_ptr) = begin
     dd = Ref{Cdouble}(0)
     val = ccall((:cif_value_get_number,"libcif"),Cint,(Ptr{cif_value_tp},Ref{Cdouble}),t.handle,dd)
     if val != 0
@@ -322,24 +322,27 @@ Base.convert(::Type{Float64},t::cif_value_tp_ptr) = begin
     return dd[]
 end
 
-Base.convert(::Type{Integer},t::cif_value_tp_ptr) = begin
-    i = convert(Float64,t)
+Base.Float64(t::cif_value_tp_ptr) = Base.Number(t)
+
+Base.Integer(t::cif_value_tp_ptr) = begin
+    i = Number(t)
     if !isinteger(i)
         InexactError(Integer,i)
     end
     return Integer(i)
 end
-    
-Base.convert(::Type{String},t::cif_value_tp_ptr) = begin
-    #Get the textual representation
-   s = Uchar(0)
-   val = ccall((:cif_value_get_text,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),t.handle,Ref(s))
-   if val != 0
-       error(error_codes[val])
-   end
-   new_string = make_jl_string(s)
+
+Base.Array{T,1}(t::cif_value_tp_ptr) where {T <:Number} = begin
+    a = cif_list(t)
+    Number.(a)
 end
 
+Base.Array{T,2}(t::cif_value_tp_ptr) where {T <: Number} = begin
+    a = cif_list(t)
+    b = cif_list.(a)
+    [Number.(c) for c in b]
+end
+#==
 Base.convert(::Type{Array{cif_value_tp_ptr}},t::cif_value_tp_ptr) = begin
     cif_list(t)
 end
@@ -348,7 +351,13 @@ Base.convert(::Type{Dict{String,cif_value_tp_ptr}},t::cif_value_tp_ptr) = begin
     cif_table(t)
 end
 
-Base.print(t::cif_value_tp_ptr) = begin
+Base.convert(::Type{Array{T}} where {T<:Number}, t::cif_value_tp_ptr) = begin
+    p = cif_list(t)
+    Number.(p)
+end
+==#
+
+Base.String(t::cif_value_tp_ptr) = begin
    #Get the textual representation
    s = Uchar(0)
    val = ccall((:cif_value_get_text,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),t.handle,Ref(s))
@@ -363,9 +372,9 @@ end
 
 get_syntactical_type(t::cif_value_tp_ptr) = begin
     val_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),t.handle)
-    if val_type == 0 || val_type == 1 return cif_value_tp_ptr
-    elseif val_type == 2 Array{cif_value_tp_ptr}
-    elseif val_type == 3 Dict{String,cif_value_tp_ptr}
+    if val_type == 0 || val_type == 1 return typeof(t)
+    elseif val_type == 2 cif_list
+    elseif val_type == 3 cif_table
     elseif val_type == 4 return Missing
     elseif val_type == 5 return Nothing
     end
@@ -393,7 +402,10 @@ Base.getindex(b::cif_container,name::AbstractString) = begin
     if new_type == Any #try and do a little better
         new_type = get_syntactical_type(new_val) 
     end
-    return convert(new_type,new_val)
+    if typeof(new_val) != new_type
+        return new_type(new_val)
+    end
+    return new_val
 end
 
 Base.get(b::cif_container,name::AbstractString,default) = begin
@@ -546,7 +558,10 @@ Base.getindex(p::cif_packet,key) = begin
     if new_type == Any
         new_type = get_syntactical_type(new_val)
     end
-    return convert(new_type,new_val)
+    if typeof(new_val) != new_type
+        return new_type(new_val)
+    end
+    return new_val
 end
 
 #==
@@ -680,7 +695,10 @@ Base.iterate(cl::cif_list,el_num) = begin
     if new_type == Any  #
         new_type = get_syntactical_type(new_element)
     end
-    return (convert(new_type,new_element),el_num+1)
+    if typeof(new_element) != new_type
+        return (new_type(new_element),el_num+1)
+    end
+    return (new_element,el_num+1)
 end
 
 Base.iterate(cl::cif_list) = begin
@@ -787,7 +805,10 @@ Base.getindex(ct::cif_table,key::AbstractString) = begin
     if new_type == Any
         new_type = get_syntactical_type(new_element)
     end
-    return convert(new_type,new_element)
+    if typeof(new_element) != new_type
+        return new_type(new_element)
+    end
+    return new_element
 end
 
 """The type external Unicode strings from libicu"""

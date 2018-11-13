@@ -7,11 +7,11 @@
     end
     @test begin
         t = cifdic(joinpath(@__DIR__,"ddl.dic"))
-        print(t["_alias.deprecation_date"]["_type.source"]) == "Assigned"
+        String(t["_alias.deprecation_date"]["_type.source"]) == "Assigned"
     end
     @test begin
         t = cifdic(joinpath(@__DIR__,"ddl.dic"))
-        print(get_by_cat_obj(t,("Type","Contents"))["_definition.class"]) == "Attribute"
+        String(get_by_cat_obj(t,("Type","Contents"))["_definition.class"]) == "Attribute"
     end
 end
 
@@ -28,4 +28,6 @@ end
     for one_pack in pl
         @test isapprox(one_pack["_atom_site_moment.crystalaxis_y"],2.66)
     end
+    # now test some array items
+    @test ud["_parent_propagation_vector.kxkykz"] == [-0.75, 0.75, -0.75]
 end

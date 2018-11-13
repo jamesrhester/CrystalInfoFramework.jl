@@ -26,9 +26,9 @@ cifdic(c::cif) = begin
     end
     b = c[keys(c)[1]]
     # now create the definition names
-    match_dict = Dict(print(s["_definition.id"]) => get_block_code(s) for s in get_all_frames(b))
+    match_dict = Dict(String(s["_definition.id"]) => get_block_code(s) for s in get_all_frames(b))
     defblocks = [(s["_name.category_id"],s["_name.object_id"],s) for s in get_all_frames(b) if "_name.category_id" in keys(s) && "_name.object_id" in keys(s)]
-    cat_obj_dict = Dict((lowercase.((print(s[1]),print(s[2]))),get_block_code(s[3])) for s in defblocks)
+    cat_obj_dict = Dict((lowercase.((String(s[1]),String(s[2]))),get_block_code(s[3])) for s in defblocks)
     cifdic(b,match_dict,cat_obj_dict)
 end
 
@@ -55,7 +55,12 @@ assign_dictionary(c::cif_block,d::cifdic) = cif_block_with_dict(c.handle,c.cif_h
 
 """If we have a dictionary, we can determine the dataname type"""
 get_dataname_type(b::cif_block_with_dict,d::AbstractString) = begin
-    return get_julia_type(b.dictionary,d)
+    t = get_julia_type(b.dictionary,d)
+    if typeof(t) == Expr
+        return eval(t)
+    else
+        return t
+    end
 end
 
 #==
@@ -84,7 +89,7 @@ const type_mapping = Dict( "Text" => String,
                            # Implied     
                            # ByReference
                            "Array" => Array,
-                           "Matrix" => Matrix,
+                           "Matrix" => Array,
                            "List" => Array{Any}
                            )
 
@@ -92,19 +97,24 @@ const type_mapping = Dict( "Text" => String,
 """Get the julia type for a given category and object"""
 get_julia_type(cifdic,cat,obj) = begin
     definition = get_by_cat_obj(cifdic,(cat,obj))
-    base_type = print(definition["_type.contents"])
-    cont_type = print(get(definition,"_type.container","Single"))
+    base_type = String(definition["_type.contents"])
+    cont_type = String(get(definition,"_type.container","Single"))
     julia_base_type = get(type_mapping,base_type,Any)
     final_type = julia_base_type
-    if cont_type != "Single"
-        final_type = :($(type_mapping[cont_type]){$julia_base_type})
+    if cont_type == "Single"
+        return final_type
     end
+    dims = String(definition["_type.dimension"])
+    act_dims = parse.(Int,split(dims[2:end-1],","))
+    final_type = :($(type_mapping[cont_type]){$julia_base_type,$(length(act_dims))})
+    println("complex type $cont_type, dims $dims mapped to $final_type")
+    #println("with type $(typeof(final_type))")
     return final_type
 end
 
 get_julia_type(cifdic,dataname::AbstractString) = begin
     definition = cifdic[dataname]
-    return get_julia_type(cifdic,print(definition["_name.category_id"]),print(definition["_name.object_id"]))
+    return get_julia_type(cifdic,String(definition["_name.category_id"]),String(definition["_name.object_id"]))
 end
 
 Range(v::cif_value_tp_ptr) = begin
