@@ -7,11 +7,6 @@ using Tables
 include("cif_errors.jl")
 include("cif_base.jl")
 include("cif_dic.jl")
-
-module dREL
-
-# definitions for running dREL code transformed to Julia
-# include("drel.jl")
+include("drel.jl")
 
 end
-end # module

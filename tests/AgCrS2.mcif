@@ -192,13 +192,13 @@ S2_1  S  -0.26880  0.00000 -0.16940  1
 S2_2  S  -0.76880 -0.50000 -0.66940  1
 
 loop_
-_atom_site_moment_label
+_atom_site_moment.label
 _atom_site_moment.crystalaxis_x
 _atom_site_moment.crystalaxis_y
 _atom_site_moment.crystalaxis_z
 _atom_site_moment.symmform
 Cr1_1  0.0  2.66  0.0  0,my,0
-Cr1_2  0.0  2.66  0.0  0,my,0
+Cr1_2  0.0  2.33  0.0  0,my,0
 
 _parent_space_group.name_H-M_alt   'R 3 m'
 _parent_space_group.IT_number   160

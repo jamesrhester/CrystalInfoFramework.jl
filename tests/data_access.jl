@@ -27,13 +27,28 @@ end
 
 # Looped value tests
 @testset "Looped values" begin
-  b = prepare_block("simple_loops.cif","simple_loops")
-  l = get_loop(b,"_col2")
-  vals = []
-  for p in l
+    println("$(Threads.nthreads()) threads running")
+    println("This thread $(Threads.threadid())")
+    b = prepare_block("simple_loops.cif","simple_loops")
+    l = get_loop(b,"_col2")
+    vals = []
+    for p in l
       push!(vals,String(p["_col2"]))
-  end
-  @test Set(vals) == Set(["v1","v2","v3"])
+    end
+    @test Set(vals) == Set(["v1","v2","v3"])
+    # do it again as this has failed in the past
+    m = get_loop(b,"_scalar_a")
+    vals = []
+    for p in l
+        println("Do nothing")
+        push!(vals,String(p["_col2"]))
+    end
+    @test Set(vals) == Set(["v1","v2","v3"])
+    vals = []
+    for q in m
+        push!(vals,String(q["_scalar_a"]))
+    end
+    @test vals == ["a"]
 end
 
 # Test lists

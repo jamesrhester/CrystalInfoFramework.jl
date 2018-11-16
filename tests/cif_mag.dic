@@ -451,7 +451,12 @@ _name.category_id                       atom_site_moment
 _name.object_id                         label
 loop_
   _alias.definition_id                  '_atom_site_moment_label'
-_import.get [{"save":atom_site_id "file":templ_attr.cif}]
+  # copied from templ_attr.dic
+    _type.purpose                Encode
+    _type.source                 Assigned
+    _type.container              Single
+    _type.contents               Code
+
 _definition.update                      2016-05-24
 
 save_

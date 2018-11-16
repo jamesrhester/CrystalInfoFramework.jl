@@ -433,6 +433,7 @@ end
 
 mutable struct cif_loop
     handle::cif_loop_tp_ptr
+    length::Int             #to allow generators
     block::cif_container    #to avoid early garbage collection
 end
 
@@ -442,6 +443,16 @@ end
                 
 loop_free!(cl::cif_loop_tp_ptr) = begin
     ccall((:cif_loop_free,"libcif"),Cvoid,(Ptr{cif_loop_tp},),cl.handle)
+end
+
+cif_loop(handle,block) = begin
+    # determine length
+    final = cif_loop(handle,0,block)
+    i = 0
+    for x in final i=i+1 end
+    #println("Loop has length $i")
+    final.length = i
+    return final
 end
 
 get_loop(b::cif_container,name) = begin
@@ -542,6 +553,8 @@ packet_free!(cif_packet) = begin
     end
 end
 
+# Note that values are freed when their packet is freed, so we do not need an
+# explicit finalizer here
 Base.getindex(p::cif_packet,key) = begin
     new_val = cif_value_tp_ptr(0)
     uname = transcode(UInt16,key)
@@ -549,7 +562,7 @@ Base.getindex(p::cif_packet,key) = begin
     val = ccall((:cif_packet_get_item,"libcif"),Cint,(Ptr{cif_packet_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
        p.handle,uname,Ref(new_val))
     if val == 35
-        KeyError(key)
+        throw(KeyError(key))
     end
     if val != 0
         error(error_code[val])
@@ -564,8 +577,34 @@ Base.getindex(p::cif_packet,key) = begin
     return new_val
 end
 
+# In order to broadcast over packets, we need to have a length
+# We get the number of names and discard them!
+
+Base.length(p::cif_packet) = begin
+    ukeys = Uchar_list(0)
+    val = ccall((:cif_packet_get_names,"libcif"),Cint,(Ptr{cif_packet_tp},Ptr{Cvoid}),p.handle,Ref(ukeys))
+    if val != 0
+        error(error_codes[val])
+    end
+    # ukeys will actually be a **UInt16, that is, after return it will hold a pointer to an array of UInt16
+    if ukeys.strings == C_NULL
+        error("Unable to get key list address")
+    end
+    # Now count how many values we have
+    n = 1
+    b = unsafe_load(ukeys.strings,n)
+    while b.string!=C_NULL
+        n = n + 1
+        b = unsafe_load(ukeys.strings,n)
+    end
+    n = n - 1
+    return n
+end
 #==
-Loops can be iterated
+Loops can be iterated. However, a condition of the libcif API
+is that iterators cannot iterate over the same loop, or over
+separate loops, simulataneously. Therefore we have to pre-determine
+the length in order for generator expressions to work.
 ==#
 
 struct cif_pktitr_tp
@@ -581,6 +620,9 @@ mutable struct loop_iterator
 end
 
 close_pktitr!(t::cif_pktitr_tp_ptr) = begin
+    #error_string = "Closing pktitr $t"
+    #tt = @task println(error_string)
+    #schedule(tt)
     val = ccall((:cif_pktitr_close,"libcif"),Cint,(Ptr{cif_pktitr_tp},),t.handle)
     if val != 0
         error(error_codes[val])
@@ -592,8 +634,9 @@ Base.iterate(cl::cif_loop) = begin
     val = ccall((:cif_loop_get_packets,"libcif"),Cint,(cif_loop_tp_ptr,Ptr{cif_pktitr_tp_ptr}),
         cl.handle,Ref(pktptr))
     if val != 0
-        error(error_codes[val])
+        error("Failed to get packet iterator for loop $(cl.handle):"* error_codes[val])
     end
+    #println("New pktitr $pktptr for loop $(cl.handle)")
     finalizer(close_pktitr!,pktptr)
     final_iter = loop_iterator(pktptr,cl)
     # We should return the first item
@@ -602,9 +645,12 @@ Base.iterate(cl::cif_loop) = begin
         final_iter.handle,Ref(new_packet))
     # If iteration has finished already, return the appropriate Julia value
     if val > 1
-        error(error_codes[val])
+        # remove the iterator
+        error("Failed to get first packet: " * error_codes[val])
     end
     if val == 1
+        println("Finalising $pktptr now")
+        finalize(pktptr)
         return nothing
     end
     finalizer(packet_free!,new_packet)
@@ -612,7 +658,7 @@ Base.iterate(cl::cif_loop) = begin
     return (new_packet,final_iter)
 end
 
-Base.iterate(cl,pktitr) = begin
+Base.iterate(cl::cif_loop,pktitr) = begin
     # Make sure that the iterator belongs to the loop
     if pktitr.loop != cl
         error("Iterator $pktitr belongs to loop $(pktitr.cif_loop) not $cl!")
@@ -621,14 +667,20 @@ Base.iterate(cl,pktitr) = begin
     val = ccall((:cif_pktitr_next_packet,"libcif"),Cint,(cif_pktitr_tp_ptr,Ptr{cif_packet}),
         pktitr.handle,Ref(new_packet))
     if val > 1
-        error(error_codes[val])
+        #println("Error, finalising $(pktitr.handle) now")
+        finalize(pktitr.handle)
+        error("Failed to get next packet :" * error_codes[val])
     end
     if val == 1
+        #println("End, finalising $(pktitr.handle) now")
+        finalize(pktitr.handle)
         return nothing
     end
     finalizer(packet_free!,new_packet)
     return (new_packet,pktitr)
 end
+
+Base.length(cl::cif_loop) = cl.length
 
 """Get the dataname type of the provided dataname, which should belong to the packet,
 although this is not checked"""
@@ -796,7 +848,7 @@ Base.getindex(ct::cif_table,key::AbstractString) = begin
     val = ccall((:cif_value_get_item_by_key,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
         ct.handle.handle,ukey,Ref(new_element))
     if val == 73
-        KeyError(key)
+        throw(KeyError(key))
         end
     if val != 0
         error(error_codes[val])

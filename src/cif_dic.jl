@@ -34,10 +34,28 @@ end
 
 cifdic(a::AbstractString) = cifdic(cif(a))
 
-
 # The index in a dictionary is the _definition.id
 Base.getindex(cdic::cifdic,definition::AbstractString) = begin
     get_save_frame(cdic.block,cdic.definitions[definition])
+end
+
+Base.keys(cdic::cifdic) = begin
+    keys(cdic.definitions)    
+end
+
+# We iterate over the definitions
+Base.iterate(c::cifdic) = begin
+    everything = collect(keys(c.definitions))
+    if length(everything) == 0 return nothing
+    end
+    sort!(everything)
+    return c[popfirst!(everything)],everything
+end
+
+Base.iterate(c::cifdic,s) = begin
+    if length(s) == 0 return nothing
+    end
+    return c[popfirst!(s)],s
 end
 
 get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
@@ -62,6 +80,7 @@ get_dataname_type(b::cif_block_with_dict,d::AbstractString) = begin
         return t
     end
 end
+
 
 #==
 The dREL type machinery. Defined that take a string

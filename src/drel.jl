@@ -1,15 +1,15 @@
 #== Definitions for running dREL code in Julia
 ==#
 
-export get_julia_type,CategoryObject
+export CategoryObject
 
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
 
 struct CategoryObject
-    datablock::cif_block
+    datablock::cif_block_with_dict
     catname::AbstractString
-    cifdic::cif_dic
+    cifdic::cifdic
     object_names::Vector{AbstractString}
     data_names::Vector{AbstractString}
     internal_object_names
@@ -23,19 +23,21 @@ struct CategoryObject
 end
 
 CategoryObject(datablock,catname) = begin
-    cifdic = datablock.cifdic
-    object_names = [a for a in keys(cifdic) if cifdic[a]["_name.category_id"] == catname]
-    data_names = [cifdic[a]["_definition.id"] for a in object_names]
-    internal_object_names = [cifdic[a]["_name.object_id"] for a in data_names]
+    cifdic = datablock.dictionary
+    object_names = [a for a in keys(cifdic) if lowercase(String(get(cifdic[a],"_name.category_id",""))) == lowercase(catname)]
+    data_names = [String(cifdic[a]["_definition.id"]) for a in object_names]
+    internal_object_names = [String(cifdic[a]["_name.object_id"]) for a in data_names]
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(zip(internal_object_names,data_names))
-    key_names = get(cifdic[catname],"_category_key.name",[])
-    is_looped = get(cifdic[catname],"_definition.class","Set") == "Loop"
-    have_vals = [k for k in data_names if k in datablock]
+    is_looped = String(get(cifdic[catname],"_definition.class","Set")) == "Loop"
+    have_vals = [k for k in data_names if k in keys(datablock)]
     use_keys = false
     key_index = []
     if is_looped
-        use_keys, key_index = create_keylists(key_names,have_vals,datablock)
+        key_l = get_loop(cifdic[catname],"_category_key.name")
+        println("Got loop $key_l")
+        key_names = [String(l["_category_key.name"]) for l in key_l]
+        use_keys, key_names = create_keylists(key_names,have_vals,datablock)
     end
     CategoryObject(datablock,catname,cifdic,object_names,data_names,internal_object_names,
         name_to_object,object_to_name,key_names,is_looped,have_vals,key_index,use_keys)
@@ -44,57 +46,62 @@ end
 # This function creates lists of data names that can be used as keys of the category
 create_keylists(key_names,have_vals,datablock) = begin
     have_keys = [k for k in key_names if k in have_vals]
-    if length(have_keys) == length(key_names)
-        keylists = [datablock[k] for k in key_names]
-        use_keys = true
-    else  #use all data names in the category
-        keylists = [datablock[k] for k in have_vals]
+    println("Found keys $have_keys")
+    use_keys = true
+    if length(have_keys) < length(key_names) #use all keys
+        have_keys = have_vals
         use_keys = false
     end
-    if length(key_names) == 1
-        return use_keys,keylists[1]   #first element
-    else
-        return use_keys,zip(keylists...)
-    end
+    return use_keys, have_keys
 end
 
 # Allow access using a dictionary of object names
+# Will Julia properly finalize the loop iterator?
+# Will the returned packet get finalised in the end?
+
 Base.getindex(c::CategoryObject,keydict) = begin
-    k = keys(keydict)
-    for one_pack in c
-        vals = [(keydict[i],one_pack[i]) for i in k]
-        f = filter(a[1]==a[2],vals)
-        if length(f)==length(k)  # all matched
-            return one_pack
+    keynames = keys(keydict)
+    keyvals = collect(values(keydict))
+    for pack in c
+        packvals = [pack[k] for k in c.key_names]
+        if keyvals == packvals
+            return pack
         end
     end
-    return nothing
+    throw(KeyError(keydict))
 end
 
 Base.iterate(c::CategoryObject) = begin
-    probe_name = c.keylists[1]
+    probe_name = c.key_names[1]
     l = get_loop(c.datablock,probe_name)
-    iterate(l)
+    state = iterate(l)
+    if state == nothing return state end
+    pack,nstate = state
+    return pack,(l,nstate)
 end
 
 Base.iterate(c::CategoryObject,ci) = begin
-    iterate(ci)
+    loop,state = ci
+    nstate = iterate(loop,state)
+    if nstate == nothing return nstate end
+    pack,fstate = nstate
+    return pack,(loop,fstate) 
 end
 
-
-"""For simplicity, the Python-Lark transformer does not annotate
+#==
+For simplicity, the Python-Lark transformer does not annotate
 any types except for the function return type. The following routine
-traverses an expression, and inserts the appropriate types"""
+traverses an expression, and inserts the appropriate types
 
-"""Any category assignments are done using a separate
+Any category assignments are done using a separate
 equals statement, so we record those as they happen. An AST
 node is a two-element structure, where the first element is
 the type and the second element is an array of arguments.
 
 The following code updates a dictionary of assignments,
 and in parallel appends type information when a getindex
-call corresponds to a known category/object combination.""".
-
+call corresponds to a known category/object combination.
+==#
 # Keep a track of assignments, and assign types
 # Each case has implications for the assignment dictionary
 # and for the filtered AST.
@@ -155,5 +162,4 @@ Tables.rows(c::CategoryObject) = c
 Tables.rowaccess(::Type{<:CategoryObject}) = true
 
 Tables.schema(c::CategoryObject) = nothing
-
 
