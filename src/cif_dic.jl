@@ -1,7 +1,7 @@
 # CIF Dictionaries...built on CIF files
 # Only DDLm dictionaries supported
 
-export cifdic,get_by_cat_obj,assign_dictionary,get_dataname_type
+export cifdic,get_by_cat_obj,assign_dictionary,get_dataname_type,get_alias
 
 struct cifdic
     block::cif_block    #the underlying CIF block
@@ -29,12 +29,13 @@ cifdic(c::cif) = begin
     match_dict = Dict(String(s["_definition.id"]) => get_block_code(s) for s in get_all_frames(b))
     defblocks = [(s["_name.category_id"],s["_name.object_id"],s) for s in get_all_frames(b) if "_name.category_id" in keys(s) && "_name.object_id" in keys(s)]
     cat_obj_dict = Dict((lowercase.((String(s[1]),String(s[2]))),get_block_code(s[3])) for s in defblocks)
+    # add aliases TODO
     cifdic(b,match_dict,cat_obj_dict)
 end
 
 cifdic(a::AbstractString) = cifdic(cif(a))
 
-# The index in a dictionary is the _definition.id
+# The index in a dictionary is the _definition.id or an alias
 Base.getindex(cdic::cifdic,definition::AbstractString) = begin
     get_save_frame(cdic.block,cdic.definitions[definition])
 end
@@ -56,6 +57,23 @@ Base.iterate(c::cifdic,s) = begin
     if length(s) == 0 return nothing
     end
     return c[popfirst!(s)],s
+end
+
+# Add aliases to our lookup dictionary
+generate_aliases(c::cifdic,name::AbstractString) = begin
+    if name in keys(c.definitions) return c.definitions[name] end
+    # find the name in all definitions
+    aliases = nothing
+    for def in values(c.definitions)
+        try
+            aliases = get_loop(c[def],"_alias.definition_id")
+        catch
+            continue
+        end
+        alias_names = [lowercase(String(a["_alias.definition_id"])) for a in aliases]
+        if lowercase(name) in alias_names return def end
+    end
+    return nothing
 end
 
 get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])

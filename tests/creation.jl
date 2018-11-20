@@ -36,3 +36,12 @@ end
 end
 
 end    #of testset
+
+@testset "Loading native CIF" begin
+    
+    p = cif(joinpath(testdir,"simple_loops.cif"))
+    @test begin
+        q = load_cif(p)
+        true
+    end
+end

@@ -26,8 +26,10 @@ end
     @test ud["_parent_space_group.IT_number"] == 160
     pl = get_loop(ud,"_atom_site_moment.crystalaxis_x")
     for one_pack in pl
-        @test isapprox(one_pack["_atom_site_moment.crystalaxis_y"],2.66)
+        @test isapprox(one_pack["_atom_site_moment.crystalaxis_x"],0.0)
     end
     # now test some array items
     @test ud["_parent_propagation_vector.kxkykz"] == [-0.75, 0.75, -0.75]
+    @test String(get_alias(ud.dictionary,"_atom_site_moment.label")["_name.object_id"]) == "label"
+    @test String(get_alias(ud.dictionary,"_atom_site_moment_label")["_name.object_id"]) == "label"
 end

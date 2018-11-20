@@ -4,6 +4,7 @@ the libcif API =#
 export cif,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table
 export get_save_frame, get_all_frames
+export load_cif
 
 import Base.Libc:FILE
 
@@ -873,6 +874,163 @@ mutable struct Uchar_list
     strings::Ptr{Uchar}
 end
 
+#== Walking a CIF
+
+The dREL approach requires multiple loops over data to be in process
+simultaneously, which is not guaranteed to give coherent data for the
+CIFAPI.  Therefore we use cif_walk to read in the data, using the cifapi
+for parsing services only. We must define all handler functions in
+this case.
+
+Our Julia datastructure is built of a Dictionary of data blocks. A
+data block is a List of Loops and a List of save frames, which are
+themselves data blocks. A loop is a DataFrame. Single-valued items are
+held in a loop with a single row.
+
+==#
+
+struct NativeCif
+    all_data::Dict{AbstractString,cif_container}
+end
+
+mutable struct NativeBlock
+    save_frames::Dict{AbstractString,cif_container}
+    loops::Vector{DataFrame}
+end
+
+mutable struct cif_builder_context
+    cif::NativeCif
+    apicif::cif
+    current_block::AbstractString
+    current_loop::Dict{AbstractString,Vector{Any}}
+    packet_order::Vector{AbstractString}
+end
+
+#== Cif walking functions
+==#
+
+handle_cif_start(a,b)::Cint = begin
+    println("Cif started; nothing done")
+    0
+end
+
+handle_cif_end(a,b)::Cint = begin
+    println("Cif is finished")
+    0
+end
+
+
+handle_block_start(a,b::cif_builder_context)::Cint = begin
+    #context = unsafe_pointer_to_objref(b)
+    fc = cif_block(a,b.apicif)
+    blockname = get_block_code(fc)
+    b.current_block = blockname
+    println("Current block is now $(b.current_block)")
+    0
+end
+
+
+handle_block_end(a,b)::Cint = begin
+    println("Block is finished")
+    0
+end
+
+
+handle_frame_start(a,b)::Cint = begin
+    println("Frame started; nothing done")
+    0
+end
+
+
+handle_frame_end(a,b)::Cint = begin
+    println("Frame is finished")
+    0
+end
+
+
+handle_loop_start(a,b)::Cint = begin
+    println("Loop started; nothing done")
+    0
+end
+
+
+handle_loop_end(a,b)::Cint = begin
+    println("Loop is finished")
+    0
+end
+
+
+handle_packet_start(a,b)::Cint = begin
+    println("Packet started; nothing done")
+    0
+end
+
+
+handle_packet_end(a,b)::Cint = begin
+    println("Packet is finished")
+    0
+end
+
+
+handle_item(a,b,c)::Cint = begin
+    println("Finally have item this is cool")
+    0
+end
+
+struct cif_handler_tp
+    cif_start::Ptr{Nothing}
+    cif_end::Ptr{Nothing}
+    block_start::Ptr{Nothing}
+    block_end::Ptr{Nothing}
+    frame_start::Ptr{Nothing}
+    frame_end::Ptr{Nothing}
+    loop_start::Ptr{Nothing}
+    loop_end::Ptr{Nothing}
+    packet_start::Ptr{Nothing}
+    packet_end::Ptr{Nothing}
+    handle_item::Ptr{Nothing}
+end
+
+# This will eventually be folded into the initial read using the cif_parse_opts
+# structure to load directly.
+
+load_cif(c::cif) = begin
+    starting_cif = NativeCif(Dict())
+    context = cif_builder_context(starting_cif,c,"",Dict(),String[])
+    handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
+    handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
+    handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_block_end_c = @cfunction(handle_block_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_frame_start_c = @cfunction(handle_frame_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_frame_end_c = @cfunction(handle_frame_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_loop_start_c = @cfunction(handle_loop_start,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
+    handle_loop_end_c = @cfunction(handle_loop_end,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
+    handle_packet_start_c = @cfunction(handle_packet_start,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
+    handle_packet_end_c = @cfunction(handle_packet_end,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
+    handle_item_c = @cfunction(handle_item,Cint,(Ptr{Uchar},cif_value_tp_ptr,Ref{cif_builder_context}))
+    handlers = cif_handler_tp(handle_cif_start_c,
+                              handle_cif_end_c,
+                              handle_block_start_c,
+                              handle_block_end_c,
+                              handle_frame_start_c,
+                              handle_frame_end_c,
+                              handle_loop_start_c,
+                              handle_loop_end_c,
+                              handle_packet_start_c,
+                              handle_packet_end_c,
+                              handle_item_c,
+                              )
+    val = ccall((:cif_walk,"libcif"),Cint,(Ptr{cif_tp},Ref{cif_handler_tp},Ref{cif_builder_context}),
+                c.handle,Ref(handlers),Ref(context))
+    if val != 0
+        error("Failed to read in CIF:"*errorcodes[val])
+    end
+    return starting_cif
+end
+
+
+#== Utilities
+==#
 # TODO: if this is used to make keys for a CIF table,
 # we segfault if "own" is true. Why is that, and can
 # we fix it
