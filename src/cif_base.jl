@@ -763,6 +763,21 @@ Base.eltype(::Type{cif_list}) = Any
 Base.firstindex(::cif_list) = 1
 Base.lastindex(cl::cif_list) = cl.length
 
+# Turn into a list of strings
+
+process_to_strings(c::cif_list,so_far::Vector{Any}) = begin
+    for el in c
+        t = get_syntactical_type(el)
+        if t == cif_value_tp_ptr
+            push!(so_far,String(t=el))
+        elseif t in [cif_list,cif_table]
+            push!(so_far,process_to_strings(el,Any[]))
+        else push!(so_far,t(el))
+        end
+    end
+    return so_far
+end               
+            
 #== Table values
 ==#
 
@@ -788,6 +803,19 @@ struct cif_table
 end
 
 cif_table(t) = cif_table(empty_cif_container(),"",t)
+
+process_to_strings(c::cif_table,so_far::Dict{AbstractString,Any}) = begin
+    for el in keys(c)
+        t = get_syntactical_type(el)
+        if t == cif_value_tp_ptr
+            push!(so_far,String(t=el))
+        elseif t in [cif_list,cif_table]
+            push!(so_far,process_to_strings(el,Any[]))
+        else push!(so_far,t(el))
+        end
+    end
+    return so_far
+end               
 
 Base.keys(ct::cif_table) = begin
     ukeys = Uchar_list(0)
@@ -893,7 +921,7 @@ struct NativeCif
     all_data::Dict{AbstractString,cif_container}
 end
 
-mutable struct NativeBlock
+mutable struct NativeBlock <: cif_container
     save_frames::Dict{AbstractString,cif_container}
     loops::Vector{DataFrame}
 end
@@ -903,7 +931,6 @@ mutable struct cif_builder_context
     apicif::cif
     current_block::AbstractString
     current_loop::Dict{AbstractString,Vector{Any}}
-    packet_order::Vector{AbstractString}
 end
 
 #== Cif walking functions
@@ -921,10 +948,10 @@ end
 
 
 handle_block_start(a,b::cif_builder_context)::Cint = begin
-    #context = unsafe_pointer_to_objref(b)
     fc = cif_block(a,b.apicif)
     blockname = get_block_code(fc)
     b.current_block = blockname
+    b.cif.all_data[blockname] = NativeBlock(Dict(),Vector())
     println("Current block is now $(b.current_block)")
     0
 end
@@ -949,13 +976,23 @@ end
 
 
 handle_loop_start(a,b)::Cint = begin
-    println("Loop started; nothing done")
+    cl = cif_loop(a,b.apicif[b.current_block])
+    b.current_loop = Dict()
+    for k in keys(cl)
+        b.current_loop[k]=Any[]
+    end
+    println("Loop started")
     0
 end
 
 
 handle_loop_end(a,b)::Cint = begin
-    println("Loop is finished")
+    println("Loop is finished,creating data frame")
+    df = DataFrame()
+    for one_col in keys(b.current_loop)
+        df[Symbol(one_col)] = b.current_loop[one_col]
+    end
+    push!(b.cif.all_data[b.current_block].loops,df)
     0
 end
 
@@ -972,9 +1009,22 @@ handle_packet_end(a,b)::Cint = begin
 end
 
 
-handle_item(a,b,c)::Cint = begin
-    println("Finally have item this is cool")
-    0
+handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
+    a_as_uchar = Uchar(a)
+    val = ""
+    keyname = make_jl_string(a_as_uchar)
+    println("Processing name $keyname")
+    syntax_type = get_syntactical_type(b)
+    if syntax_type == cif_value_tp_ptr
+        val = String(b)
+    elseif syntax_type == cif_list
+        val = process_to_strings(b,Any[])
+    elseif syntax_type == cif_table
+        val = process_to_strings(b,Dict())
+    else val = syntax_type()
+    end
+    push!(c.current_loop[keyname],val)
+    return 0    
 end
 
 struct cif_handler_tp
@@ -1007,7 +1057,7 @@ load_cif(c::cif) = begin
     handle_loop_end_c = @cfunction(handle_loop_end,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
     handle_packet_start_c = @cfunction(handle_packet_start,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
     handle_packet_end_c = @cfunction(handle_packet_end,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
-    handle_item_c = @cfunction(handle_item,Cint,(Ptr{Uchar},cif_value_tp_ptr,Ref{cif_builder_context}))
+    handle_item_c = @cfunction(handle_item,Cint,(Ptr{UInt16},cif_value_tp_ptr,Ref{cif_builder_context}))
     handlers = cif_handler_tp(handle_cif_start_c,
                               handle_cif_end_c,
                               handle_block_start_c,

@@ -42,6 +42,7 @@ end    #of testset
     p = cif(joinpath(testdir,"simple_loops.cif"))
     @test begin
         q = load_cif(p)
+        println("Full CIF is $q")
         true
     end
 end
