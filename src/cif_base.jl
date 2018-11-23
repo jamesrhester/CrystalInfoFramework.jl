@@ -1,32 +1,29 @@
 #= This file provides the functions that interact directly with
 the libcif API =#
 
-export cif,cif_block,get_all_blocks,get_block_code
+export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table
 export get_save_frame, get_all_frames
-export load_cif
+export load_cif,NativeCif
 
 import Base.Libc:FILE
 
+keep_alive = Any[]   #to stop GC freeing memory
 """
-This represents the opaque cif_tp type.
+The abstract cif type
+"""
+abstract type cif end
+
+"""
+This represents the opaque cifapi cif_tp type.
 """
 mutable struct cif_tp
 end
 
 """A pointer to a cif_tp type managed by C"""
-mutable struct cif_tp_ptr
-    p::Ptr{cif_tp}
-end
-
-"""
-A CIF object (may extend in the future)
-"""
-mutable struct cif
+mutable struct cif_tp_ptr <: cif
     handle::Ptr{cif_tp}
 end
-
-cif(x::cif_tp_ptr) = cif(x.p)
 
 """A finalizer for a C-allocated CIF object"""
 cif_destroy!(x) =  begin
@@ -40,63 +37,25 @@ cif_destroy!(x) =  begin
     end
 end
 
-"""Construct a new CIF object"""
-cif()= begin
-    dpp = cif_tp_ptr(0)   #Null pointer will be replaced by C call
-    val=ccall((:cif_create,"libcif"),Cint,(Ref{cif_tp_ptr},),Ref(dpp))
-    # Can error-check val if necessary
-    r = cif(dpp)
-    #finalizer(cif_destroy!,r) #this will be called when finished
-    println("Created cif ptr: $r for empty CIF")  #for debugging later
-    return r
-end
-
 """Parse input stream and return a CIF object"""
-cif(f::IOStream) = begin
+cif_tp_ptr(f::IOStream) = begin
     error("Creating CIF from stream not yet implemented")
     # get the underlying file descriptor, turn it into a FILE*
     # then call...
 end
 
-"""An opaque type representing the parse options object in libcif"""
-struct cif_parse_options
-end
-
-"""A pointer to a parse options structure"""
-mutable struct cpo_ptr
-    handle::Ptr{cif_parse_options}
-end
-
-"""Free C resources for parse options"""
-pos_destroy!(x::cpo_ptr) = begin
-    error_string = "Finalizing parse options $x"
-    t = @task println(error_string)
-    schedule(t)
-    ccall((:free,"libc"),Cvoid,(cpo_ptr,),x.handle)
-end
-
-"""Given a filename, parse and return a CIF object"""
-cif(s::AbstractString)=begin
-    # obtain an IOStream
-    f = open(s,"r")
-    fptr = Base.Libc.FILE(f)
-    # create a parse options structure
-    p_opts = cpo_ptr(0)
-    ## Todo: finalizer for parse options
-    val = ccall((:cif_parse_options_create,"libcif"),Cint,(Ref{cpo_ptr},),Ref(p_opts))
-    dpp = cif_tp_ptr(0)   #value replaced by C library
-    val=ccall((:cif_parse,"libcif"),Cint,(FILE,cpo_ptr,Ref{cif_tp_ptr}),fptr,p_opts,Ref(dpp))
-    close(f)
-    r = cif(dpp)
-    finalizer(cif_destroy!,r)
-    # Check for errors and destroy the CIF if necessary
-    if val != 0
-        finalize(r)
-        error("File $s load error: "* error_codes[val])
-    end
-    #q = time_ns()
-    #println("$q: Created cif ptr:$r for file $s")
-    return r
+struct cif_handler_tp
+    cif_start::Ptr{Nothing}
+    cif_end::Ptr{Nothing}
+    block_start::Ptr{Nothing}
+    block_end::Ptr{Nothing}
+    frame_start::Ptr{Nothing}
+    frame_end::Ptr{Nothing}
+    loop_start::Ptr{Nothing}
+    loop_end::Ptr{Nothing}
+    packet_start::Ptr{Nothing}
+    packet_end::Ptr{Nothing}
+    handle_item::Ptr{Nothing}
 end
 
 #==
@@ -143,7 +102,7 @@ referenced."""
 
 struct cif_block <: cif_container
     handle::cif_container_tp_ptr   #*cif_container_tp
-    cif_handle::cif                #keep a reference to this
+    cif_handle::cif_tp_ptr         #keep a reference to this
 end
 
 container_destroy!(cb::cif_container_tp_ptr) =  begin
@@ -153,7 +112,7 @@ container_destroy!(cb::cif_container_tp_ptr) =  begin
     ccall((:cif_container_free,"libcif"),Cvoid,(Ptr{cif_container_tp},),cb.handle)
 end
 
-Base.getindex(c::cif,block_name::AbstractString) = begin
+Base.getindex(c::cif_tp_ptr,block_name::AbstractString) = begin
     cbt = cif_container_tp_ptr(0)
     bn_as_uchar = transcode(UInt16,block_name)
     append!(bn_as_uchar,0)
@@ -176,7 +135,7 @@ mutable struct container_list_ptr
 end
 
 """Get handles to all blocks in a data file"""
-Base.values(c::cif) = begin
+Base.values(c::cif_tp_ptr) = begin
     array_address = container_list_ptr(0)  #**cif_block_tp
     #println("Array address before: $array_address")
     val = ccall((:cif_get_all_blocks,"libcif"),Cint,(Ptr{cif_tp},Ptr{container_list_ptr}),c.handle,Ref(array_address))
@@ -214,15 +173,19 @@ end
 
 """Obtain the name of a frame or block"""
 get_block_code(b::cif_container) = begin
+    get_block_code(b.handle)
+end
+
+get_block_code(b::cif_container_tp_ptr) = begin
     s = Uchar(0)
-    val = ccall((:cif_container_get_code,"libcif"),Cint,(cif_container_tp_ptr,Ptr{Cvoid}),b.handle,Ref(s))
+    val = ccall((:cif_container_get_code,"libcif"),Cint,(cif_container_tp_ptr,Ptr{Cvoid}),b,Ref(s))
     if val != 0
         error(error_codes[val])
     end
     make_jl_string(s)
 end
 
-Base.keys(c::cif) = get_block_code.(values(c))
+Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
 
 struct cif_frame <: cif_container
     handle::cif_container_tp_ptr
@@ -469,9 +432,9 @@ get_loop(b::cif_container,name) = begin
     return cif_loop(loop,b)
 end
 
-Base.keys(l::cif_loop) = begin
+Base.keys(l::Ptr{cif_loop_tp}) = begin
     ukeys = Uchar_list(0)
-    val = ccall((:cif_loop_get_names,"libcif"),Cint,(cif_loop_tp_ptr,Ptr{Cvoid}),l.handle,Ref(ukeys))
+    val = ccall((:cif_loop_get_names,"libcif"),Cint,(Ptr{cif_loop_tp},Ptr{Cvoid}),l,Ref(ukeys))
     if val != 0
         error(error_codes[val])
     end
@@ -499,6 +462,10 @@ Base.keys(l::cif_loop) = begin
     key_list = make_jl_string.(ukey_list)
     # println("Found loop values $key_list")
     return key_list
+end
+    
+Base.keys(l::cif_loop) = begin
+    keys(l.handle)
 end
 
 # Return all datanames in the container. As all items belong to a loop, we get all loops,
@@ -918,19 +885,49 @@ held in a loop with a single row.
 ==#
 
 struct NativeCif
-    all_data::Dict{AbstractString,cif_container}
+    contents::Dict{String,cif_container}
 end
 
 mutable struct NativeBlock <: cif_container
-    save_frames::Dict{AbstractString,cif_container}
-    loops::Vector{DataFrame}
+    save_frames::Dict{String,cif_container}
+    loop_names::Vector{Vector{String}} #one loop is a list of datanames
+    data_values::Dict{String,Vector{Union{String,Missing,Nothing}}}
 end
 
 mutable struct cif_builder_context
-    cif::NativeCif
-    apicif::cif
-    current_block::AbstractString
-    current_loop::Dict{AbstractString,Vector{Any}}
+    actualcif::Dict{String,cif_container}
+    current_block::String
+end
+
+"""An opaque type representing the parse options object in libcif"""
+mutable struct cif_parse_options
+    prefer_cif2::Int32
+    default_encoding_name::Ptr{UInt8}
+    force_default_encoding::Int32
+    line_folding_modified::Int32
+    text_prefixing_modifier::Int32
+    max_frame_depth::Int32
+    extra_ws_chars::Ptr{UInt8}
+    extra_eol_chars::Ptr{UInt8}
+    handler::Ref{cif_handler_tp}
+    whitespace_callback::Ptr{Cvoid}
+    keyword_callback::Ptr{Cvoid}
+    dataname_callback::Ptr{Cvoid}
+    error_callback::Ptr{Cvoid}
+    user_data::cif_builder_context
+end
+
+"""A pointer to a parse options structure"""
+mutable struct cpo_ptr
+    handle::Ptr{cif_parse_options}
+end
+
+"""Free C resources for parse options"""
+pos_destroy!(x::cpo_ptr) = begin
+    error_string = "Finalizing parse options $x"
+    t = @task println(error_string)
+    schedule(t)
+    ccall((:free,"libc"),Cvoid,(Ptr{cif_parse_options},),x.handle)
 end
 
 #== Cif walking functions
@@ -947,12 +944,12 @@ handle_cif_end(a,b)::Cint = begin
 end
 
 
-handle_block_start(a,b::cif_builder_context)::Cint = begin
-    fc = cif_block(a,b.apicif)
-    blockname = get_block_code(fc)
+handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
+    #context = unsafe_pointer_to_objref(b)
+    blockname = get_block_code(a)
     b.current_block = blockname
-    b.cif.all_data[blockname] = NativeBlock(Dict(),Vector())
-    println("Current block is now $(b.current_block)")
+    println("New blockname $(b.current_block)")
+    b.actualcif[blockname] = NativeBlock(Dict(),Vector(),Dict())
     0
 end
 
@@ -976,23 +973,13 @@ end
 
 
 handle_loop_start(a,b)::Cint = begin
-    cl = cif_loop(a,b.apicif[b.current_block])
-    b.current_loop = Dict()
-    for k in keys(cl)
-        b.current_loop[k]=Any[]
-    end
     println("Loop started")
     0
 end
 
-
-handle_loop_end(a,b)::Cint = begin
-    println("Loop is finished,creating data frame")
-    df = DataFrame()
-    for one_col in keys(b.current_loop)
-        df[Symbol(one_col)] = b.current_loop[one_col]
-    end
-    push!(b.cif.all_data[b.current_block].loops,df)
+handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
+    println("Loop is finished,recording packets")
+    push!(b.actualcif[b.current_block].loop_names,keys(a))
     0
 end
 
@@ -1014,6 +1001,9 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     val = ""
     keyname = make_jl_string(a_as_uchar)
     println("Processing name $keyname")
+    if !(keyname in keys(c.actualcif[c.current_block].data_values))
+        c.actualcif[c.current_block].data_values[keyname] = String[]
+    end
     syntax_type = get_syntactical_type(b)
     if syntax_type == cif_value_tp_ptr
         val = String(b)
@@ -1023,30 +1013,62 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         val = process_to_strings(b,Dict())
     else val = syntax_type()
     end
-    push!(c.current_loop[keyname],val)
+    if !ismissing(val) && val != nothing
+        println("With value $val")
+    elseif ismissing(val)
+        println("With value ?")
+    else println("With value .")
+    end
+    push!(c.actualcif[c.current_block].data_values[keyname],val)
     return 0    
 end
 
-struct cif_handler_tp
-    cif_start::Ptr{Nothing}
-    cif_end::Ptr{Nothing}
-    block_start::Ptr{Nothing}
-    block_end::Ptr{Nothing}
-    frame_start::Ptr{Nothing}
-    frame_end::Ptr{Nothing}
-    loop_start::Ptr{Nothing}
-    loop_end::Ptr{Nothing}
-    packet_start::Ptr{Nothing}
-    packet_end::Ptr{Nothing}
-    handle_item::Ptr{Nothing}
+default_options() = begin
+    p_opts = cpo_ptr(0)
+    val = ccall((:cif_parse_options_create,"libcif"),Cint,(Ref{cpo_ptr},),Ref(p_opts))
+    println("Parse options: $p_opts")
+    local_structure = unsafe_load(p_opts.handle)
+    #pos_destroy!(p_opts) 
+    println("Containing $local_structure")
+    return local_structure
+end
+
+default_options_new() = begin
+    handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
+    handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
+    handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_block_end_c = @cfunction(handle_block_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_frame_start_c = @cfunction(handle_frame_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_frame_end_c = @cfunction(handle_frame_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
+    handle_loop_start_c = @cfunction(handle_loop_start,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
+    handle_loop_end_c = @cfunction(handle_loop_end,Cint,(Ptr{cif_loop_tp},Ref{cif_builder_context}))
+    handle_packet_start_c = @cfunction(handle_packet_start,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
+    handle_packet_end_c = @cfunction(handle_packet_end,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
+    handle_item_c = @cfunction(handle_item,Cint,(Ptr{UInt16},cif_value_tp_ptr,Ref{cif_builder_context}))
+    handlers = cif_handler_tp(handle_cif_start_c,
+                              handle_cif_end_c,
+                              handle_block_start_c,
+                              handle_block_end_c,
+                              handle_frame_start_c,
+                              handle_frame_end_c,
+                              handle_loop_start_c,
+                              handle_loop_end_c,
+                              handle_packet_start_c,
+                              handle_packet_end_c,
+                              handle_item_c,
+                              )
+    starting_cif = Dict()
+    context = cif_builder_context(Dict(),"")
+    p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
+    return p_opts
 end
 
 # This will eventually be folded into the initial read using the cif_parse_opts
 # structure to load directly.
 
-load_cif(c::cif) = begin
-    starting_cif = NativeCif(Dict())
-    context = cif_builder_context(starting_cif,c,"",Dict(),String[])
+load_cif(c::cif_tp_ptr) = begin
+    starting_cif = NativeCif()
+    context = cif_builder_context(starting_cif,"")
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -1078,6 +1100,34 @@ load_cif(c::cif) = begin
     return starting_cif
 end
 
+NativeCif(s::AbstractString) = begin
+    p_opts = default_options_new()
+    result = cif_tp_ptr(s,p_opts)
+    # the real result is in our building context
+    return NativeCif(p_opts.user_data.actualcif)
+end
+
+"""Given a filename, parse and return a CIF object according to the provided options"""
+cif_tp_ptr(s::AbstractString,p_opts::cif_parse_options)=begin
+    # obtain an IOStream
+    f = open(s,"r")
+    fptr = Base.Libc.FILE(f)
+    ## Todo: finalizer for parse options
+    dpp = cif_tp_ptr(0)   #value replaced by C library
+    ## Debugging: do we have good values in our parse options context?
+    println("User context is $(p_opts.user_data)")
+    val=ccall((:cif_parse,"libcif"),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
+    close(f)
+    finalizer(cif_destroy!,dpp)
+    # Check for errors and destroy the CIF if necessary
+    if val != 0
+        finalize(dpp)
+        error("File $s load error: "* error_codes[val])
+    end
+    #q = time_ns()
+    #println("$q: Created cif ptr:$dpp for file $s")
+    return dpp
+end
 
 #== Utilities
 ==#
