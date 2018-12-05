@@ -895,8 +895,8 @@ mutable struct NativeBlock <: cif_container
 end
 
 mutable struct cif_builder_context
-    actualcif::Dict{String,cif_container}
-    current_block::String
+    actual_cif::Dict{String,cif_container}
+    block_stack::Array{cif_container}
 end
 
 """An opaque type representing the parse options object in libcif"""
@@ -945,29 +945,36 @@ end
 
 
 handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
-    #context = unsafe_pointer_to_objref(b)
     blockname = get_block_code(a)
-    b.current_block = blockname
-    println("New blockname $(b.current_block)")
-    b.actualcif[blockname] = NativeBlock(Dict(),Vector(),Dict())
+    println("New blockname $(blockname)")
+    newblock = NativeBlock(Dict(),Vector(),Dict())
+    push!(b.block_stack,newblock)
     0
 end
 
 
-handle_block_end(a,b)::Cint = begin
-    println("Block is finished")
+handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
+    blockname = get_block_code(a)
+    println("Block is finished: $blockname")
+    b.actual_cif[blockname] = pop!(b.block_stack)
     0
 end
 
 
-handle_frame_start(a,b)::Cint = begin
-    println("Frame started; nothing done")
+handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
+    println("Frame started")
+    blockname = get_block_code(a)
+    newblock = NativeBlock(Dict(),Vector(),Dict())
+    push!(b.block_stack,newblock)
     0
 end
 
 
 handle_frame_end(a,b)::Cint = begin
     println("Frame is finished")
+    final_frame = pop!(b.block_stack)
+    blockname = get_block_code(a)
+    b.block_stack[end].save_frames[blockname] = final_frame 
     0
 end
 
@@ -979,7 +986,7 @@ end
 
 handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     println("Loop is finished,recording packets")
-    push!(b.actualcif[b.current_block].loop_names,keys(a))
+    push!(b.block_stack[end].loop_names,keys(a))
     0
 end
 
@@ -1001,8 +1008,9 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     val = ""
     keyname = make_jl_string(a_as_uchar)
     println("Processing name $keyname")
-    if !(keyname in keys(c.actualcif[c.current_block].data_values))
-        c.actualcif[c.current_block].data_values[keyname] = String[]
+    current_block = c.block_stack[end]
+    if !(keyname in keys(current_block.data_values))
+        current_block.data_values[keyname] = String[]
     end
     syntax_type = get_syntactical_type(b)
     if syntax_type == cif_value_tp_ptr
@@ -1019,7 +1027,7 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         println("With value ?")
     else println("With value .")
     end
-    push!(c.actualcif[c.current_block].data_values[keyname],val)
+    push!(current_block.data_values[keyname],val)
     return 0    
 end
 
@@ -1058,7 +1066,7 @@ default_options_new() = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),"")
+    context = cif_builder_context(Dict(),cif_container[])
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
@@ -1100,11 +1108,48 @@ load_cif(c::cif_tp_ptr) = begin
     return starting_cif
 end
 
+NativeCif() = begin
+    return NativeCif(Dict{String,NativeBlock}())
+end
+
 NativeCif(s::AbstractString) = begin
     p_opts = default_options_new()
     result = cif_tp_ptr(s,p_opts)
     # the real result is in our building context
-    return NativeCif(p_opts.user_data.actualcif)
+    return NativeCif(p_opts.user_data.actual_cif)
+end
+
+# Operations on Cifs
+Base.getindex(c::NativeCif,s) = begin
+    c.contents[s]
+end
+
+Base.setindex!(c::NativeCif,s,v) = begin
+    c.contents[s]=v
+end
+
+Base.keys(c::NativeCif) = keys(c.contents)
+Base.keys(b::NativeBlock) = keys(b.data_values)
+
+# And on NativeBlocks
+Base.getindex(b::NativeBlock,s::AbstractString) = begin
+    b.data_values[s]
+end
+
+Base.setindex!(b::NativeBlock,s,v) = begin
+    # TODO:
+    # More checking required!
+    b.data_values[s]=v
+end
+
+get_loop(b::NativeBlock,s) = begin
+    loop_names = [l for l in b.loop_names if s in l]
+    # Construct a DataFrame
+    df = DataFrame()
+    for n in loop_names[1]
+        df[Symbol(n)]=b.data_values[n]
+    end
+    return df
 end
 
 """Given a filename, parse and return a CIF object according to the provided options"""

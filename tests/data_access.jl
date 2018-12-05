@@ -3,10 +3,9 @@
 # Simple value tests
 @testset "Simple data values" begin
     b = prepare_block("simple_data.cif","simple_data")
-    @test String(b["_numb_su"]) == "0.0625(2)"
-    @test String(b["_unquoted_string"]) == "unquoted"
-    @test String(b["_text_string"]) == "text"
-    @test Number(b["_numb_su"]) ≈ 0.0625
+    @test b["_numb_su"] == ["0.0625(2)"]
+    @test b["_unquoted_string"] == ["unquoted"]
+    @test b["_text_string"] == ["text"]
     known_dnames =  Set(["_unknown_value",
 "_na_value",
 "_unquoted_string",
@@ -27,26 +26,24 @@ end
 
 # Looped value tests
 @testset "Looped values" begin
-    println("$(Threads.nthreads()) threads running")
-    println("This thread $(Threads.threadid())")
     b = prepare_block("simple_loops.cif","simple_loops")
     l = get_loop(b,"_col2")
     vals = []
-    for p in l
-      push!(vals,String(p["_col2"]))
+    for p in eachrow(l)
+      push!(vals,String(p[:_col2]))
     end
     @test Set(vals) == Set(["v1","v2","v3"])
     # do it again as this has failed in the past
     m = get_loop(b,"_scalar_a")
     vals = []
-    for p in l
+    for p in eachrow(l)
         println("Do nothing")
-        push!(vals,String(p["_col2"]))
+        push!(vals,String(p[:_col2]))
     end
     @test Set(vals) == Set(["v1","v2","v3"])
     vals = []
-    for q in m
-        push!(vals,String(q["_scalar_a"]))
+    for q in eachrow(m)
+        push!(vals,String(q[:_scalar_a]))
     end
     @test vals == ["a"]
 end
@@ -57,21 +54,14 @@ end
     l = b["_digit_list"]
     println("digit list is $l")
     r = collect(l)
-    @test String.(r) == ["0","1","2","3","4","5","6","7","8","9"]
+    @test r == ["0","1","2","3","4","5","6","7","8","9"]
 end
 
 # Test tables
 @testset "Table values" begin
 b = prepare_block("table_data.cif","table_data")
 l = b["_type_examples"]
-@test Number(l["numb"])≈-123.4e+67
-@test String(l["char"])=="char"
+@test l["numb"]=="-123.4e+67"
+@test l["char"]=="char"
 @test "unknown" in keys(l)
-end
-
-# Get the blocks
-@testset "Block manipulations" begin
-    t = cif(joinpath(@__DIR__,"simple_data.cif"))
-    bl = values(t)
-    @test get_block_code(bl[1]) == "simple_data"
 end
