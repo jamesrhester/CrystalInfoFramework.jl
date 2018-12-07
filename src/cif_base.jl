@@ -4,7 +4,7 @@ the libcif API =#
 export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table
 export get_save_frame, get_all_frames
-export load_cif,NativeCif
+export load_cif,NativeCif,native_cif_element
 
 import Base.Libc:FILE
 
@@ -339,8 +339,8 @@ get_syntactical_type(t::cif_value_tp_ptr) = begin
     if val_type == 0 || val_type == 1 return typeof(t)
     elseif val_type == 2 cif_list
     elseif val_type == 3 cif_table
-    elseif val_type == 4 return Missing
-    elseif val_type == 5 return Nothing
+    elseif val_type == 4 return Nothing
+    elseif val_type == 5 return Missing
     end
 end
     
@@ -732,6 +732,8 @@ Base.String(s::native_cif_element) = begin
     String(s.element)
 end
 
+Base.getindex(n::native_cif_element,s::String) = n.element[s]
+Base.getindex(n::native_cif_element,i::Integer) = n.element[i]
 # Turn all primitive elements into strings
 
 process_to_strings(c::cif_list,so_far::Vector{native_cif_element}) = begin
@@ -740,9 +742,9 @@ process_to_strings(c::cif_list,so_far::Vector{native_cif_element}) = begin
         if t == cif_value_tp_ptr
             push!(so_far,native_cif_element(String(el)))
         elseif t == cif_list
-            push!(so_far,process_to_strings(el,Vector{native_cif_element}()))
+            push!(so_far,native_cif_element(process_to_strings(t(el),Vector{native_cif_element}())))
         elseif t == cif_table
-            push!(so_far,process_to_strings(el,Dict{String,native_cif_element}()))
+            push!(so_far,native_cif_element(process_to_strings(t(el),Dict{String,native_cif_element}())))
         else push!(so_far,native_cif_element(t()))
         end
     end
@@ -781,9 +783,9 @@ process_to_strings(c::cif_table,so_far::Dict{String,native_cif_element}) = begin
         if t == cif_value_tp_ptr
             so_far[el]=native_cif_element(String(c[el]))
         elseif t == cif_list
-            so_far[el]=process_to_strings(c[el],Vector{native_cif_element}())
+            so_far[el]=native_cif_element(process_to_strings(t(c[el]),Vector{native_cif_element}()))
         elseif t == cif_table
-            so_far[el]=process_to_strings(c[el],Dict{String,native_cif_element}())
+            so_far[el]=native_cif_element(process_to_strings(t(c[el]),Dict{String,native_cif_element}()))
         else so_far[el]=native_cif_element(t())
         end
     end

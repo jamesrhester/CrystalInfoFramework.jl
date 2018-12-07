@@ -64,3 +64,13 @@ l = b["_type_examples"]
 @test String(l[1]["char"])=="char"
 @test "unknown" in keys(l[1])
 end
+
+# Test both at once!
+@testset "Lists and tables" begin
+    b = prepare_block("table_list_data.cif","tl_data")
+    l = b["_import.get"]
+    @test l[1][1]["block"]==native_cif_element(missing)
+    @test String(l[1][2]["c"])=="whatever"
+    q = b["_list_in_table"]
+    @test String(q[1]["q"][2]) == "b"
+end

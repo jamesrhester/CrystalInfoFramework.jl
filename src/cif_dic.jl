@@ -4,15 +4,16 @@
 export cifdic,get_by_cat_obj,assign_dictionary,get_dataname_type,get_alias
 
 struct cifdic
-    block::cif_block    #the underlying CIF block
-    definitions::Dict{AbstractString,AbstractString}
-    by_cat_obj::Dict{Tuple,AbstractString} #by category/object
+    block::NativeBlock    #the underlying CIF block
+    definitions::Dict{String,String}
+    by_cat_obj::Dict{Tuple,String} #by category/object
     cifdic(b,d,c) = begin
-        if !issubset(values(d),get_block_code.(get_all_frames(b)))
+        all_names = collect(keys(b))
+        if !issubset(values(d),all_names)
             error("""Cifdic: supplied definition lookup contains save frames that are
                     not present in the dictionary block""")
         end
-        if !issubset(values(c),get_block_code.(get_all_frames(b)))
+        if !issubset(values(c),all_names)
             error("""Cifdic: supplied cat-obj lookup contains save frames that are
                    not present in the dictionary block""")
         end
@@ -20,23 +21,25 @@ struct cifdic
     end
 end
 
-cifdic(c::cif) = begin
+cifdic(c::NativeCif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
     b = c[keys(c)[1]]
     # now create the definition names
-    match_dict = Dict(String(s["_definition.id"]) => get_block_code(s) for s in get_all_frames(b))
-    defblocks = [(s["_name.category_id"],s["_name.object_id"],s) for s in get_all_frames(b) if "_name.category_id" in keys(s) && "_name.object_id" in keys(s)]
-    cat_obj_dict = Dict((lowercase.((String(s[1]),String(s[2]))),get_block_code(s[3])) for s in defblocks)
+    defs = get_all_frames(b)
+    bnames = collect(keys(defs))
+    match_dict = Dict(String(defs[k]["_definition.id"]) => k for k in bnames)
+    defblocks = [(defs[k]["_name.category_id"],defs[k]["_name.object_id"],k) for k in bnames if "_name.category_id" in keys(defs[k]) && "_name.object_id" in keys(defs[k])]
+    cat_obj_dict = Dict((lowercase.((String(s[1]),String(s[2]))),s[3]) for s in defblocks)
     # add aliases TODO
     cifdic(b,match_dict,cat_obj_dict)
 end
 
-cifdic(a::AbstractString) = cifdic(cif(a))
+cifdic(a::String) = cifdic(NativeCif(a))
 
 # The index in a dictionary is the _definition.id or an alias
-Base.getindex(cdic::cifdic,definition::AbstractString) = begin
+Base.getindex(cdic::cifdic,definition::String) = begin
     get_save_frame(cdic.block,cdic.definitions[definition])
 end
 
@@ -60,7 +63,7 @@ Base.iterate(c::cifdic,s) = begin
 end
 
 # Add aliases to our lookup dictionary
-generate_aliases(c::cifdic,name::AbstractString) = begin
+generate_aliases(c::cifdic,name::String) = begin
     if name in keys(c.definitions) return c.definitions[name] end
     # find the name in all definitions
     aliases = nothing
@@ -82,15 +85,14 @@ get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lo
 ==#
 
 struct cif_block_with_dict <: cif_container
-    handle::cif_container_tp_ptr
-    cif_handle::cif
+    data::NativeBlock
     dictionary::cifdic
 end
 
-assign_dictionary(c::cif_block,d::cifdic) = cif_block_with_dict(c.handle,c.cif_handle,d)
+assign_dictionary(c::NativeBlock,d::cifdic) = cif_block_with_dict(c,d)
 
 """If we have a dictionary, we can determine the dataname type"""
-get_dataname_type(b::cif_block_with_dict,d::AbstractString) = begin
+get_dataname_type(b::cif_block_with_dict,d::String) = begin
     t = get_julia_type(b.dictionary,d)
     if typeof(t) == Expr
         return eval(t)
@@ -149,12 +151,12 @@ get_julia_type(cifdic,cat,obj) = begin
     return final_type
 end
 
-get_julia_type(cifdic,dataname::AbstractString) = begin
+get_julia_type(cifdic,dataname::String) = begin
     definition = cifdic[dataname]
     return get_julia_type(cifdic,String(definition["_name.category_id"]),String(definition["_name.object_id"]))
 end
 
-Range(v::cif_value_tp_ptr) = begin
+Range(v::native_cif_element) = begin
     as_string = String(v)
     lower,upper = split(as_string,":")
     parse(Number,lower),parse(Number,upper)
