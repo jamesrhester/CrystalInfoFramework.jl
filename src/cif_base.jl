@@ -194,7 +194,7 @@ end
 
 
 """Get handles to all save frames in a data block"""
-get_all_frames(b::cif_container) = begin
+get_all_frames(b::cif_frame) = begin
     array_address = container_list_ptr(0)  #**cif_block_tp
     #println("Array address before: $array_address")
     val = ccall((:cif_container_get_all_frames,"libcif"),Cint,(cif_container_tp_ptr,Ptr{container_list_ptr}),
@@ -231,7 +231,7 @@ get_all_frames(b::cif_container) = begin
     return save_frames
 end
 
-get_save_frame(b::cif_container,s::AbstractString) = begin
+get_save_frame(b::cif_frame,s::AbstractString) = begin
     new_frame = cif_container_tp_ptr(0)
     uname = transcode(UInt16,s)
     append!(uname,0)
@@ -886,6 +886,16 @@ held in a loop with a single row.
 struct NativeCif
     contents::Dict{String,cif_container}
 end
+# Operations on Cifs
+Base.getindex(c::NativeCif,s) = begin
+    c.contents[s]
+end
+
+Base.setindex!(c::NativeCif,s,v) = begin
+    c.contents[s]=v
+end
+
+Base.keys(c::NativeCif) = keys(c.contents)
 
 mutable struct NativeBlock <: cif_container
     save_frames::Dict{String,cif_container}
@@ -893,9 +903,39 @@ mutable struct NativeBlock <: cif_container
     data_values::Dict{String,Vector{native_cif_element}}
 end
 
+Base.keys(b::NativeBlock) = keys(b.data_values)
+
+Base.getindex(b::NativeBlock,s::String) = begin
+    getproperty.(b.data_values[s],:element)
+end
+
+Base.setindex!(b::NativeBlock,s,v) = begin
+    # TODO:
+    # More checking required!
+    setproperty!.(b.data_values[s],:element,v)
+end
+
+get_loop(b::NativeBlock,s) = begin
+    loop_names = [l for l in b.loop_names if s in l]
+    # Construct a DataFrame
+    df = DataFrame()
+    for n in loop_names[1]
+        df[Symbol(n)]=b.data_values[n]
+    end
+    return df
+end
+
 mutable struct cif_builder_context
     actual_cif::Dict{String,cif_container}
     block_stack::Array{cif_container}
+end
+
+get_all_frames(c::NativeBlock) = begin
+    NativeCif(c.save_frames)
+end
+
+get_save_frame(c::NativeBlock,s::String) = begin
+    c.save_frames[s]
 end
 
 """An opaque type representing the parse options object in libcif"""
@@ -1121,38 +1161,6 @@ NativeCif(s::AbstractString) = begin
     return NativeCif(p_opts.user_data.actual_cif)
 end
 
-# Operations on Cifs
-Base.getindex(c::NativeCif,s) = begin
-    c.contents[s]
-end
-
-Base.setindex!(c::NativeCif,s,v) = begin
-    c.contents[s]=v
-end
-
-Base.keys(c::NativeCif) = keys(c.contents)
-Base.keys(b::NativeBlock) = keys(b.data_values)
-
-# And on NativeBlocks
-Base.getindex(b::NativeBlock,s::String) = begin
-    getproperty.(b.data_values[s],:element)
-end
-
-Base.setindex!(b::NativeBlock,s,v) = begin
-    # TODO:
-    # More checking required!
-    setproperty!.(b.data_values[s],:element,v)
-end
-
-get_loop(b::NativeBlock,s) = begin
-    loop_names = [l for l in b.loop_names if s in l]
-    # Construct a DataFrame
-    df = DataFrame()
-    for n in loop_names[1]
-        df[Symbol(n)]=b.data_values[n]
-    end
-    return df
-end
 
 """Given a filename, parse and return a CIF object according to the provided options"""
 cif_tp_ptr(s::AbstractString,p_opts::cif_parse_options)=begin
