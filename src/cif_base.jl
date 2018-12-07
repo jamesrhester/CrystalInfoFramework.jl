@@ -676,10 +676,10 @@ end
 struct cif_list
     handle::cif_value_tp_ptr
     parent::cif_container #for type information
-    dataname::AbstractString #for type information
+    dataname::String #for type information
     length::Int  # for efficiency
 
-    cif_list(cc::cif_container,dname::AbstractString,cv::cif_value_tp_ptr) = begin
+    cif_list(cc::cif_container,dname::String,cv::cif_value_tp_ptr) = begin
         cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
         if cif_type != 2
             error("$val is not a cif list value")
@@ -711,13 +711,6 @@ Base.iterate(cl::cif_list,el_num) = begin
     if val != 0
         error(error_codes[val])
     end
-    new_type = get_dataname_type(cl.parent,cl.dataname)
-    if new_type == Any  #
-        new_type = get_syntactical_type(new_element)
-    end
-    if typeof(new_element) != new_type
-        return (new_type(new_element),el_num+1)
-    end
     return (new_element,el_num+1)
 end
 
@@ -730,16 +723,27 @@ Base.eltype(::Type{cif_list}) = Any
 Base.firstindex(::cif_list) = 1
 Base.lastindex(cl::cif_list) = cl.length
 
-# Turn into a list of strings
+# And now our native version
+struct native_cif_element
+    element::Union{Vector{native_cif_element},Dict{String,native_cif_element},String,Missing,Nothing}
+end
 
-process_to_strings(c::cif_list,so_far::Vector{Any}) = begin
+Base.String(s::native_cif_element) = begin
+    String(s.element)
+end
+
+# Turn all primitive elements into strings
+
+process_to_strings(c::cif_list,so_far::Vector{native_cif_element}) = begin
     for el in c
         t = get_syntactical_type(el)
         if t == cif_value_tp_ptr
-            push!(so_far,String(t=el))
-        elseif t in [cif_list,cif_table]
-            push!(so_far,process_to_strings(el,Any[]))
-        else push!(so_far,t(el))
+            push!(so_far,native_cif_element(String(el)))
+        elseif t == cif_list
+            push!(so_far,process_to_strings(el,Vector{native_cif_element}()))
+        elseif t == cif_table
+            push!(so_far,process_to_strings(el,Dict{String,native_cif_element}()))
+        else push!(so_far,native_cif_element(t()))
         end
     end
     return so_far
@@ -771,14 +775,16 @@ end
 
 cif_table(t) = cif_table(empty_cif_container(),"",t)
 
-process_to_strings(c::cif_table,so_far::Dict{AbstractString,Any}) = begin
+process_to_strings(c::cif_table,so_far::Dict{String,native_cif_element}) = begin
     for el in keys(c)
-        t = get_syntactical_type(el)
+        t = get_syntactical_type(c[el])
         if t == cif_value_tp_ptr
-            push!(so_far,String(t=el))
-        elseif t in [cif_list,cif_table]
-            push!(so_far,process_to_strings(el,Any[]))
-        else push!(so_far,t(el))
+            so_far[el]=native_cif_element(String(c[el]))
+        elseif t == cif_list
+            so_far[el]=process_to_strings(c[el],Vector{native_cif_element}())
+        elseif t == cif_table
+            so_far[el]=process_to_strings(c[el],Dict{String,native_cif_element}())
+        else so_far[el]=native_cif_element(t())
         end
     end
     return so_far
@@ -849,13 +855,6 @@ Base.getindex(ct::cif_table,key::AbstractString) = begin
     if val != 0
         error(error_codes[val])
     end
-    new_type = get_dataname_type(ct.parent,ct.dataname)
-    if new_type == Any
-        new_type = get_syntactical_type(new_element)
-    end
-    if typeof(new_element) != new_type
-        return new_type(new_element)
-    end
     return new_element
 end
 
@@ -891,7 +890,7 @@ end
 mutable struct NativeBlock <: cif_container
     save_frames::Dict{String,cif_container}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{Union{String,Missing,Nothing}}}
+    data_values::Dict{String,Vector{native_cif_element}}
 end
 
 mutable struct cif_builder_context
@@ -1009,16 +1008,15 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     keyname = make_jl_string(a_as_uchar)
     println("Processing name $keyname")
     current_block = c.block_stack[end]
-    if !(keyname in keys(current_block.data_values))
-        current_block.data_values[keyname] = String[]
-    end
     syntax_type = get_syntactical_type(b)
     if syntax_type == cif_value_tp_ptr
         val = String(b)
     elseif syntax_type == cif_list
-        val = process_to_strings(b,Any[])
+        tl = cif_list(current_block,keyname,b)
+        val = process_to_strings(tl,Vector{native_cif_element}())
     elseif syntax_type == cif_table
-        val = process_to_strings(b,Dict())
+        tt = cif_table(current_block,keyname,b)
+        val = process_to_strings(tt,Dict{String,native_cif_element}())
     else val = syntax_type()
     end
     if !ismissing(val) && val != nothing
@@ -1027,7 +1025,11 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         println("With value ?")
     else println("With value .")
     end
-    push!(current_block.data_values[keyname],val)
+    if !(keyname in keys(current_block.data_values))
+        current_block.data_values[keyname] = [native_cif_element(val)]
+    else
+        push!(current_block.data_values[keyname],native_cif_element(val))
+    end
     return 0    
 end
 
@@ -1132,14 +1134,14 @@ Base.keys(c::NativeCif) = keys(c.contents)
 Base.keys(b::NativeBlock) = keys(b.data_values)
 
 # And on NativeBlocks
-Base.getindex(b::NativeBlock,s::AbstractString) = begin
-    b.data_values[s]
+Base.getindex(b::NativeBlock,s::String) = begin
+    getproperty.(b.data_values[s],:element)
 end
 
 Base.setindex!(b::NativeBlock,s,v) = begin
     # TODO:
     # More checking required!
-    b.data_values[s]=v
+    setproperty!.(b.data_values[s],:element,v)
 end
 
 get_loop(b::NativeBlock,s) = begin

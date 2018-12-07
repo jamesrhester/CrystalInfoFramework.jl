@@ -53,15 +53,14 @@ end
     b = prepare_block("list_data.cif","list_data")
     l = b["_digit_list"]
     println("digit list is $l")
-    r = collect(l)
-    @test r == ["0","1","2","3","4","5","6","7","8","9"]
+    @test String.(l[1]) == ["0","1","2","3","4","5","6","7","8","9"]
 end
 
 # Test tables
 @testset "Table values" begin
 b = prepare_block("table_data.cif","table_data")
 l = b["_type_examples"]
-@test l["numb"]=="-123.4e+67"
-@test l["char"]=="char"
-@test "unknown" in keys(l)
+@test String(l[1]["numb"])=="-123.4e+67(5)"
+@test String(l[1]["char"])=="char"
+@test "unknown" in keys(l[1])
 end
