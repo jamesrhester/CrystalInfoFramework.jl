@@ -419,7 +419,7 @@ cif_loop(handle,block) = begin
     return final
 end
 
-get_loop(b::cif_container,name) = begin
+get_loop(b::cif_frame,name) = begin
     loop = cif_loop_tp_ptr(0)
     utfname = transcode(UInt16,name)
     append!(utfname,0)
@@ -728,10 +728,13 @@ struct native_cif_element
     element::Union{Vector{native_cif_element},Dict{String,native_cif_element},String,Missing,Nothing}
 end
 
-Base.String(s::native_cif_element) = begin
-    String(s.element)
+Base.String(s::native_cif_element) = String(s.element)
+Base.length(s::native_cif_element) = begin
+    if typeof(s.element) <: AbstractString return 1 end
+    length(s.element)
 end
-
+Base.iterate(i::native_cif_element) = Base.iterate(i.element)
+Base.iterate(i::native_cif_element,j::Integer) = Base.iterate(i.element,j)
 Base.getindex(n::native_cif_element,s::String) = n.element[s]
 Base.getindex(n::native_cif_element,i::Integer) = n.element[i]
 # Turn all primitive elements into strings

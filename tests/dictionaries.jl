@@ -7,29 +7,30 @@
     end
     @test begin
         t = cifdic(joinpath(@__DIR__,"ddl.dic"))
-        String(t["_alias.deprecation_date"]["_type.source"]) == "Assigned"
+        String(t["_alias.deprecation_date"]["_type.source"][1]) == "Assigned"
     end
     @test begin
         t = cifdic(joinpath(@__DIR__,"ddl.dic"))
-        String(get_by_cat_obj(t,("Type","Contents"))["_definition.class"]) == "Attribute"
+        String(get_by_cat_obj(t,("Type","Contents"))["_definition.class"][1]) == "Attribute"
     end
 end
 
 prepare_system() = begin
     t = cifdic(joinpath(@__DIR__,"cif_mag.dic"))
-    u = cif(joinpath(@__DIR__,"AgCrS2.mcif")) #
+    u = NativeCif(joinpath(@__DIR__,"AgCrS2.mcif")) #
     ud = assign_dictionary(u["AgCrS2_OG"],t)
 end
 
 @testset "Smart CIF blocks" begin
     ud = prepare_system()
-    @test ud["_parent_space_group.IT_number"] == 160
+    @test ud["_parent_space_group.IT_number"][1] == 160
     pl = get_loop(ud,"_atom_site_moment.crystalaxis_x")
-    for one_pack in pl
-        @test isapprox(one_pack["_atom_site_moment.crystalaxis_x"],0.0)
+    for one_pack in eachrow(pl)
+        @test isapprox(one_pack[Symbol("_atom_site_moment.crystalaxis_x")],0.0)
     end
     # now test some array items
-    @test ud["_parent_propagation_vector.kxkykz"] == [-0.75, 0.75, -0.75]
-    @test String(get_alias(ud.dictionary,"_atom_site_moment.label")["_name.object_id"]) == "label"
-    @test String(get_alias(ud.dictionary,"_atom_site_moment_label")["_name.object_id"]) == "label"
+    @test ud["_parent_propagation_vector.kxkykz"][1] == [-0.75, 0.75, -0.75]
+    # test aliases
+    @test "Cr1_1" in ud["_atom_site_moment_label"]
+    @test "Cr1_1" in ud["_atom_site_moment.label"]
 end
