@@ -34,3 +34,8 @@ end
     @test "Cr1_1" in ud["_atom_site_moment_label"]
     @test "Cr1_1" in ud["_atom_site_moment.label"]
 end
+
+@testset "Importation" begin
+    ud = prepare_system()
+    @test String(ud.dictionary["_atom_site_rotation.label"]["_name.linked_item_id"][1]) == "_atom_site.label"
+end

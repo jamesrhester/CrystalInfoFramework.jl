@@ -4,7 +4,7 @@ the libcif API =#
 export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table
 export get_save_frame, get_all_frames
-export load_cif,NativeCif,native_cif_element
+export NativeCif,native_cif_element
 
 import Base.Libc:FILE
 
@@ -68,7 +68,7 @@ Data blocks
 
 """The type of blocks and save frames"""
 
-abstract type cif_container end
+abstract type cif_container{V} <: AbstractDict{String,V} end
 
 """Without a dictionary we could have lists, tables or strings"""
 
@@ -80,7 +80,7 @@ end
 of where a value comes from...may be removed with better
 design"""
 
-struct empty_cif_container <: cif_container end
+struct empty_cif_container{V} <: cif_container{V} end
 
 """An opaque type representing a CIF block"""
 mutable struct cif_container_tp   #cif_block_tp in libcif
@@ -100,7 +100,7 @@ longer referenced in a program.  This will cause a
 segmentation fault whenever the block is subsequently
 referenced."""
 
-struct cif_block <: cif_container
+struct cif_block <: cif_container{cif_container_tp_ptr}
     handle::cif_container_tp_ptr   #*cif_container_tp
     cif_handle::cif_tp_ptr         #keep a reference to this
 end
@@ -172,7 +172,7 @@ Base.values(c::cif_tp_ptr) = begin
 end
 
 """Obtain the name of a frame or block"""
-get_block_code(b::cif_container) = begin
+get_block_code(b::cif_block) = begin
     get_block_code(b.handle)
 end
 
@@ -187,7 +187,7 @@ end
 
 Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
 
-struct cif_frame <: cif_container
+struct cif_frame <: cif_container{cif_container_tp_ptr}
     handle::cif_container_tp_ptr
     parent::cif_container   #Stop garbage collection of the parent block
 end
@@ -306,20 +306,6 @@ Base.Array{T,2}(t::cif_value_tp_ptr) where {T <: Number} = begin
     b = cif_list.(a)
     [Number.(c) for c in b]
 end
-#==
-Base.convert(::Type{Array{cif_value_tp_ptr}},t::cif_value_tp_ptr) = begin
-    cif_list(t)
-end
-
-Base.convert(::Type{Dict{String,cif_value_tp_ptr}},t::cif_value_tp_ptr) = begin
-    cif_table(t)
-end
-
-Base.convert(::Type{Array{T}} where {T<:Number}, t::cif_value_tp_ptr) = begin
-    p = cif_list(t)
-    Number.(p)
-end
-==#
 
 Base.String(t::cif_value_tp_ptr) = begin
    #Get the textual representation
@@ -694,7 +680,7 @@ struct cif_list
     end
 end
 
-cif_list(t) = cif_list(empty_cif_container(),"",t)
+cif_list(t) = cif_list(empty_cif_container{cif_value_tp_ptr}(),"",t)
 
 #== Remember that we conventionally start at element 1 in Julia
 
@@ -735,8 +721,9 @@ Base.length(s::native_cif_element) = begin
 end
 Base.iterate(i::native_cif_element) = Base.iterate(i.element)
 Base.iterate(i::native_cif_element,j::Integer) = Base.iterate(i.element,j)
-Base.getindex(n::native_cif_element,s::String) = n.element[s]
-Base.getindex(n::native_cif_element,i::Integer) = n.element[i]
+Base.getindex(n::native_cif_element,s) = n.element[s]
+Base.get(n::native_cif_element,s,d) = get(n.element,s,d)
+
 # Turn all primitive elements into strings
 
 process_to_strings(c::cif_list,so_far::Vector{native_cif_element}) = begin
@@ -778,7 +765,7 @@ struct cif_table
     end
 end
 
-cif_table(t) = cif_table(empty_cif_container(),"",t)
+cif_table(t) = cif_table(empty_cif_container{cif_value_tp_ptr}(),"",t)
 
 process_to_strings(c::cif_table,so_far::Dict{String,native_cif_element}) = begin
     for el in keys(c)
@@ -890,34 +877,42 @@ held in a loop with a single row.
 
 struct NativeCif
     contents::Dict{String,cif_container}
+    original_file::String
 end
 # Operations on Cifs
 Base.getindex(c::NativeCif,s) = begin
     c.contents[s]
 end
 
-Base.setindex!(c::NativeCif,s,v) = begin
+Base.setindex!(c::NativeCif,v,s) = begin
     c.contents[s]=v
 end
 
 Base.keys(c::NativeCif) = keys(c.contents)
+Base.haskey(c::NativeCif,s::String) = haskey(c.contents,s)
 
-mutable struct NativeBlock <: cif_container
-    save_frames::Dict{String,cif_container}
+mutable struct NativeBlock <: cif_container{native_cif_element}
+    save_frames::Dict{String,cif_container{native_cif_element}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{native_cif_element}}
+    original_file::String
 end
 
 Base.keys(b::NativeBlock) = keys(b.data_values)
+Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,s)
+Base.iterate(b::NativeBlock) = iterate(b.data_values)
+Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
 
 Base.getindex(b::NativeBlock,s::String) = begin
     getproperty.(b.data_values[s],:element)
 end
 
-Base.setindex!(b::NativeBlock,s,v) = begin
-    # TODO:
-    # More checking required!
-    setproperty!.(b.data_values[s],:element,v)
+Base.setindex!(b::NativeBlock,v,s) = begin
+    b.data_values[s]=v
+end
+
+Base.delete!(b::NativeBlock,s) = begin
+    delete!(b.data_values,s)
 end
 
 get_loop(b::NativeBlock,s) = begin
@@ -933,10 +928,11 @@ end
 mutable struct cif_builder_context
     actual_cif::Dict{String,cif_container}
     block_stack::Array{cif_container}
+    filename::String
 end
 
 get_all_frames(c::NativeBlock) = begin
-    NativeCif(c.save_frames)
+    NativeCif(c.save_frames,c.original_file)
 end
 
 get_save_frame(c::NativeBlock,s::String) = begin
@@ -991,7 +987,7 @@ end
 handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
     println("New blockname $(blockname)")
-    newblock = NativeBlock(Dict(),Vector(),Dict())
+    newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
 end
@@ -1008,7 +1004,7 @@ end
 handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     println("Frame started")
     blockname = get_block_code(a)
-    newblock = NativeBlock(Dict(),Vector(),Dict())
+    newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
 end
@@ -1088,7 +1084,7 @@ default_options() = begin
     return local_structure
 end
 
-default_options_new() = begin
+default_options_new(s::String) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -1113,64 +1109,31 @@ default_options_new() = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),cif_container[])
+    context = cif_builder_context(Dict(),cif_container[],s)
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
 
-# This will eventually be folded into the initial read using the cif_parse_opts
-# structure to load directly.
-
-load_cif(c::cif_tp_ptr) = begin
-    starting_cif = NativeCif()
-    context = cif_builder_context(starting_cif,"")
-    handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
-    handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
-    handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
-    handle_block_end_c = @cfunction(handle_block_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
-    handle_frame_start_c = @cfunction(handle_frame_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
-    handle_frame_end_c = @cfunction(handle_frame_end,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
-    handle_loop_start_c = @cfunction(handle_loop_start,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
-    handle_loop_end_c = @cfunction(handle_loop_end,Cint,(cif_loop_tp_ptr,Ref{cif_builder_context}))
-    handle_packet_start_c = @cfunction(handle_packet_start,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
-    handle_packet_end_c = @cfunction(handle_packet_end,Cint,(Ptr{cif_packet_tp},Ref{cif_builder_context}))
-    handle_item_c = @cfunction(handle_item,Cint,(Ptr{UInt16},cif_value_tp_ptr,Ref{cif_builder_context}))
-    handlers = cif_handler_tp(handle_cif_start_c,
-                              handle_cif_end_c,
-                              handle_block_start_c,
-                              handle_block_end_c,
-                              handle_frame_start_c,
-                              handle_frame_end_c,
-                              handle_loop_start_c,
-                              handle_loop_end_c,
-                              handle_packet_start_c,
-                              handle_packet_end_c,
-                              handle_item_c,
-                              )
-    val = ccall((:cif_walk,"libcif"),Cint,(Ptr{cif_tp},Ref{cif_handler_tp},Ref{cif_builder_context}),
-                c.handle,Ref(handlers),Ref(context))
-    if val != 0
-        error("Failed to read in CIF:"*errorcodes[val])
-    end
-    return starting_cif
-end
-
 NativeCif() = begin
-    return NativeCif(Dict{String,NativeBlock}())
+    return NativeCif(Dict{String,NativeBlock}(),"")
 end
 
 NativeCif(s::AbstractString) = begin
-    p_opts = default_options_new()
-    result = cif_tp_ptr(s,p_opts)
-    # the real result is in our building context
-    return NativeCif(p_opts.user_data.actual_cif)
+    p_opts = default_options_new(s)
+    result = cif_tp_ptr(p_opts)
+    # the real result is in our user data context
+    return NativeCif(p_opts.user_data.actual_cif,s)
 end
 
 
-"""Given a filename, parse and return a CIF object according to the provided options"""
-cif_tp_ptr(s::AbstractString,p_opts::cif_parse_options)=begin
+"""Given a filename, parse and return a CIF object according to the provided options.
+This is only tested with our walker functions, but will probably work for a
+CIFAPI cif"""
+
+cif_tp_ptr(p_opts::cif_parse_options)=begin
     # obtain an IOStream
-    f = open(s,"r")
+    filename = p_opts.user_data.filename
+    f = open(filename,"r")
     fptr = Base.Libc.FILE(f)
     ## Todo: finalizer for parse options
     dpp = cif_tp_ptr(0)   #value replaced by C library

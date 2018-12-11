@@ -1,6 +1,7 @@
 module JuliaCif
 using Tables
 using DataFrames
+using URIParser
 #= This module provides ways of interacting with a Crystallographic Information
  file using Julia. It currently wraps the C CIF API.
 =#
