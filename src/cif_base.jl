@@ -784,8 +784,8 @@ end
 
 Base.keys(ct::cif_table) = begin
     ukeys = Uchar_list(0)
-    q = time_ns()
-    println("$q: accessing keys for $(ct.handle.handle)")
+    #q = time_ns()
+    #println("$q: accessing keys for $(ct.handle.handle)")
     val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle.handle,Ref(ukeys))
     if val != 0
         error(error_codes[val])
@@ -797,14 +797,14 @@ Base.keys(ct::cif_table) = begin
     # Now count how many values we have
     n = 1
     b = unsafe_load(ukeys.strings,n)
-    println("Start of actual array: $(b.string)")
+    # println("Start of actual array: $(b.string)")
     while b.string!=C_NULL
         n = n + 1
         b = unsafe_load(ukeys.strings,n)
-        println("Ptr is $(b.string)")
+        #println("Ptr is $(b.string)")
     end
     n = n - 1
-    println("Number of keys: $n")
+    #println("Number of keys: $n")
     if n != ct.length
         error("Number of keys does not match stated length")
     end
@@ -974,19 +974,19 @@ end
 ==#
 
 handle_cif_start(a,b)::Cint = begin
-    println("Cif started; nothing done")
+    #println("Cif started; nothing done")
     0
 end
 
 handle_cif_end(a,b)::Cint = begin
-    println("Cif is finished")
+    #println("Cif is finished")
     0
 end
 
 
 handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
-    println("New blockname $(blockname)")
+    #println("New blockname $(blockname)")
     newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
@@ -995,14 +995,14 @@ end
 
 handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
-    println("Block is finished: $blockname")
+    #println("Block is finished: $blockname")
     b.actual_cif[blockname] = pop!(b.block_stack)
     0
 end
 
 
 handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
-    println("Frame started")
+    #println("Frame started")
     blockname = get_block_code(a)
     newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
@@ -1011,7 +1011,7 @@ end
 
 
 handle_frame_end(a,b)::Cint = begin
-    println("Frame is finished")
+    #println("Frame is finished")
     final_frame = pop!(b.block_stack)
     blockname = get_block_code(a)
     b.block_stack[end].save_frames[blockname] = final_frame 
@@ -1020,25 +1020,25 @@ end
 
 
 handle_loop_start(a,b)::Cint = begin
-    println("Loop started")
+    #println("Loop started")
     0
 end
 
 handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
-    println("Loop is finished,recording packets")
+    #println("Loop is finished,recording packets")
     push!(b.block_stack[end].loop_names,keys(a))
     0
 end
 
 
 handle_packet_start(a,b)::Cint = begin
-    println("Packet started; nothing done")
+    #println("Packet started; nothing done")
     0
 end
 
 
 handle_packet_end(a,b)::Cint = begin
-    println("Packet is finished")
+    #println("Packet is finished")
     0
 end
 
@@ -1047,7 +1047,7 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     a_as_uchar = Uchar(a)
     val = ""
     keyname = make_jl_string(a_as_uchar)
-    println("Processing name $keyname")
+    #println("Processing name $keyname")
     current_block = c.block_stack[end]
     syntax_type = get_syntactical_type(b)
     if syntax_type == cif_value_tp_ptr
@@ -1060,12 +1060,12 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         val = process_to_strings(tt,Dict{String,native_cif_element}())
     else val = syntax_type()
     end
-    if !ismissing(val) && val != nothing
+    #==if !ismissing(val) && val != nothing
         println("With value $val")
     elseif ismissing(val)
         println("With value ?")
     else println("With value .")
-    end
+    end ==#
     if !(keyname in keys(current_block.data_values))
         current_block.data_values[keyname] = [native_cif_element(val)]
     else
@@ -1138,7 +1138,7 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     ## Todo: finalizer for parse options
     dpp = cif_tp_ptr(0)   #value replaced by C library
     ## Debugging: do we have good values in our parse options context?
-    println("User context is $(p_opts.user_data)")
+    ## println("User context is $(p_opts.user_data)")
     val=ccall((:cif_parse,"libcif"),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
     close(f)
     finalizer(cif_destroy!,dpp)

@@ -8,10 +8,10 @@ with each iteration providing a new packet"""
 
 struct CategoryObject
     datablock::cif_block_with_dict
-    catname::AbstractString
-    cifdic::cifdic
-    object_names::Vector{AbstractString}
-    data_names::Vector{AbstractString}
+    catname::String
+    object_names::Vector{String}
+    data_names::Vector{String}
+    data_frame::DataFrame
     internal_object_names
     name_to_object
     object_to_name
@@ -24,27 +24,26 @@ end
 
 CategoryObject(datablock,catname) = begin
     cifdic = datablock.dictionary
-    object_names = [a for a in keys(cifdic) if lowercase(String(get(cifdic[a],"_name.category_id",""))) == lowercase(catname)]
-    data_names = [String(cifdic[a]["_definition.id"]) for a in object_names]
-    internal_object_names = [String(cifdic[a]["_name.object_id"]) for a in data_names]
+    object_names = [a for a in keys(cifdic) if lowercase(String(get(cifdic[a],"_name.category_id",[""])[1])) == lowercase(catname)]
+    data_names = [String(cifdic[a]["_definition.id"][1]) for a in object_names]
+    internal_object_names = [String(cifdic[a]["_name.object_id"][1]) for a in data_names]
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(zip(internal_object_names,data_names))
-    is_looped = String(get(cifdic[catname],"_definition.class","Set")) == "Loop"
+    is_looped = String(get(cifdic[catname],"_definition.class",["Set"])[1]) == "Loop"
     have_vals = [k for k in data_names if k in keys(datablock)]
     use_keys = false
     key_index = []
     if is_looped
-        key_l = get_loop(cifdic[catname],"_category_key.name")
-        println("Got loop $key_l")
-        key_names = [String(l["_category_key.name"]) for l in key_l]
-        use_keys, key_names = create_keylists(key_names,have_vals,datablock)
+        key_names = cifdic[catname]["_category_key.name"]
+        use_keys, key_names = create_keylists(key_names,have_vals)
     end
-    CategoryObject(datablock,catname,cifdic,object_names,data_names,internal_object_names,
+    actual_data = get_loop(datablock,have_vals[1])
+    CategoryObject(datablock,catname,object_names,data_names,actual_data,internal_object_names,
         name_to_object,object_to_name,key_names,is_looped,have_vals,key_index,use_keys)
 end
 
 # This function creates lists of data names that can be used as keys of the category
-create_keylists(key_names,have_vals,datablock) = begin
+create_keylists(key_names,have_vals) = begin
     have_keys = [k for k in key_names if k in have_vals]
     println("Found keys $have_keys")
     use_keys = true
@@ -56,37 +55,22 @@ create_keylists(key_names,have_vals,datablock) = begin
 end
 
 # Allow access using a dictionary of object names
-# Will Julia properly finalize the loop iterator?
-# Will the returned packet get finalised in the end?
 
 Base.getindex(c::CategoryObject,keydict) = begin
-    keynames = keys(keydict)
-    keyvals = collect(values(keydict))
-    for pack in c
-        packvals = [pack[k] for k in c.key_names]
-        if keyvals == packvals
-            return pack
-        end
+    pack = c.data_frame
+    println("Loop is $pack")
+    for pr in keydict
+        k,v = pr
+        println("Testing for $k == $v")
+        pack = pack[ pack[Symbol(k)] .== v,:]
     end
-    throw(KeyError(keydict))
+    return pack
 end
 
-Base.iterate(c::CategoryObject) = begin
-    probe_name = c.key_names[1]
-    l = get_loop(c.datablock,probe_name)
-    state = iterate(l)
-    if state == nothing return state end
-    pack,nstate = state
-    return pack,(l,nstate)
-end
+# We simply iterate over the data loop
 
-Base.iterate(c::CategoryObject,ci) = begin
-    loop,state = ci
-    nstate = iterate(loop,state)
-    if nstate == nothing return nstate end
-    pack,fstate = nstate
-    return pack,(loop,fstate) 
-end
+Base.iterate(c::CategoryObject) = iterate(c.data_frame)
+Base.iterate(c::CategoryObject,ci) = iterate(c.data_frame,ci)
 
 #==
 For simplicity, the Python-Lark transformer does not annotate

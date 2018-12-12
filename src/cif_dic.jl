@@ -5,7 +5,7 @@ export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 
 struct cifdic
     block::NativeBlock    #the underlying CIF block
-    definitions::Dict{String,String}
+    definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
     cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
@@ -122,7 +122,7 @@ resolve_imports!(c::cifdic) = begin
         import_table = one_block["_import.get"][1]
         import_def = nothing   #define it in the right scope
         for one_entry in import_table
-            println("Now processing $one_entry")
+            # println("Now processing $one_entry")
             url = URI(fix_url(String(one_entry["file"]),original_dir))
             if url.scheme != "file"
                 error("Non-file URI cannot be handled: $(one_entry[file])")
@@ -148,7 +148,7 @@ resolve_imports!(c::cifdic) = begin
             end
             # Now carry out the import
             if !(location in keys(cached_dicts))
-                println("Now trying to import $location")
+                #println("Now trying to import $location")
                 try
                     cached_dicts[location] = cifdic(location)
                 catch y
@@ -209,6 +209,12 @@ get_loop(b::cif_block_with_dict,s::String) = begin
     return df
 end
 
+# Anything not defined in the dictionary is invisible
+Base.keys(c::cif_block_with_dict) = begin
+    true_keys = lowercase.(collect(keys(c.data)))
+    dnames = [d for d in keys(c.dictionary) if lowercase(d) in true_keys]
+    return dnames
+end
 #==
 The dREL type machinery. Defined that take a string
 as input and return an object of the appropriate type
@@ -256,6 +262,8 @@ get_julia_type(cifdic,cat,obj,value) = begin
         change_func = (x -> map(y->real_from_meas(y),x))
     elseif julia_base_type == Complex
         change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
+    elseif julia_base_type == String
+        change_func = (x -> map(y->String(y),x))
     end
     if cont_type == "Single"
         return change_func(value)
