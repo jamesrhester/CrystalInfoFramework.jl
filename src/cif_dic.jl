@@ -194,17 +194,27 @@ end
 assign_dictionary(c::NativeBlock,d::cifdic) = cif_block_with_dict(c,d)
 
 Base.getindex(c::cif_block_with_dict,s::String) = begin
-    true_key = c.dictionary.definitions[lowercase(s)]
-    as_string = c.data[true_key]
+    as_string = c.data[s]
     actual_type = get_julia_type(c.dictionary,s,as_string)
 end
 
+# As a dictionary is available, we return the loop that
+# would contain the name, even if it is absent
+
 get_loop(b::cif_block_with_dict,s::String) = begin
-    loop_names = [l for l in b.data.loop_names if s in l]
+    category = b.dictionary[s]["_name.category_id"]
+    all_names = [n for n in keys(b.dictionary) if get(b.dictionary[n],"_name.category_id",nothing) == category]
+    #println("All names in category of $s: $all_names")
+    loop_names = [l for l in all_names if l in keys(b)]
+    if length(loop_names) == 0
+        error("Non-existent loop requested, same category as $s")
+    end
+    #println("All names present in datafile: $loop_names")
     # Construct a data frame using Dictionary knowledge
     df = DataFrame()
-    for n in loop_names[1]
-        df[Symbol(n)] = get_julia_type(b.dictionary,n,b.data.data_values[n])
+    for n in loop_names
+        obj_name = String(b.dictionary[n]["_name.object_id"][1])
+        df[Symbol(lowercase(obj_name))] = b[n]
     end
     return df
 end
@@ -245,17 +255,20 @@ const type_mapping = Dict( "Text" => String,
                            "List" => Array{Any}
                            )
 
-
+get_julia_type_name(cifdic,cat,obj) = begin
+    definition = get_by_cat_obj(cifdic,(cat,obj))
+    base_type = String(definition["_type.contents"][1])
+    cont_type = String(get(definition,"_type.container",["Single"])[1])
+    jl_base_type = type_mapping[base_type]
+    return jl_base_type,cont_type
+end
 
 """Convert to the julia type for a given category, object and String value.
 This is clearly insufficient as it only handles one level of arrays."""
 get_julia_type(cifdic,cat,obj,value) = begin
-    definition = get_by_cat_obj(cifdic,(cat,obj))
-    base_type = String(definition["_type.contents"][1])
-    cont_type = String(get(definition,"_type.container",["Single"])[1])
+    julia_base_type,cont_type = get_julia_type_name(cifdic,cat,obj)
     change_func = (x->x)
-    julia_base_type = type_mapping[base_type]
-    println("Julia type for $base_type is $julia_base_type, converting $value")
+    # println("Julia type for $base_type is $julia_base_type, converting $value")
     if julia_base_type == Integer
         change_func = (x -> map(y->parse(Int,y),x))
     elseif julia_base_type == Float64
@@ -281,7 +294,7 @@ end
 real_from_meas(value) = begin
     as_string = String(value)
     if '(' in as_string
-        return parse(Float64,as_string[:findfirst(isequal("("),as_string)-1])
+        return parse(Float64,as_string[1:findfirst(isequal('('),as_string)-1])
     end
     return parse(Float64,as_string)
 end

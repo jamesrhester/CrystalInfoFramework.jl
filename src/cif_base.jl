@@ -899,20 +899,20 @@ mutable struct NativeBlock <: cif_container{native_cif_element}
 end
 
 Base.keys(b::NativeBlock) = keys(b.data_values)
-Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,s)
+Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,lowercase(s))
 Base.iterate(b::NativeBlock) = iterate(b.data_values)
 Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
-
+Base.length(b::NativeBlock) = length(b.data_values)
 Base.getindex(b::NativeBlock,s::String) = begin
-    getproperty.(b.data_values[s],:element)
+    getproperty.(b.data_values[lowercase(s)],:element)
 end
 
 Base.setindex!(b::NativeBlock,v,s) = begin
-    b.data_values[s]=v
+    b.data_values[lowercase(s)]=v
 end
 
 Base.delete!(b::NativeBlock,s) = begin
-    delete!(b.data_values,s)
+    delete!(b.data_values,lowercase(s))
 end
 
 get_loop(b::NativeBlock,s) = begin
@@ -1066,10 +1066,11 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         println("With value ?")
     else println("With value .")
     end ==#
-    if !(keyname in keys(current_block.data_values))
-        current_block.data_values[keyname] = [native_cif_element(val)]
+    lc_keyname = lowercase(keyname)
+    if !(lc_keyname in keys(current_block.data_values))
+        current_block.data_values[lc_keyname] = [native_cif_element(val)]
     else
-        push!(current_block.data_values[keyname],native_cif_element(val))
+        push!(current_block.data_values[lc_keyname],native_cif_element(val))
     end
     return 0    
 end
@@ -1145,7 +1146,7 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     # Check for errors and destroy the CIF if necessary
     if val != 0
         finalize(dpp)
-        error("File $s load error: "* error_codes[val])
+        error("File $filename load error: "* error_codes[val])
     end
     #q = time_ns()
     #println("$q: Created cif ptr:$dpp for file $s")
