@@ -204,8 +204,10 @@ ast_fix_indexing(ast_node,in_scope_list;lhs=nothing) = begin
             if typeof(ixpr.args[2]) ==  Expr && ixpr.args[2].head == :call && ixpr.args[2].args[1] == :(:)
                 ixpr.args[2].args[2] = :($(ixpr.args[2].args[2])+1)
                 # no need to adjust endpoint as Julia is inclusive, dREL is exclusive
-            else
-                ixpr.args[2] = :($(ixpr.args[2])+1)
+            else  # multi-indexing, has anything been missed?
+                for i in 2:length(ixpr.args)
+                    ixpr.args[i] = :($(ixpr.args[i])+1)
+                end
             end
         end
         return ixpr
@@ -322,9 +324,9 @@ to_julia_array(drel_array) = begin
             println("$level:$result")
             return level+1, cat(result...,dims=level)
         end
-    else    #primitive elements
+    else    #primitive elements, make them floats
         println("Bottom level: $drel_array")
-        return 2,hcat(drel_array...)
+        return 2,hcat(Float64.(drel_array)...)
     end
 end
 
