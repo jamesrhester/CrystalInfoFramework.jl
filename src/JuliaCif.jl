@@ -9,6 +9,6 @@ using URIParser
 include("cif_errors.jl")
 include("cif_base.jl")
 include("cif_dic.jl")
-include("drel.jl")
+include("drel/drel.jl")
 
 end

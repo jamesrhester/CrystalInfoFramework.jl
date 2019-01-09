@@ -1,0 +1,662 @@
+@
+Introduction
+============
+
+The Python-based Lark grammar system allows 'Transformer' functions to be defined. Each transformer
+is named after a node in the parse tree, and takes the contents of the node as an
+argument.  The transformers in this file transform the parse tree into a piece of
+Julia code assuming the following environment:
+
+1. The entire dREL method becomes a Julia function definition that takes a Category
+   representing the category in which the definition appears.
+   This allows the function to be 'mapped' over the category if necessary.
+
+2. The outer function also takes a cif data block object with a specified interface.
+
+3. The CIF interactions are mediated by the JuliaCif package.
+   
+The transformer methods will assume that any interior nodes have already been processed.
+
+This module is designed to be imported by a Julia routine that uses PyCall to import
+it. Other uses are untested.
+
+<<*>>=
+from lark import Lark,Transformer,UnexpectedInput
+import re
+
+<<Transformer class>>
+<<Utility functions>>
+
+@
+Lark top level
+--------------
+
+We inherit from the Lark Transformer class.
+
+<<Transformer class>>=
+class TreeToPy(Transformer):
+    """Convert a Lark parse tree to Python code"""
+    <<Initialise transformer>>
+    <<Statements>>
+    <<Compound statements>>
+    <<Atoms to expressions>>
+    <<Lists and tables>>
+    <<Subscriptions>>
+    <<Attributes>>
+    <<Functions>>
+
+                 
+@ Initialisation.   We require a lot of contextual information:
+
+1. the dataname so that we can determine the category/object in which this definition
+   appears, in order to identify the return value
+2. the name we wish to give the function
+
+If this method is to be used for arbitrary data names, the ``is_validation'' flag
+is set.  When set, the generated function is supplied with a further argument,
+the data name, and attributes from the dictionary are preset for this function.
+
+As this is called from Julia, we cannot pass complex objects (such as a cifdic) as
+the Julia -> Python object wrapping is not that fancy.
+
+<<Initialise transformer>>=
+def __init__(self, dataname, func_name, target_cat, target_obj, cat_list,
+             is_func = False, is_validation=False,att_dict={},func_list=[]):
+    super().__init__()
+    self.func_name = func_name
+    self.target_cat = target_cat
+    self.target_object = target_obj
+    self.is_func = is_func
+    self.is_validation = is_validation
+    self.cat_list = [a.lower() for a in cat_list]
+    self.att_dict = att_dict  #DDLm attribute dictionary, validation only
+    self.func_list = func_list
+    <<Internal use variables>>
+
+@         
+
+<<Internal use variables>>=
+self.cat_ids = set([])   #categories mentioned in the method
+self.target_category_alias = target_cat #
+self.ddlm_cats = set([]) #DDLm categories mentioned, validation only
+self.aug_assign_table = {"++=":"julia-fixme",
+                    "--=":"julia-fixme"}
+
+@ 
+dREL top level
+==============
+
+The final function body is output by concatenating the strings generated before,
+separated by newlines.  The header of the function will depend on whether or
+not it should be used for validation. ::
+
+<<Statements>>=
+def input(self,args):
+    cat_string = "# Transform for (%s,%s)\n" % (self.target_cat,self.target_object)
+    ddlm_string = ""
+    if self.is_func:
+        return "",cat_string + args[0]
+    for c in self.cat_ids:
+        cat_string = cat_string + '%s = CategoryObject(__datablock,"%s")\n' % (c,c)
+    for c in self.ddlm_cats:   #DDLm attributes
+        ddlm_string = ddlm_string + '%s = CategoryObject(__dict[__dataname],"%s")\n' % (c,c)
+    if self.is_validation:
+        header_code = '%s(__datablock,__dict,__packet,__dataname,__ddldic) = begin' % self.func_name
+    else:
+        header_code = "%s(__datablock,__dict,__packet) = begin" % self.func_name
+    debug_string = '\nprint("' + '%s -> ")' % self.target_object
+    debug_string += "println(__dreltarget)"
+    body = cat_string
+    if self.is_validation: body = body + ddlm_string
+    body = body + args[0] + debug_string+"\nreturn __dreltarget\nend"
+    if self.target_category_alias == self.target_cat:
+        self.target_category_alias = ""
+    return self.target_category_alias,header_code + add_indent("\n"+body)  #leave the indent for nice layout
+
+def statements(self,args):
+    return _concat(args,"\n")
+
+def statement(self,args):
+    return _concat(args,"\n")
+
+def simple_statement(self,args):
+    return _concat(args,"\n")
+
+def small_statement(self,args):
+    return _concat(args)
+
+#TODO: analyse LHS/RHS information
+def assignment(self,args):
+    if args[1] in ["=","+=","-="]: 
+        return _concat(args)
+    else: #call runtime functions
+        operator = self.aug_assign_table[args[1]]
+        return "%s = %s(%s,%s)" % (args[0],operator,args[0],args[2])
+
+def augop(self,args):
+    return args[0]
+
+def lhs(self,args):
+    return args[0]
+
+def rhs(self,args):
+    v = args[0]
+    return v
+
+@
+From literals to expressions
+----------------------------
+
+Julia recognises only double quotes as string delimiters, so we
+must remove any incidences of single quotes. Also, Julia has
+characters as well as strings, and does not accept that 'a' (a
+character) is equal to "a" (a string). TODO: perhaps redefine
+equality?
+
+<<Atoms to expressions>>=
+def literal(self,args):
+    # Pick up built-in literals
+    v = args[0]
+    if v.lower() == 'twopi':
+        return "2pi"
+    # Deal with string delimiters. If there are
+    # internal triple double quotes, then...that
+    # would be sad.
+    if v[0:3]=="'''" and v[-3:]=="'''":
+        v[0:3] = '"""' + v[3:-3] + '"""'
+    elif v[0] == "'" and v[-1] == "'":
+        # escape internal quotes
+        v = re.sub(r'"','\\"',v)
+        v = '"' + v[1:-1] + '"'
+    
+    return v
+
+# A real does not need to be followed by anything, so
+# make sure we catch this case. Julia does not like
+# trailing periods, so we drop them if necessary.
+def real(self,args):
+    if len(args)==1:
+        return args[0]
+    else:
+        return args[0]+"."+args[1]
+
+# If we catch a category identifier, we
+# give an explicit type. This allows us
+# to pick it up when traversing the AST
+# later so that we can annotate the types
+# of its members.
+def ident(self,args):
+    # remove initial underscores
+    v = args[0]
+    if v[0] == '_':
+        v = v[1:]
+    # catch any category references
+    if v.lower() in self.cat_list and v != self.target_cat:
+        self.cat_ids.add(v)
+    if v in self.att_dict.keys():
+        self.ddlm_cats.add(v)
+    if v == self.target_cat:
+        v = "__packet"
+    elif v.lower() in self.cat_list:
+        v = v + "::CategoryObject"
+    return v
+
+#TODO: this is missing in Py version
+def id_list(self,args):
+    if len(args) == 1:
+        return args[0]
+    else:
+        return _concat(args,",")
+    
+def enclosure(self,args):
+    return _concat(args)
+
+def att_primary(self,args):
+    return _concat(args)
+
+def primary(self,args):
+    return _concat(args)
+
+def arith(self,args):
+    if len(args)>1:
+        return fix_mathops(args[1],args[0],args[2])
+    return _concat(args)
+
+def power(self,args):
+    if len(args) == 1:
+        return args
+    return args[0] + "^" + args[-1]
+
+def factor(self,args):
+    return _concat(args)
+
+# In this case we can just redefine using Julia's
+# multiple despatch
+#
+def term(self,args):
+    return _concat(args)
+
+def restricted_comp_operator(self,args):
+    return _concat(args," ")
+
+def comp_operator(self,args):
+    return _concat(args," ")
+
+# We have to catch "not in" and move the
+# not operator to the outside
+
+def comparison(self,args):
+    if len(args)>1:
+        if (args[1][:3]).lower() == "not":
+            return _concat(["!(",args[0],args[1][3:],args[2],")"]," ")
+    return _concat(args," ")
+
+def not_test(self,args):    
+    if len(args) == 1:
+        return _concat(args," ")
+    else:
+        return '!'+args[1]
+
+def and_test(self,args):
+    if len(args) == 1:
+        return args
+    else:
+        return _concat([args[0],'&&',args[2]],' ')
+
+def or_test(self,args):
+    if len(args) == 1:
+        return args
+    else:
+        return _concat([args[0],'||',args[2]],' ')
+
+@
+
+Subscriptions. Element references of form primary [ subscript ].  A
+subscription may be a simple element lookup, as in a[1]; it may be
+a keyed lookup of a different category using the value within the
+square brackets e.g. p[m.symop]; it may use multiple keys and use
+a dotted list of key values; or it may be a slicing. If it is a
+slicing, it is not applicable to category objects.
+
+As category objects can only be used in 'with' or 'loop' statements,
+if we find the primary is something that we are looping or withing, we
+immediately adopt the keyed lookup.  It is also possible for a delayed
+attribute lookup to occur, for example, a = atom_site[label] and later
+b = a.position, so we catch any subscriptions applied to loop category
+names.
+
+We convert list-valued subscriptions to a Julia-native form....TODO
+
+In all other cases we have a plain subscription as per the Julia
+`getindex` method.
+
+<<Subscriptions>>=
+#TODO: dREL-specific behaviour
+def subscription(self,args):
+    return args[0]+"["+args[1]+"]"
+
+def dotlist_element(self,args):
+    return args[0]+"=>"+args[1]
+
+def dotlist(self,args):
+    return "Dict(" + _concat(args,",")+")"
+
+@ Attribute references.
+    
+Note that we should not assume that a dataname is constructed as
+``_category.object''.  Rather, we should look up the correct form of
+the dataname using the provided dictionary. Our match on 'atom' will
+already have substituted in the string '__packet' if we are referencing
+an item in the target category, so we check for this in order to catch
+the particular data name that is the one we are calculating.
+
+Type annotations for the target object are handled by annotating the
+calling function.
+
+The packet object can be annotated later using Julia metaprogramming.
+
+We are unlikely to catch category aliases here, as attribute references will
+be processed before the enclosing block containing the with statement.
+The syntax ``a.b'' is mapped to the 'getproperty' call in Julia, which
+works with data frames, so we need not touch anything.
+
+<<Attributes>>=
+def attributeref(self,args):
+    #TODO: all of the dREL-specific behaviour, guessing keys etc.
+    print("ATTRIBUTEREF: passed %s.%s" % (args[0],args[1]))
+    if (args[0] == '__packet' or args[0] == self.target_category_alias) \
+        and args[1] == self.target_object:
+        return "__dreltarget"
+    else:
+        return "("+args[0] + '.' + args[1].lower()+")"
+    
+@ Lists and tables.
+
+Julia, bless its cotton socks, indexes from 1. We rely on a Julia
+macro provided with JuliaCif to insert index corrections in the
+appropriate places. Also, the second element in a three-element
+slice is the step, unlike Python or dREL, for which it is the end, so
+we swap things around below.
+
+TODO Julia: row/column major indexing...do we need to swap stuff?
+    
+<<Lists and tables>>=
+def slicing(self,args):
+    return _concat(args)
+
+# this is where we work out whether or not we had a step in there
+# We are passed a single argument containing the results of the
+# short or long slices. We retain zero-based indexing in anticipation
+# of the Julia macros catching and fixing stuff.
+
+def proper_slice(self,args):
+    step = args[0].get("step","1")
+    return args[0]["start"]+":"+step+":"+args[0]["stop"]
+
+def short_slice(self,args):
+    if len(args)==1: # a colon
+        return {"start":"0","stop":"end"}    #meaning identical in Julia
+    if len(args) == 3:    #start, end
+        return {"start":args[0],"stop":args[2]}
+    elif len(args) == 2 and args[0]==":":
+        return {"start":"0","stop":args[1]}
+    else:
+        return {"start":args[0],"stop":"end"}
+
+def long_slice(self,args):
+    # args[0] is a dictionary
+    args[0].update({"step":args[1]})
+    return args[0]
+
+def slice_list(self,args):
+    return _concat(args)
+
+def list_display(self,args):
+    return _concat(args)
+
+def expression_list(self,args):
+    return _concat(args) #comma is provided
+
+def parenth_form(self,args):
+    return _concat(args)
+
+def table_display(self,args):
+    return _concat(args)
+
+def table_contents(self,args):
+    return _concat(args)
+
+def table_entry(self,args):
+    return _concat(args)
+
+def expression(self,args):
+    return _concat(args)
+
+@
+Compound Statements
+===================
+
+<<Compound statements>>=
+def suite(self,args):
+    return _concat(args)
+
+def compound_statement(self,args):
+    return args[0]
+
+def repeat_stmt(self,args):
+    os = "while true" + add_indent("\n" + args[1]) + '\nend'
+    return os
+
+# args[1] might be a list. Julia doesn't seem to support assigning
+# to a list in a for statement header, so we insert the assignment
+# at the beginning of the suite.
+def for_stmt(self,args):
+    if "," in args[1]:
+        extra_line = args[1]+"=" + "__dummy"
+        outstring = "for __dummy in copy(" + args[3] + ")\n"
+        outstring = outstring + extra_line
+    else:
+        outstring = "for " + args[1] + " in " + "copy(" + args[3] + ")"
+    outstring = outstring + add_indent("\n"+args[-1]) + '\nend'
+    return outstring
+
+def do_stmt(self,args):
+    outstring = "for " + args[1] + " in " + args[2]
+    if len(args)>7:  #increment
+        increment = args[7]
+    else:
+        increment = "1"
+    outstring = outstring + ":" + increment + ':' + args[3]
+    outstring = outstring + add_indent("\n"+args[-1] + '\nend')
+    return outstring
+
+def loop_stmt(self,args):
+    # TODO: the fancy stuff
+    start = "for %s in %s" % (args[1],args[3])
+    return start + add_indent("\n"+args[-1]+'\nend')
+
+# Our alias may apply to a packet or another category
+def with_stmt(self,args):
+    print("WITH: %s" % repr(args))
+    withstr = "%s = %s" % (args[1],args[3])
+    if args[3] != "__packet":
+        withstr = withstr + "::CategoryObject"
+    else:   #our target category
+        self.target_category_alias = args[1]
+    withstr = withstr + "\n" + args[-1] #not indented
+    return withstr
+
+# An if stmt may have 'elseif' as the second argument.
+def if_stmt(self,args):
+    ifstr = "if " + args[1] +add_indent("\n"+args[2])
+    ifstr = ifstr + _concat(args[3:]) + '\nend'
+    return ifstr
+
+def else_stmt(self,args):
+    return "\nelse" + add_indent("\n"+args[-1]) + '\n'
+
+def else_if_stmt(self,args):
+    ifstr = "\nelseif " + args[1] + add_indent("\n"+args[-1]) + '\n'
+    return ifstr
+
+@ 
+Functions.  A function call may invoke a built-in function, so we have
+to convert these to known python functions. However, list/array construction
+in Julia is accomplished simply by using square brackets, so we special-case
+these functions.
+
+<<Functions>>=
+def call(self,args):
+    # Catch list / array constructors
+    print("Function call: " + args[0])
+    if args[0].lower() in ["list","array"]:
+        if len(args) == 3:
+            return " []"
+        else:
+            return " [" +args[2]+ "] "
+    # Catch dictionary-defined functions
+    if args[0].lower() in self.func_list:
+        return args[0]+"(" + args[2] + ",__datablock)"
+    before,middle,after = get_function_name(args[0])
+    if len(args) == 3:
+        fstr = before + "(" + middle + ")" + after #no arguments
+    else:
+        fstr = before + "(" + middle + args[2] + ")" + after
+    return fstr
+
+# A function definition will be a standalone function, so we insert
+# our category calls here
+def funcdef(self,args):
+    fstr = args[1]+"("+args[2]+",__datablock)"+"= begin\n"
+    for c in self.cat_ids:
+        fstr = fstr + '%s = CategoryObject(__datablock,"%s")\n' % (c,c)
+    fstr += add_indent("\n"+args[-1]+"\nreturn %s" % args[1]) + '\nend'
+    return fstr
+
+def arglist(self,args):
+    return _concat(args)
+
+def one_arg(self,args):
+    return args[0]   #TODO: add Julia type information
+
+
+
+@
+Utility functions
+=================
+
+We do a lot of concatenation. If there is only one argument, we do
+not use the separator.
+
+<<Utility functions>>=
+def _concat(args,separator=""):
+    #print("Concatenating %s" % repr(args))
+    if len(args)==1:
+    #    print("Returning %s" % args[0])
+        return args[0]
+    s = ""
+    for a in args:
+       if not isinstance(a,str):
+           print("Warning: %s is not string" % repr(a))
+           b = str(a)
+       else:
+           b = a
+       s = s + b + separator
+    #print("Returning %s" % s)
+    return s
+
+def add_indent(some_text,n=4):
+    """Indent text by n spaces"""
+    return re.sub("\n","\n"+4*" ",some_text)
+
+def add_type(cifdic,dicname):
+    """Annotate dicname with type"""
+    entry = cifdic[dicname]
+    annotation = get_type_annotation(entry['_type.contents'],
+                                     entry.get('_type.container','Single'),
+                                     entry.get('_type.dimension',None)
+                                     )
+    return dicname + "::"+annotation
+
+<<Function transformer>>
+<<Mathematical operations>>
+<<Type annotations>>
+
+@ We call out to this function in order to find out what the Julian
+name of the given function is.  Where we have to provide our own
+function, that is also listed.  Note that this only works for unary
+functions.  We provide the broadcast versions of Julia functions where
+possible, in keeping with the dREL convention that functions can apply
+to matrices and lists.
+
+We force all matrices to be 64-bit floats.  If you check SeitzFromJones, you will
+find a matrix that defaults to integer type, meaning that any assignments of float
+values are rounded, thus the need for explicitly working with floats. TODO: What does
+this mean for Julia??
+
+<<Function transformer>>=
+def get_function_name(in_name):
+    """Return the Julia name of the dREL function, an argument prefix,
+       and anything to be appended to the end"""
+    builtins = {"table":"Dict",
+                "len":"length",
+                "abs":"abs",
+                "magn":"abs",
+                "str":"str",
+                "norm":"norm",
+                "sqrt":"sqrt",
+                "exp":"exp",
+                "complex":"complex",
+                "max":"max",
+                "min":"min",
+                "float":"Float64",
+                "strip":"drel_strip",
+                "eigen":"drel_eigen",
+      "sind":"sind",
+      "cosd":"cosd",
+      "tand":"tand",
+      "asind":"asind",
+      "acosd":"acosd",
+      "atand":"atand",
+                "mod":"mod.",
+                "repr":"string"
+    }
+    test_name = in_name.lower()
+    target_name = builtins.get(test_name,None)
+    if target_name is not None:
+        return target_name,"",""
+    if test_name == "matrix":  #custom Julia creation
+        return "to_julia_array","","[1]"  #zero-based indexing at this stage
+    if test_name == "atoi":
+        return "parse","Int,",""
+    if test_name == "int":
+        return "floor.","Int64,",""
+    if test_name == "upper":
+        return "","",".upper()"
+    if test_name == "transpose":
+        return "","",".T"
+    if test_name == 'expimag':
+        return "cmath.exp","1j*(",")"
+    if test_name in ['real','imag']:
+        return "","","." + test_name
+    if test_name == 'sort':
+        return "sort!","",""
+    if test_name == 'current_row':
+        return "","",".__current_row()"
+    # These are our validation builtins
+    if test_name in ('known','instance'):
+        return test_name,"__dict,__datablock,",""
+    if test_name == 'reference':
+        return test_name,"__dict,",""
+    if test_name in ('packetdata','lookup'):
+        return test_name,"",""
+    return in_name,"",""   #dictionary defined
+
+@
+    Mathematical operations. The two operators that are provided in
+    the syntax are "^" (cross product) and "*" (matrix multiplication).
+
+<<Mathematical operations>>=
+def fix_mathops(op,first_arg,second_arg):
+    """Return a string that will carry out the requested operation"""
+    if op == "^":
+        return "LinearAlgebra.cross(%s,%s)" % (first_arg,second_arg)
+    elif op == "*":  #could be matrix multiplication...or not
+        return "LinearAlgebra.dot(%s,%s)" % (first_arg,second_arg)
+    elif op in "+-/": #turn into broadcasted equivalents
+        return "%s %s %s" % (first_arg," ."+op,second_arg)
+
+@
+In Julia we can annotate type after any variable. This type is then used to
+search for an appropriate 'convert' function. So by annotating type, we can
+get Cif values turned into numbers etc. without doing this explicitly.
+
+<<Type annotations>>=
+def get_type_annotation(ddl_type,ddl_container,ddl_dimension):
+    if "," in ddl_type:
+        element_type = "Any"
+    elif ddl_type in ("Text","Code","Name","Tag","Uri","Date","Symop"):
+        element_type = "String"
+    elif ddl_type in ("Range","Count","Index","Integer"):
+        element_type = "Integer"
+    elif ddl_type == "Real":
+        element_type = "Real"
+    elif ddl_type in ("Imag","Complex"):
+        element_type = "Complex"
+    # Now figure out containers
+    if ddl_container == "Single":
+        annotation = element_type    
+    elif ddl_container == "List":
+        annotation = "Array{%s}" % element_type
+    elif ddl_container == "Array":
+        annotation = "Array{%s}" % element_type
+    elif ddl_container == "Matrix":
+        annotation = "Matrix{%s}" % element_type
+    elif ddl_container == "Table":
+        annotation = "Dict{String,%s}" % element_type      
+    return annotation
+
+
+
+
+      
