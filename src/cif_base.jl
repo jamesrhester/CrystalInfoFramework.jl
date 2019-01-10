@@ -4,7 +4,7 @@ the libcif API =#
 export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table
 export get_save_frame, get_all_frames
-export NativeCif,native_cif_element
+export NativeCif,native_cif_element,NativeBlock
 
 import Base.Libc:FILE
 

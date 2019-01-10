@@ -11,7 +11,7 @@ end
     ud = prepare_system()
     c = CategoryObject(ud,"atom_site_moment")
     f = c[Dict("label"=>"Cr1_2")]
-    @test f[Symbol("crystalaxis_y")][1] == 2.33
+    @test (f.crystalaxis_y)[1] == 2.33
 end
 
 @testset "Testing expression processing" begin
@@ -25,7 +25,7 @@ end
     newtext = ast_fix_indexing(rawtext,[])
     println("New text: $newtext")
     @test eval(newtext) == 5
-    rawtext = :(a = atom_site_moment::CategoryObject;a[label] = "Hello";return true)
+    rawtext = :(a = atom_site_moment::CategoryObject;a["label"] = "Hello";return true)
     newtext = ast_fix_indexing(rawtext,Symbol.(["__packet","atom_site_moment"]))
     println("New text: $newtext")
     @test true
