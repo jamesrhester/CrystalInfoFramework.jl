@@ -3,7 +3,7 @@
 
 module drel_exec
 
-export dynamic_dict
+export dynamic_dict,dynamic_block
 
 using JuliaCif
 
@@ -49,7 +49,7 @@ lark_transformer(dname,dict,all_funcs,cat_list,func_cat) = begin
     if lowercase(target_cat) == lowercase.(func_cat)
         is_func = true
     end
-    tt = jl_transformer[:TreeToPy](dname,"myfunc",target_cat,target_obj,cat_list,is_func=is_func,func_list=all_funcs)
+    tt = jl_transformer[:TreeToPy](dname,target_cat,target_obj,cat_list,is_func=is_func,func_list=all_funcs)
 end
 
 #== Functions defined in the dictionary are detected and adjusted while parsing. To avoid
@@ -79,7 +79,17 @@ get_drel_methods(cd) = begin
     return meths
 end
 
-make_julia_code(drel_text::String,dataname::String,dict::cifdic,parser,all_funcs,func_cat,cat_names) = begin
+#== This method creates Julia code from dREL code by
+(1) parsing the drel text into a parse tree
+(2) traversing the parse tree with a transformer that has been prepared
+    with the crucial information to output syntactically-correct Julia code
+(3) parsing the returned Julia code into an expression
+(4) adjusting indices to 1-based
+(5) changing any aliases of the main category back to the category name
+(6) making sure that all local variables are defined at the top level
+==#
+
+make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser,all_funcs,func_cat,cat_names) = begin
     tree = parser[:parse](drel_text)
     transformer = lark_transformer(dataname,dict,all_funcs,cat_names,func_cat)
     tc_aliases,proto = transformer[:transform](tree)
@@ -90,11 +100,24 @@ make_julia_code(drel_text::String,dataname::String,dict::cifdic,parser,all_funcs
     parsed = fix_scope(parsed)
 end
 
+#== Extract the dREL text from the dictionary
+==#
+get_func_text(dict,dataname::String) =  begin
+    full_def = dict[dataname]
+    func_text = get_loop(full_def,"_method.expression")
+    # TODO: ignore non 'Evaluation' methods
+    # TODO: allow multiple methods
+    func_text = String(func_text[Symbol("_method.expression")][1])
+end
+
 #== A dynamic block uses the dREL code defined in the dictionary
 in order to find missing values==#
 
-struct dynamic_dict
+struct dynamic_dict <: abstract_cif_dictionary
     dictionary::cifdic
+    cat_names::Array{String,1}
+    func_cat::String
+    func_names::Array{String,1}
 
     dynamic_dict(c::cifdic) = begin
         #Parse and evaluate all dictionary-defined functions
@@ -110,36 +133,64 @@ struct dynamic_dict
             println("Function text: $func_text")
             result = make_julia_code(func_text,entry_name,c,parser,all_funcs,func_cat,cat_names)
             println("Transformed text: $result")
-            eval(result)
+            eval(result)  #place function name in module scope
         end
-        return new(c)
+        return new(c,cat_names,func_cat,all_funcs)
     end
 end
 
 dynamic_dict(s::String) = begin
     s = cifdic(s)
-    println("Have ordinary dictionary")
     return dynamic_dict(s)
 end
 
+Base.getindex(d::dynamic_dict,s::String) = d.dictionary[s]
+
 struct dynamic_block
-    cif::NativeBlock
+    block::cif_block_with_dict
     dictionary::dynamic_dict
+end
+
+dynamic_block(b::NativeBlock,c::cifdic) = begin
+    cbwd = assign_dictionary(b,c)
+    dd = dynamic_dict(c)
+    dynamic_block(cbwd,dd)
 end
 
 #== Initialise functions
 ==#
-
+const func_lookup = Dict{String,Function}()
 
 Base.getindex(d::dynamic_block,s::String) = begin
     try
-        q = d.cif[s]
-    catch KeyError
+        q = d.block[s]
+    catch
         derive(d,s)
     end
 end
 
 derive(d::dynamic_block,s::String) = begin
-    
+    if !(s in keys(func_lookup))
+        add_new_func(d.dictionary,s)
+    end
+    func_name = func_lookup[s]
+    target_loop = get_loop(d.block,s)
+    println("$target_loop")
+    for p in eachrow(target_loop)
+        println("$p")
+    end
+    [Base.invokelatest(func_name,d.block,d.dictionary,p) for p in eachrow(target_loop)]
 end
+
+add_new_func(d::dynamic_dict,s::String) = begin
+    t = get_func_text(d,s)
+    parser = lark_grammar()
+    r = make_julia_code(t,s,d,parser,d.func_names,
+                                  d.func_cat,d.cat_names)
+    println("Transformed code for $s:\n")
+    println(r)
+    f = eval(r)
+    merge!(func_lookup,Dict(s=>f))
+end
+
 end

@@ -70,8 +70,25 @@ end
 
 # We simply iterate over the data loop
 
-Base.iterate(c::CategoryObject) = iterate(c.data_frame)
-Base.iterate(c::CategoryObject,ci) = iterate(c.data_frame,ci)
+Base.iterate(c::CategoryObject) = begin
+    er = eachrow(c.data_frame)
+    next = iterate(er)
+    if next == nothing
+        return next
+    end
+    r,s = next
+    return r,(er,s)
+end
+
+Base.iterate(c::CategoryObject,ci) = begin
+    er,s = ci
+    next = iterate(er,s)
+    if next == nothing
+        return next
+    end
+    r,s = next
+    return r,(er,s)
+end
 
 #== The Tables.jl interface functions, commented out for now
 

@@ -2,8 +2,11 @@
 # Only DDLm dictionaries supported
 
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
+export cif_block_with_dict,cifdic, abstract_cif_dictionary
 
-struct cifdic
+abstract type abstract_cif_dictionary end
+
+struct cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
@@ -197,6 +200,9 @@ Base.getindex(c::cif_block_with_dict,s::String) = begin
     as_string = c.data[s]
     actual_type = get_julia_type(c.dictionary,s,as_string)
 end
+
+Base.iterate(c::cif_block_with_dict) = iterate(c.data)
+Base.iterate(c::cif_block_with_dict,s) = iterate(c.data,s)
 
 # As a dictionary is available, we return the loop that
 # would contain the name, even if it is absent

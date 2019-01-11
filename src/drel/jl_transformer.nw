@@ -60,10 +60,9 @@ As this is called from Julia, we cannot pass complex objects (such as a cifdic) 
 the Julia -> Python object wrapping is not that fancy.
 
 <<Initialise transformer>>=
-def __init__(self, dataname, func_name, target_cat, target_obj, cat_list,
+def __init__(self, dataname, target_cat, target_obj, cat_list,
              is_func = False, is_validation=False,att_dict={},func_list=[]):
     super().__init__()
-    self.func_name = func_name
     self.target_cat = target_cat
     self.target_object = target_obj
     self.is_func = is_func
@@ -101,10 +100,10 @@ def input(self,args):
     for c in self.ddlm_cats:   #DDLm attributes
         ddlm_string = ddlm_string + '%s = CategoryObject(__dict[__dataname],"%s")\n' % (c,c)
     if self.is_validation:
-        header_code = '%s(__datablock,__dict,__packet,__dataname,__ddldic) = begin' % self.func_name
+        header_code = '(__datablock,__dict,__packet,__dataname,__ddldic) -> begin'
     else:
-        header_code = "%s(__datablock,__dict,__packet) = begin" % self.func_name
-    debug_string = '\nprint("' + '%s -> ")' % self.target_object
+        header_code = "(__datablock,__dict,__packet) -> begin"
+    debug_string = '\nprintln("' + '%s -> ")\n' % self.target_object
     debug_string += "println(__dreltarget)"
     body = cat_string
     if self.is_validation: body = body + ddlm_string
@@ -431,7 +430,7 @@ def do_stmt(self,args):
     return outstring
 
 def loop_stmt(self,args):
-    # TODO: the fancy stuff
+    # TODO: the fancy stuff (additional bits at the end)
     start = "for %s in %s" % (args[1],args[3])
     return start + add_indent("\n"+args[-1]+'\nend')
 
