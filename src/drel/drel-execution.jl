@@ -93,6 +93,8 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     tree = parser[:parse](drel_text)
     transformer = lark_transformer(dataname,dict,all_funcs,cat_names,func_cat)
     tc_aliases,proto = transformer[:transform](tree)
+    println("Proto-Julia code: ")
+    println(proto)
     parsed = ast_fix_indexing(Meta.parse(proto),Symbol.(["__packet"]))
     if tc_aliases != ""
         parsed = find_target(parsed,tc_aliases,transformer[:target_object])
@@ -146,7 +148,9 @@ end
 
 Base.getindex(d::dynamic_dict,s::String) = d.dictionary[s]
 
-struct dynamic_block
+Base.keys(d::dynamic_dict) = keys(d.dictionary)
+    
+struct dynamic_block <: cif_container_with_dict
     block::cif_block_with_dict
     dictionary::dynamic_dict
 end
@@ -156,6 +160,11 @@ dynamic_block(b::NativeBlock,c::cifdic) = begin
     dd = dynamic_dict(c)
     dynamic_block(cbwd,dd)
 end
+
+Base.keys(b::dynamic_block) = keys(b.block)
+JuliaCif.get_loop(b::dynamic_block,s) = get_loop(b.block,s)
+Base.iterate(b::dynamic_block) = iterate(b.block)
+Base.iterate(b::dynamic_block,s) = iterate(b.block,s)
 
 #== Initialise functions
 ==#
@@ -169,6 +178,9 @@ Base.getindex(d::dynamic_block,s::String) = begin
     end
 end
 
+#==Derive all values in a loop for the given
+dataname==#
+
 derive(d::dynamic_block,s::String) = begin
     if !(s in keys(func_lookup))
         add_new_func(d.dictionary,s)
@@ -179,7 +191,19 @@ derive(d::dynamic_block,s::String) = begin
     for p in eachrow(target_loop)
         println("$p")
     end
-    [Base.invokelatest(func_name,d.block,d.dictionary,p) for p in eachrow(target_loop)]
+    [Base.invokelatest(func_name,d,d.dictionary,p) for p in eachrow(target_loop)]
+end
+
+#==This is called from within a dREL method when an item is
+found missing from a packet==#
+
+derive(d::dynamic_block,cat::String,obj::String,p::CatPacket) = begin
+    dataname = String(get_by_cat_obj(d.block.dictionary,(cat,obj))["_definition.id"][1])
+    if !(dataname in keys(func_lookup))
+        add_new_func(d.dictionary,dataname)
+    end
+    func_name = func_lookup[dataname]
+    Base.invokelatest(func_name,d.block,d.dictionary,p)
 end
 
 add_new_func(d::dynamic_dict,s::String) = begin
@@ -193,4 +217,12 @@ add_new_func(d::dynamic_dict,s::String) = begin
     merge!(func_lookup,Dict(s=>f))
 end
 
+deriving_get_property(dfr::CatPacket,obj::String,db::dynamic_block) = begin
+    try
+        return get_index(dfr,Symbol(obj))
+    catch KeyError
+        return derive(db,get_name(dfr),obj,dfr)
+    end
+end
+    
 end

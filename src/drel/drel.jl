@@ -1,14 +1,14 @@
 #== Definitions for running dREL code in Julia.
 ==#
 
-export CategoryObject,find_target, ast_assign_types, ast_fix_indexing, to_julia_array
-export fix_scope, get_attribute
+export CategoryObject,CatPacket,find_target, ast_assign_types, ast_fix_indexing, to_julia_array
+export fix_scope, get_attribute,get_name
 
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
 
 struct CategoryObject
-    datablock::cif_block_with_dict
+    datablock::cif_container_with_dict
     catname::String
     object_names::Vector{String}
     data_names::Vector{String}
@@ -65,10 +65,22 @@ Base.getindex(c::CategoryObject,keydict) = begin
         println("Testing for $k == $v")
         pack = pack[ pack[Symbol(k)] .== v,:]
     end
-    return pack
+    return CatPacket(pack,c.catname)
 end
 
-# We simply iterate over the data loop
+# We can't use a dataframerow by itself as we need to know the
+# category name for use in deriving missing parts of the packet
+
+struct CatPacket
+    dfr::DataFrameRow
+    name::String
+end
+
+get_name(c::CatPacket) = return c.name
+
+    
+# We simply iterate over the data loop, but keep a track of the
+# actual category name for access
 
 Base.iterate(c::CategoryObject) = begin
     er = eachrow(c.data_frame)
@@ -77,7 +89,7 @@ Base.iterate(c::CategoryObject) = begin
         return next
     end
     r,s = next
-    return r,(er,s)
+    return CatPacket(r,c.catname),(er,s)
 end
 
 Base.iterate(c::CategoryObject,ci) = begin
@@ -87,7 +99,7 @@ Base.iterate(c::CategoryObject,ci) = begin
         return next
     end
     r,s = next
-    return r,(er,s)
+    return CatPacket(r,c.catname),(er,s)
 end
 
 #== The Tables.jl interface functions, commented out for now

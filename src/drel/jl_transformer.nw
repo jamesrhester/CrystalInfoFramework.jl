@@ -317,7 +317,9 @@ The packet object can be annotated later using Julia metaprogramming.
 We are unlikely to catch category aliases here, as attribute references will
 be processed before the enclosing block containing the with statement.
 The syntax ``a.b'' is mapped to the 'getproperty' call in Julia, which
-works with data frames, so we need not touch anything.
+works with data frames, but we want to additionally allow recursive
+derivation. Therefore, we transform these calls into a function call that
+first tries the standard 'getproperty' call before attempting derivation.
 
 <<Attributes>>=
 def attributeref(self,args):
@@ -327,7 +329,9 @@ def attributeref(self,args):
         and args[1] == self.target_object:
         return "__dreltarget"
     else:
-        return "("+args[0] + '.' + args[1].lower()+")"
+        # the following line creates something of the form
+        # 'deriving_get_property(c,"vector",__datablock)'
+        return "( deriving_get_property("+args[0] + ',"' + args[1].lower()+'",__datablock))'
     
 @ Lists and tables.
 

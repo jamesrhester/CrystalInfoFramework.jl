@@ -2,7 +2,7 @@
 # Only DDLm dictionaries supported
 
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
-export cif_block_with_dict,cifdic, abstract_cif_dictionary
+export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
 
 abstract type abstract_cif_dictionary end
 
@@ -189,7 +189,9 @@ end
 #== Adding dictionary information to a data block
 ==#
 
-struct cif_block_with_dict <: cif_container{native_cif_element}
+abstract type cif_container_with_dict <: cif_container{native_cif_element} end
+    
+struct cif_block_with_dict <: cif_container_with_dict
     data::NativeBlock
     dictionary::cifdic
 end
