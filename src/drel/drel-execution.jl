@@ -72,7 +72,7 @@ get_dict_funcs(dict::cifdic) = begin
     return func_catname,all_funcs
 end
 
-get_drel_methods(cd) = begin
+get_drel_methods(cd::cifdic) = begin
     has_meth = [n for n in cd if "_method.expression" in keys(n) && String(get(n,"_definition.scope",["Item"])[1]) != "Category"]
     meths = [(String(n["_definition.id"][1]),get_loop(n,"_method.expression")) for n in has_meth]
     println("Found $(length(meths)) methods")
@@ -96,15 +96,16 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     println("Proto-Julia code: ")
     println(proto)
     parsed = ast_fix_indexing(Meta.parse(proto),Symbol.(["__packet"]))
-    if tc_aliases != ""
-        parsed = find_target(parsed,tc_aliases,transformer[:target_object])
-    end
+    # catch implicit matrix assignments
+    container_type = String(dict[dataname]["_type.container"][1])
+    is_matrix = (container_type == "Matrix" || container_type == "Array")
+    parsed = find_target(parsed,tc_aliases,transformer[:target_object];is_matrix=is_matrix)
     parsed = fix_scope(parsed)
 end
 
 #== Extract the dREL text from the dictionary
 ==#
-get_func_text(dict,dataname::String) =  begin
+get_func_text(dict::abstract_cif_dictionary,dataname::String) =  begin
     full_def = dict[dataname]
     func_text = get_loop(full_def,"_method.expression")
     # TODO: ignore non 'Evaluation' methods
@@ -147,9 +148,10 @@ dynamic_dict(s::String) = begin
 end
 
 Base.getindex(d::dynamic_dict,s::String) = d.dictionary[s]
-
 Base.keys(d::dynamic_dict) = keys(d.dictionary)
-    
+JuliaCif.get_by_cat_obj(d::dynamic_dict,catobj) = get_by_cat_obj(d.dictionary,catobj)
+JuliaCif.find_category(d::dynamic_dict,s) = find_category(d.dictionary,s)
+
 struct dynamic_block <: cif_container_with_dict
     block::cif_block_with_dict
     dictionary::dynamic_dict
@@ -161,10 +163,8 @@ dynamic_block(b::NativeBlock,c::cifdic) = begin
     dynamic_block(cbwd,dd)
 end
 
-Base.keys(b::dynamic_block) = keys(b.block)
-JuliaCif.get_loop(b::dynamic_block,s) = get_loop(b.block,s)
-Base.iterate(b::dynamic_block) = iterate(b.block)
-Base.iterate(b::dynamic_block,s) = iterate(b.block,s)
+JuliaCif.get_datablock(b::dynamic_block) = b.block
+JuliaCif.get_dictionary(b::dynamic_block) = b.dictionary
 
 #== Initialise functions
 ==#
@@ -173,7 +173,7 @@ const func_lookup = Dict{String,Function}()
 Base.getindex(d::dynamic_block,s::String) = begin
     try
         q = d.block[s]
-    catch
+    catch KeyError
         derive(d,s)
     end
 end
@@ -183,27 +183,41 @@ dataname==#
 
 derive(d::dynamic_block,s::String) = begin
     if !(s in keys(func_lookup))
-        add_new_func(d.dictionary,s)
+        add_new_func(get_dictionary(d),s)
     end
     func_name = func_lookup[s]
-    target_loop = get_loop(d.block,s)
-    println("$target_loop")
-    for p in eachrow(target_loop)
-        println("$p")
+    target_loop = CategoryObject(d,find_category(get_dictionary(d),s))
+    println("Now deriving $s in loop")
+    for p in target_loop
+        println("$(getfield(p,:dfr))")
     end
-    [Base.invokelatest(func_name,d,d.dictionary,p) for p in eachrow(target_loop)]
+    [Base.invokelatest(func_name,d,get_dictionary(d),p) for p in target_loop]
 end
 
 #==This is called from within a dREL method when an item is
 found missing from a packet==#
 
 derive(d::dynamic_block,cat::String,obj::String,p::CatPacket) = begin
-    dataname = String(get_by_cat_obj(d.block.dictionary,(cat,obj))["_definition.id"][1])
+    dataname = String(get_by_cat_obj(get_dictionary(d),(cat,obj))["_definition.id"][1])
     if !(dataname in keys(func_lookup))
-        add_new_func(d.dictionary,dataname)
+        add_new_func(get_dictionary(d),dataname)
     end
     func_name = func_lookup[dataname]
-    Base.invokelatest(func_name,d.block,d.dictionary,p)
+    Base.invokelatest(func_name,d,get_dictionary(d),p)
+end
+
+#== We redefine getproperty to allow derivation
+==#
+
+Base.getproperty(cp::CatPacket,obj::Symbol) = begin
+    try
+        return getproperty(getfield(cp,:dfr),obj)
+    catch KeyError
+        println("$(getfield(cp,:dfr)) has no member $obj:deriving...")
+        # get the parent container with dictionary
+        db = getfield(cp,:parent).datablock
+        return derive(db,get_name(cp),String(obj),cp)
+    end
 end
 
 add_new_func(d::dynamic_dict,s::String) = begin
@@ -217,12 +231,5 @@ add_new_func(d::dynamic_dict,s::String) = begin
     merge!(func_lookup,Dict(s=>f))
 end
 
-deriving_get_property(dfr::CatPacket,obj::String,db::dynamic_block) = begin
-    try
-        return get_index(dfr,Symbol(obj))
-    catch KeyError
-        return derive(db,get_name(dfr),obj,dfr)
-    end
-end
     
 end

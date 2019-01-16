@@ -3,13 +3,25 @@
 
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
+export get_dictionary,get_datablock,find_category
 
 abstract type abstract_cif_dictionary end
+
+# Methods that should be instantiated by concrete types
+
+Base.keys(d::abstract_cif_dictionary) = begin
+    error("Keys function should be defined for $(typeof(d))")
+end
+
+Base.length(d::abstract_cif_dictionary) = begin
+    return length(keys(d))
+end
 
 struct cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
+
     cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
         if !issubset(values(d),all_names)
@@ -90,6 +102,11 @@ generate_aliases(b::NativeCif) = begin
 end
 
 get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
+
+find_category(c::cifdic,dataname::String) = begin
+    block = c[dataname]
+    catname = String(block["_name.category_id"][1])
+end
 
 #== Resolve imports
 This routine will substitute all _import.get statements with the imported dictionary. Generally
@@ -190,28 +207,41 @@ end
 ==#
 
 abstract type cif_container_with_dict <: cif_container{native_cif_element} end
-    
+
+#== Should always define the following methods
+==#
+get_dictionary(c::cif_container_with_dict) = begin
+    error("get_dictionary not defined for concrete class!")
+end
+
+get_datablock(c::cif_container_with_dict) = begin
+    error("get_datablock not defined for concrete class!")
+end
+
 struct cif_block_with_dict <: cif_container_with_dict
     data::NativeBlock
     dictionary::cifdic
 end
 
 assign_dictionary(c::NativeBlock,d::cifdic) = cif_block_with_dict(c,d)
+get_dictionary(c::cif_block_with_dict) = c.dictionary
+get_datablock(c::cif_block_with_dict) = c.data
 
-Base.getindex(c::cif_block_with_dict,s::String) = begin
-    as_string = c.data[s]
-    actual_type = get_julia_type(c.dictionary,s,as_string)
+Base.getindex(c::cif_container_with_dict,s::String) = begin
+    as_string = get_datablock(c)[s]
+    actual_type = get_julia_type(get_dictionary(c),s,as_string)
 end
 
-Base.iterate(c::cif_block_with_dict) = iterate(c.data)
-Base.iterate(c::cif_block_with_dict,s) = iterate(c.data,s)
+Base.iterate(c::cif_container_with_dict) = iterate(get_datablock(c))
+Base.iterate(c::cif_container_with_dict,s) = iterate(get_datablock(c),s)
 
 # As a dictionary is available, we return the loop that
 # would contain the name, even if it is absent
 
-get_loop(b::cif_block_with_dict,s::String) = begin
-    category = b.dictionary[s]["_name.category_id"]
-    all_names = [n for n in keys(b.dictionary) if get(b.dictionary[n],"_name.category_id",nothing) == category]
+get_loop(b::cif_container_with_dict,s::String) = begin
+    dict = get_dictionary(b)
+    category = dict[s]["_name.category_id"]
+    all_names = [n for n in keys(dict) if get(dict[n],"_name.category_id",nothing) == category]
     #println("All names in category of $s: $all_names")
     loop_names = [l for l in all_names if l in keys(b)]
     if length(loop_names) == 0
@@ -221,16 +251,16 @@ get_loop(b::cif_block_with_dict,s::String) = begin
     # Construct a data frame using Dictionary knowledge
     df = DataFrame()
     for n in loop_names
-        obj_name = String(b.dictionary[n]["_name.object_id"][1])
+        obj_name = String(dict[n]["_name.object_id"][1])
         df[Symbol(lowercase(obj_name))] = b[n]
     end
     return df
 end
 
 # Anything not defined in the dictionary is invisible
-Base.keys(c::cif_block_with_dict) = begin
-    true_keys = lowercase.(collect(keys(c.data)))
-    dnames = [d for d in keys(c.dictionary) if lowercase(d) in true_keys]
+Base.keys(c::cif_container_with_dict) = begin
+    true_keys = lowercase.(collect(keys(get_datablock(c))))
+    dnames = [d for d in keys(get_dictionary(c)) if lowercase(d) in true_keys]
     return dnames
 end
 #==

@@ -10,6 +10,7 @@ include("cif_errors.jl")
 include("cif_base.jl")
 include("cif_dic.jl")
 include("drel/drel.jl")
+include("drel/drel_ast.jl")
 include("drel/drel-execution.jl")
 
 end

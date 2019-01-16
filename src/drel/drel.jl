@@ -1,8 +1,7 @@
 #== Definitions for running dREL code in Julia.
 ==#
 
-export CategoryObject,CatPacket,find_target, ast_assign_types, ast_fix_indexing, to_julia_array
-export fix_scope, get_attribute,get_name
+export CategoryObject,CatPacket,get_name
 
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
@@ -23,8 +22,8 @@ struct CategoryObject
     use_keys
 end
 
-CategoryObject(datablock,catname) = begin
-    cifdic = datablock.dictionary
+CategoryObject(datablock::cif_container_with_dict,catname) = begin
+    cifdic = get_dictionary(datablock)
     object_names = [a for a in keys(cifdic) if lowercase(String(get(cifdic[a],"_name.category_id",[""])[1])) == lowercase(catname)]
     data_names = [String(cifdic[a]["_definition.id"][1]) for a in object_names]
     internal_object_names = [String(cifdic[a]["_name.object_id"][1]) for a in data_names]
@@ -34,6 +33,7 @@ CategoryObject(datablock,catname) = begin
     have_vals = [k for k in data_names if k in keys(datablock)]
     use_keys = false
     key_index = []
+    key_names = []
     if is_looped
         key_names = cifdic[catname]["_category_key.name"]
         use_keys, key_names = create_keylists(key_names,have_vals)
@@ -65,20 +65,32 @@ Base.getindex(c::CategoryObject,keydict) = begin
         println("Testing for $k == $v")
         pack = pack[ pack[Symbol(k)] .== v,:]
     end
-    return CatPacket(pack,c.catname)
+    if size(pack,1) != 1
+        error("$keydict does not identify a unique row")
+    end
+    return CatPacket(eachrow(pack)[1],c.catname,c)
 end
 
+Base.length(c::CategoryObject) = size(c.data_frame,1)
+    
 # We can't use a dataframerow by itself as we need to know the
 # category name for use in deriving missing parts of the packet
+# We store the parent as a source for derivation information
 
 struct CatPacket
     dfr::DataFrameRow
     name::String
+    parent::CategoryObject
 end
 
-get_name(c::CatPacket) = return c.name
+get_name(c::CatPacket) = return getfield(c,:name)
 
-    
+#== getproperty is redefined again in the drel_exec module
+==#
+#Base.getproperty(cp::CatPacket,obj::Symbol) = getproperty(getfield(cp,:dfr),obj)
+
+Base.propertynames(c::CatPacket,private::Bool=false) = propertynames(getfield(c,:dfr))
+
 # We simply iterate over the data loop, but keep a track of the
 # actual category name for access
 
@@ -89,7 +101,7 @@ Base.iterate(c::CategoryObject) = begin
         return next
     end
     r,s = next
-    return CatPacket(r,c.catname),(er,s)
+    return CatPacket(r,c.catname,c),(er,s)
 end
 
 Base.iterate(c::CategoryObject,ci) = begin
@@ -99,7 +111,7 @@ Base.iterate(c::CategoryObject,ci) = begin
         return next
     end
     r,s = next
-    return CatPacket(r,c.catname),(er,s)
+    return CatPacket(r,c.catname,c),(er,s)
 end
 
 #== The Tables.jl interface functions, commented out for now

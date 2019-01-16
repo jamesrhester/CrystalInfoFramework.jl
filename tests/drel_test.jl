@@ -15,7 +15,7 @@ end
 end
 
 @testset "Testing expression processing" begin
-    ud = prepare_system()
+    #ud = prepare_system()
     rawtext = :(a = [1,2,3,4]; b = a[0]; return b)
     newtext = ast_fix_indexing(rawtext,[])
     println("New text: $newtext")
@@ -37,4 +37,9 @@ end
     @test_throws UndefVarError f(2) == 1
     eval(newtext)
     @test f(2) == 1
+    #Now test that we properly process matrices
+    rawtext = :(a.label = [[1,2,3],[4,5,6]]; return a)
+    newtext = find_target(rawtext,"a","label";is_matrix=true)
+    println("$newtext")
+    @test eval(newtext) == [[1 2 3];[4 5 6]]
 end

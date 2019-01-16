@@ -76,6 +76,8 @@ get_dataname_type(c::cif_container,d::AbstractString) = begin
     return Any
 end
 
+Base.length(c::cif_container) = length(keys(c))
+
 """An empty dummy container for when we havent kept track
 of where a value comes from...may be removed with better
 design"""
@@ -875,10 +877,11 @@ held in a loop with a single row.
 
 ==#
 
-struct NativeCif
+struct NativeCif <: cif
     contents::Dict{String,cif_container}
     original_file::String
 end
+
 # Operations on Cifs
 Base.getindex(c::NativeCif,s) = begin
     c.contents[s]
