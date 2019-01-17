@@ -196,8 +196,8 @@ def ident(self,args):
         self.ddlm_cats.add(v)
     if v == self.target_cat:
         v = "__packet"
-    elif v.lower() in self.cat_list:
-        v = v + "::CategoryObject"
+    #elif v.lower() in self.cat_list:
+    #    v = v + "::CategoryObject"
     return v
 
 #TODO: this is missing in Py version
@@ -585,7 +585,7 @@ def get_function_name(in_name):
     if target_name is not None:
         return target_name,"",""
     if test_name == "matrix":  #custom Julia creation
-        return "to_julia_array","","[1]"  #zero-based indexing at this stage
+        return "to_julia_array","",""
     if test_name == "atoi":
         return "parse","Int,",""
     if test_name == "int":

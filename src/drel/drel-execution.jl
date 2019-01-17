@@ -87,6 +87,7 @@ end
 (4) adjusting indices to 1-based
 (5) changing any aliases of the main category back to the category name
 (6) making sure that all local variables are defined at the top level
+(7) turning set categories into packets
 ==#
 
 make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser,all_funcs,func_cat,cat_names) = begin
@@ -95,12 +96,14 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     tc_aliases,proto = transformer[:transform](tree)
     println("Proto-Julia code: ")
     println(proto)
+    set_categories = get_set_categories(dict)
     parsed = ast_fix_indexing(Meta.parse(proto),Symbol.(["__packet"]))
     # catch implicit matrix assignments
     container_type = String(dict[dataname]["_type.container"][1])
     is_matrix = (container_type == "Matrix" || container_type == "Array")
     parsed = find_target(parsed,tc_aliases,transformer[:target_object];is_matrix=is_matrix)
     parsed = fix_scope(parsed)
+    parsed = cat_to_packet(parsed,set_categories)  #turn Set categories into packets
 end
 
 #== Extract the dREL text from the dictionary

@@ -1,7 +1,7 @@
 #== Definitions for running dREL code in Julia.
 ==#
 
-export CategoryObject,CatPacket,get_name
+export CategoryObject,CatPacket,get_name,first_packet
 
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
@@ -113,6 +113,9 @@ Base.iterate(c::CategoryObject,ci) = begin
     r,s = next
     return CatPacket(r,c.catname,c),(er,s)
 end
+
+# Useful for Set categories
+first_packet(c::CategoryObject) = iterate(c)[1]
 
 #== The Tables.jl interface functions, commented out for now
 

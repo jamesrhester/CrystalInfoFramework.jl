@@ -3,7 +3,7 @@
 
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
-export get_dictionary,get_datablock,find_category
+export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
 
 abstract type abstract_cif_dictionary end
 
@@ -106,6 +106,17 @@ get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lo
 find_category(c::cifdic,dataname::String) = begin
     block = c[dataname]
     catname = String(block["_name.category_id"][1])
+end
+
+get_categories(c::abstract_cif_dictionary) = begin
+    cats = [x for x in keys(c) if String(get(c[x],"_definition.scope",["Item"])[])=="Category"]
+    lowercase.([String(c[x]["_definition.id"][]) for x in cats])
+end
+
+get_set_categories(c::abstract_cif_dictionary) = begin
+    all_cats = get_categories(c)
+    println("$all_cats")
+    [x for x in all_cats if String(get(c[x],"_definition.class",["Datum"])[]) == "Set"] 
 end
 
 #== Resolve imports
