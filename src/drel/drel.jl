@@ -55,11 +55,23 @@ create_keylists(key_names,have_vals) = begin
     return use_keys, have_keys
 end
 
-# Allow access using a dictionary of object names
+# Allow access using a dictionary of object names. It is possible
+# that a single key dataname does not exist, in which case it
+# can be created arbitrarily.
 
 Base.getindex(c::CategoryObject,keydict) = begin
     pack = c.data_frame
     println("Loop is $pack")
+    # Try to create missing key data values - only
+    # possible if there is a single key
+    if length(keydict) == 1
+        keyobj = collect(keys(keydict))[1]
+        if !(Symbol(keyobj) in names(pack))
+            fullname = c.object_to_name[keyobj]
+            result = derive(c.datablock,fullname)
+            pack[Symbol(keyobj)] = result
+        end
+    end
     for pr in keydict
         k,v = pr
         println("Testing for $k == $v")
@@ -84,10 +96,6 @@ struct CatPacket
 end
 
 get_name(c::CatPacket) = return getfield(c,:name)
-
-#== getproperty is redefined again in the drel_exec module
-==#
-#Base.getproperty(cp::CatPacket,obj::Symbol) = getproperty(getfield(cp,:dfr),obj)
 
 Base.propertynames(c::CatPacket,private::Bool=false) = propertynames(getfield(c,:dfr))
 

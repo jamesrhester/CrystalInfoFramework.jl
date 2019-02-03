@@ -86,8 +86,9 @@ end
 (3) parsing the returned Julia code into an expression
 (4) adjusting indices to 1-based
 (5) changing any aliases of the main category back to the category name
-(6) making sure that all local variables are defined at the top level
+(6) making sure that all loop-local variables are defined at the entry level
 (7) turning set categories into packets
+(8) Assigning types to any dictionary items for which this is known
 ==#
 
 make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser,all_funcs,func_cat,cat_names) = begin
@@ -97,13 +98,16 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     println("Proto-Julia code: ")
     println(proto)
     set_categories = get_set_categories(dict)
-    parsed = ast_fix_indexing(Meta.parse(proto),Symbol.(["__packet"]))
+    parsed = ast_fix_indexing(Meta.parse(proto),get_categories(dict),dict)
+    println("After indexing fixes: ")
+    println(parsed)
     # catch implicit matrix assignments
     container_type = String(dict[dataname]["_type.container"][1])
     is_matrix = (container_type == "Matrix" || container_type == "Array")
     parsed = find_target(parsed,tc_aliases,transformer[:target_object];is_matrix=is_matrix)
     parsed = fix_scope(parsed)
     parsed = cat_to_packet(parsed,set_categories)  #turn Set categories into packets
+    parsed = ast_assign_types(parsed,Dict(),cifdic=dict,set_cats=set_categories,all_cats=get_categories(dict))
 end
 
 #== Extract the dREL text from the dictionary
@@ -192,7 +196,7 @@ derive(d::dynamic_block,s::String) = begin
     target_loop = CategoryObject(d,find_category(get_dictionary(d),s))
     println("Now deriving $s in loop")
     for p in target_loop
-        println("$(getfield(p,:dfr))")
+        #println("$(getfield(p,:dfr))")
     end
     [Base.invokelatest(func_name,d,get_dictionary(d),p) for p in target_loop]
 end
@@ -216,7 +220,7 @@ Base.getproperty(cp::CatPacket,obj::Symbol) = begin
     try
         return getproperty(getfield(cp,:dfr),obj)
     catch KeyError
-        println("$(getfield(cp,:dfr)) has no member $obj:deriving...")
+        #println("$(getfield(cp,:dfr)) has no member $obj:deriving...")
         # get the parent container with dictionary
         db = getfield(cp,:parent).datablock
         return derive(db,get_name(cp),String(obj),cp)
@@ -228,8 +232,8 @@ add_new_func(d::dynamic_dict,s::String) = begin
     parser = lark_grammar()
     r = make_julia_code(t,s,d,parser,d.func_names,
                                   d.func_cat,d.cat_names)
-    println("Transformed code for $s:\n")
-    println(r)
+    #println("Transformed code for $s:\n")
+    #println(r)
     f = eval(r)
     merge!(func_lookup,Dict(s=>f))
 end

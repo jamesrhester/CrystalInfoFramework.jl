@@ -4,6 +4,7 @@
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
+export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 
 abstract type abstract_cif_dictionary end
 
@@ -115,8 +116,33 @@ end
 
 get_set_categories(c::abstract_cif_dictionary) = begin
     all_cats = get_categories(c)
-    println("$all_cats")
     [x for x in all_cats if String(get(c[x],"_definition.class",["Datum"])[]) == "Set"] 
+end
+
+get_loop_categories(c::abstract_cif_dictionary) = begin
+    all_cats = get_categories(c)
+    [x for x in all_cats if String(get(c[x],"_definition.class",["Datum"])[]) == "Loop"]
+end
+
+#== Get the object part of a single dataname that acts as a key
+==#
+get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
+    definition = d[c]
+    cat_keys = get(definition,"_category_key.name",[])
+    obj = missing
+    if length(cat_keys) == 0
+        error("Category $c has no key datanames defined")
+    end
+    if length(cat_keys) == 1
+        obj = String(cat_keys[1])
+    else
+        alternate = get(definition,"_category.key_id",[])
+        if length(alternate) == 0
+            error("Category $c has no primitive key available")
+        end
+        obj = String(alternate[1])
+    end
+    objval = String(d[obj]["_name.object_id"][1])
 end
 
 #== Resolve imports
@@ -281,7 +307,7 @@ as input and return an object of the appropriate type
 
 #== Type annotation ==#
 const type_mapping = Dict( "Text" => String,        
-                           "Code" => String,                                                
+                           "Code" => "CaselessString",                                                
                            "Name" => String,        
                            "Tag"  => String,         
                            "Uri"  => String,         
@@ -304,7 +330,7 @@ const type_mapping = Dict( "Text" => String,
                            "List" => Array{Any}
                            )
 
-get_julia_type_name(cifdic,cat,obj) = begin
+get_julia_type_name(cifdic,cat::String,obj::String) = begin
     definition = get_by_cat_obj(cifdic,(cat,obj))
     base_type = String(definition["_type.contents"][1])
     cont_type = String(get(definition,"_type.container",["Single"])[1])
@@ -326,6 +352,8 @@ get_julia_type(cifdic,cat,obj,value) = begin
         change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
     elseif julia_base_type == String
         change_func = (x -> map(y->String(y),x))
+    elseif julia_base_type == "CaselessString"
+        change_func = (x -> map(y->CaselessString(y),x))
     end
     if cont_type == "Single"
         return change_func(value)
@@ -340,6 +368,23 @@ get_julia_type(cifdic,dataname::String,value) = begin
     return get_julia_type(cifdic,String(definition["_name.category_id"][1]),String(definition["_name.object_id"][1]),value)
 end
 
+# return dimensions as an Array. Note that we do not handle
+# asterisks, I think they are no longer allowed?
+# The first dimension in Julia is number of rows, then number
+# of columns. This is the opposite to dREL
+
+get_dimensions(cifdic,cat,obj) = begin
+    definition = get_by_cat_obj(cifdic,(cat,obj))
+    dims = String(get(definition,"_type.dimension","[]")[1])
+    final = eval(Meta.parse(dims))
+    if length(final) > 1
+        t = final[1]
+        final[1] = final[2]
+        final[2] = t
+    end
+    return final
+end
+    
 real_from_meas(value) = begin
     as_string = String(value)
     if '(' in as_string
@@ -354,4 +399,25 @@ Range(v::native_cif_element) = begin
     parse(Number,lower),parse(Number,upper)
 end
 
+#== This type of string compares as a caseless string
+Most other operations are left undefined for now ==#
 
+struct CaselessString <: AbstractString
+    actual_string::String
+end
+
+Base.:(==)(a::CaselessString,b::AbstractString) = begin
+    lowercase(a.actual_string) == lowercase(b)
+end
+
+Base.:(==)(a::AbstractString,b::CaselessString) = begin
+    lowercase(a) == lowercase(b.actual_string)
+end
+
+Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
+
+Base.iterate(c::CaselessString) = iterate(c.actual_string)
+Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
+Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
+Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
+Base.codeunit(c::CaselessString) = codeunit(c.actual_string) 

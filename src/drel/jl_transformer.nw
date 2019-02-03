@@ -122,6 +122,10 @@ def simple_statement(self,args):
     return _concat(args,"\n")
 
 def small_statement(self,args):
+    if args[0].lower() == "break":
+        return "break"
+    elif args[0].lower() == "next":
+        return "continue"
     return _concat(args)
 
 #TODO: analyse LHS/RHS information
@@ -154,10 +158,7 @@ equality?
 
 <<Atoms to expressions>>=
 def literal(self,args):
-    # Pick up built-in literals
     v = args[0]
-    if v.lower() == 'twopi':
-        return "2pi"
     # Deal with string delimiters. If there are
     # internal triple double quotes, then...that
     # would be sad.
@@ -187,6 +188,10 @@ def real(self,args):
 def ident(self,args):
     # remove initial underscores
     v = args[0]
+    if v.lower() == 'twopi':
+        return "2pi"
+    elif v.lower() == 'pi':
+        return "pi"
     if v[0] == '_':
         v = v[1:]
     # catch any category references
@@ -233,6 +238,8 @@ def factor(self,args):
 # multiple despatch
 #
 def term(self,args):
+    if len(args) > 1:
+        return fix_mathops(args[1],args[0],args[2])
     return _concat(args)
 
 def restricted_comp_operator(self,args):
@@ -486,7 +493,7 @@ def call(self,args):
 # A function definition will be a standalone function, so we insert
 # our category calls here
 def funcdef(self,args):
-    fstr = args[1]+"("+args[2]+",__datablock)"+"= begin\n"
+    fstr = args[1]+"("+args[2]+",__datablock::dynamic_block)"+"= begin\n"
     for c in self.cat_ids:
         fstr = fstr + '%s = CategoryObject(__datablock,"%s")\n' % (c,c)
     fstr += add_indent("\n"+args[-1]+"\nreturn %s" % args[1]) + '\nend'
@@ -496,9 +503,9 @@ def arglist(self,args):
     return _concat(args)
 
 def one_arg(self,args):
-    return args[0]   #TODO: add Julia type information
-
-
+    # annotate where we can
+    annot = get_type_annotation(args[2],args[1])
+    return args[0]+"::"+annot
 
 @
 Utility functions
@@ -619,11 +626,11 @@ def get_function_name(in_name):
 def fix_mathops(op,first_arg,second_arg):
     """Return a string that will carry out the requested operation"""
     if op == "^":
-        return "LinearAlgebra.cross(%s,%s)" % (first_arg,second_arg)
-    elif op == "*":  #could be matrix multiplication...or not
-        return "LinearAlgebra.dot(%s,%s)" % (first_arg,second_arg)
+        return "cross(%s,%s)" % (first_arg,second_arg)
     elif op in "+-/": #turn into broadcasted equivalents
         return "%s %s %s" % (first_arg," ."+op,second_arg)
+    else:
+        return "%s %s %s" % (first_arg, op, second_arg)
 
 @
 In Julia we can annotate type after any variable. This type is then used to
@@ -631,26 +638,24 @@ search for an appropriate 'convert' function. So by annotating type, we can
 get Cif values turned into numbers etc. without doing this explicitly.
 
 <<Type annotations>>=
-def get_type_annotation(ddl_type,ddl_container,ddl_dimension):
+def get_type_annotation(ddl_type,ddl_container):
     if "," in ddl_type:
         element_type = "Any"
     elif ddl_type in ("Text","Code","Name","Tag","Uri","Date","Symop"):
         element_type = "String"
     elif ddl_type in ("Range","Count","Index","Integer"):
-        element_type = "Integer"
+        element_type = "Int64"
     elif ddl_type == "Real":
-        element_type = "Real"
+        element_type = "Float64"
     elif ddl_type in ("Imag","Complex"):
-        element_type = "Complex"
+        element_type = "Complex64"
     # Now figure out containers
     if ddl_container == "Single":
         annotation = element_type    
     elif ddl_container == "List":
         annotation = "Array{%s}" % element_type
-    elif ddl_container == "Array":
+    elif ddl_container in ["Array","Matrix"]:
         annotation = "Array{%s}" % element_type
-    elif ddl_container == "Matrix":
-        annotation = "Matrix{%s}" % element_type
     elif ddl_container == "Table":
         annotation = "Dict{String,%s}" % element_type      
     return annotation
