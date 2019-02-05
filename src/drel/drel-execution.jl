@@ -42,11 +42,11 @@ end
 
 lark_transformer(dname,dict,all_funcs,cat_list,func_cat) = begin
     # extract information to pass to python
-    println("Now preparing dREL transformer for $dname")
+    println("Now preparing dREL transformer for $dname (functions in $func_cat)")
     target_cat = String(dict[dname]["_name.category_id"][1])
     target_obj = String(dict[dname]["_name.object_id"][1])
     is_func = false
-    if lowercase(target_cat) == lowercase.(func_cat)
+    if lowercase(target_cat) == func_cat
         is_func = true
     end
     tt = jl_transformer[:TreeToPy](dname,target_cat,target_obj,cat_list,is_func=is_func,func_list=all_funcs)
@@ -91,7 +91,7 @@ end
 ==#
 
 make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser) = begin
-    all_funcs,func_cat = get_dict_funcs(dict)
+    func_cat,all_funcs = get_dict_funcs(dict)
     cat_names = get_cat_names(dict)
     target_cat = find_category(dict,dataname)
     tree = parser[:parse](drel_text)
@@ -126,15 +126,16 @@ define_dict_funcs(c::abstract_cif_dictionary) = begin
     func_cat,all_funcs = get_dict_funcs(c)
     parser = lark_grammar()
     for f in all_funcs
-            println("Now processing $f")         
-            full_def = get_by_cat_obj(c,(func_cat,f))
-            entry_name = String(full_def["_definition.id"][1])
-            func_text = get_loop(full_def,"_method.expression")
-            func_text = String(func_text[Symbol("_method.expression")][1])
-            println("Function text: $func_text")
-            result = make_julia_code(func_text,entry_name,c,parser)
-            println("Transformed text: $result")
-            eval(result)  #place function name in module scope
+        println("Now processing $f")         
+        full_def = get_by_cat_obj(c,(func_cat,f))
+        entry_name = String(full_def["_definition.id"][1])
+        func_text = get_loop(full_def,"_method.expression")
+        func_text = String(func_text[Symbol("_method.expression")][1])
+        println("Function text: $func_text")
+        result = make_julia_code(func_text,entry_name,c,parser)
+        println("Transformed text: $result")
+        println("Evaluating in module $(@__MODULE__)")
+        Base.eval(@__MODULE__,result)  #place function name in module scope
     end
 end
 

@@ -15,6 +15,11 @@ The following code updates a dictionary of assignments,
 and in parallel appends type information when a getindex
 call corresponds to a known category/object combination.
 
+As a special case we pick up assignments of the form
+'a = first_packet(CategoryObject(b))' as this is the form
+that creation of a single packet of a Set category look
+like.
+
 ==#
 # Keep a track of assignments, and assign types
 # Each case has implications for the assignment dictionary
@@ -29,6 +34,13 @@ ast_assign_types(ast_node,in_scope_dict;lhs=nothing,cifdic=Dict(),set_cats=Array
             lh = ast_node.args[1]
             if typeof(ast_node.args[2]) == Symbol && ast_node.args[2] != :missing #direct assignment, lets keep it
                 in_scope_dict[lh] = String(ast_node.args[2])
+            # Check for "first_packet(CategoryObject(dict,category name))"
+            elseif typeof(ast_node.args[2])== Expr && ast_node.args[2].head == :call
+                func_call = ast_node.args[2]
+                if func_call.args[1] == :first_packet
+                    println("Found creation of set packet for $(func_call.args[2].args[3])")
+                    in_scope_dict[lh] = func_call.args[2].args[3]
+                end
             end
             ixpr.head = ast_node.head
             ixpr.args = [ast_assign_types(x,in_scope_dict,lhs=lh,cifdic=cifdic,all_cats=all_cats) for x in ast_node.args]
