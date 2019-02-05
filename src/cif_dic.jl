@@ -5,6 +5,7 @@ export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
+export CaselessString
 
 abstract type abstract_cif_dictionary end
 
@@ -307,7 +308,7 @@ as input and return an object of the appropriate type
 
 #== Type annotation ==#
 const type_mapping = Dict( "Text" => String,        
-                           "Code" => "CaselessString",                                                
+                           "Code" => Symbol("CaselessString"),                                                
                            "Name" => String,        
                            "Tag"  => String,         
                            "Uri"  => String,         
@@ -352,7 +353,7 @@ get_julia_type(cifdic,cat,obj,value) = begin
         change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
     elseif julia_base_type == String
         change_func = (x -> map(y->String(y),x))
-    elseif julia_base_type == "CaselessString"
+    elseif julia_base_type == Symbol("CaselessString")
         change_func = (x -> map(y->CaselessString(y),x))
     end
     if cont_type == "Single"

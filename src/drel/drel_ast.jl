@@ -21,11 +21,11 @@ call corresponds to a known category/object combination.
 # and for the filtered AST.
 
 ast_assign_types(ast_node,in_scope_dict;lhs=nothing,cifdic=Dict(),set_cats=Array{String}[],all_cats=Array{String}[]) = begin
-    println("$ast_node: in scope $in_scope_dict")
+    #println("$ast_node: in scope $in_scope_dict")
     ixpr = :(:call,:f)  #dummy
     if typeof(ast_node) == Expr
-        if ast_node.head == :(=)
-            println("Found assignment for $ast_node")
+        if ast_node.head == :(=) && typeof(ast_node.args[1]) == Symbol # simple assignment
+            #println("Found assignment for $ast_node")
             lh = ast_node.args[1]
             if typeof(ast_node.args[2]) == Symbol && ast_node.args[2] != :missing #direct assignment, lets keep it
                 in_scope_dict[lh] = String(ast_node.args[2])
@@ -42,16 +42,22 @@ ast_assign_types(ast_node,in_scope_dict;lhs=nothing,cifdic=Dict(),set_cats=Array
             return ixpr
         elseif ast_node.head in [:for]
             new_scope_dict = deepcopy(in_scope_dict)
-            println("New scope!")
+            #println("New scope!")
             ixpr.head = ast_node.head
             ixpr.args = [ast_assign_types(x,new_scope_dict,lhs=nothing,cifdic=cifdic,all_cats=all_cats) for x in ast_node.args]
-            println("At end of scope: $new_scope_dict")
+            #println("At end of scope: $new_scope_dict")
             return ixpr
         # Following sections append type information
         elseif ast_node.head == :call && ast_node.args[1] == :getindex
-            println("Found call of getindex")
+            #println("Found call of getindex")
             if ast_node.args[2] in keys(in_scope_dict)
-                return ast_construct_type(ast_node,cifdic,in_scope_dict[ast_node.args[2]],String(ast_node.args[3]))
+                # if assignment to '__packet', look further
+                target_cat = in_scope_dict[ast_node.args[2]]
+                if in_scope_dict[ast_node.args[2]] == "__packet"
+                    target_cat = in_scope_dict[Symbol("__packet")]
+                end
+                #println("Looking up type for $target_cat")
+                return ast_construct_type(ast_node,cifdic,target_cat,String(ast_node.args[3]))
             else  #normal indexing
                 ixpr.head = ast_node.head
                 ixpr.args = [ast_assign_types(x,in_scope_dict,lhs=nothing,cifdic=cifdic,all_cats=all_cats) for x in ast_node.args]
@@ -59,19 +65,31 @@ ast_assign_types(ast_node,in_scope_dict;lhs=nothing,cifdic=Dict(),set_cats=Array
                 return ixpr
             end
         elseif ast_node.head == :ref
-            println("Found subscription")
+            #println("Found subscription")
             if ast_node.args[1] in keys(in_scope_dict)
-                return ast_construct_type(ast_node,cifdic,in_scope_dict[ast_node.args[1]],String(ast_node.args[2]))
+                # if assignment to '__packet', look further
+                target_cat = in_scope_dict[ast_node.args[1]]
+                if in_scope_dict[ast_node.args[1]] == "__packet"
+                    target_cat = in_scope_dict[Symbol("__packet")]
+                end
+                #println("Looking up type for $target_cat")
+                return ast_construct_type(ast_node,cifdic,target_cat,String(ast_node.args[2]))
             elseif String(ast_node.args[1]) in all_cats && lhs != nothing  #indexing category packet selection
                 in_scope_dict[lhs] = String(ast_node.args[1])
-                println("Found assignment to indexed category $lhs -> $(in_scope_dict[lhs])")
+                #println("Found assignment to indexed category $lhs -> $(in_scope_dict[lhs])")
             end
             ixpr.head = ast_node.head
             ixpr.args = [ast_assign_types(x,in_scope_dict,lhs=nothing,cifdic=cifdic,all_cats=all_cats) for x in ast_node.args]
             return ixpr
         elseif ast_node.head == :(.)   #property access, set categories also allowed
             if ast_node.args[1] in keys(in_scope_dict)
-                return ast_construct_type(ast_node,cifdic,in_scope_dict[ast_node.args[1]],String(ast_node.args[2].value))
+                # if assignment to '__packet', look further
+                target_cat = in_scope_dict[ast_node.args[1]]
+                if in_scope_dict[ast_node.args[1]] == "__packet"
+                    target_cat = in_scope_dict[Symbol("__packet")]
+                end
+                #println("Looking up type for $target_cat")
+                return ast_construct_type(ast_node,cifdic,target_cat,String(ast_node.args[2].value))
             elseif String(ast_node.args[1]) in set_cats
                 return ast_construct_type(ast_node,cifdic,String(ast_node.args[1]),String(ast_node.args[2].value))
             else
@@ -96,12 +114,12 @@ end
 ast_construct_type(ast_node,cifdic,cat,obj) = begin
     final_type,final_cont = get_julia_type_name(cifdic,cat,obj)
     if final_cont == "Single"
-        println("category $cat object $obj type $final_type")
+        #println("category $cat object $obj type $final_type")
         return :($ast_node::$final_type)
     end
     dims = get_dimensions(cifdic,cat,obj)
     if final_cont in ["Array","Matrix"]
-        println("category $cat object $obj type Array{$final_type} dims $dims")
+        #println("category $cat object $obj type Array{$final_type} dims $dims")
         if length(dims) == 1   # a vector, every time!
             return :($ast_node::drelvector)
         end
@@ -168,7 +186,7 @@ ast_fix_indexing(ast_node,in_scope_list,cifdic;lhs=nothing) = begin
             ixpr.head = ast_node.head
             ixpr.args = [ast_fix_indexing(x,in_scope_list,cifdic,lhs=nothing) for x in ast_node.args]
             if !(String(ast_node.args[1]) in in_scope_list)
-                println("Checking node $(ixpr.args[2])")
+                #println("Checking node $(ixpr.args[2])")
                 if typeof(ixpr.args[2]) ==  Expr && ixpr.args[2].head == :call && ixpr.args[2].args[1] == :(:)
                     ixpr.args[2].args[2] = :($(ixpr.args[2].args[2])+1)
                     # no need to adjust endpoint as Julia is inclusive, dREL is exclusive
@@ -244,17 +262,6 @@ find_target(ast_node,alias_name,target_obj;is_matrix=false) = begin
     end
 end
 
-#== Decorate known types
-This function applies knowledge about datanames to provide type
-information:
-(1) Values with type 'Code' are encapsulated as caseless 
-objects
-(2) ...
-==#
-
-use_type_information(ast_node,aliases,dictionary) = begin
-end
-
 #== A function to detect assignments inside code blocks. As dREL
 follows Python behaviour and considers that variables in do loops
 exist beyond the end of the do loop, and that subsequent iterations
@@ -284,6 +291,8 @@ fix_scope(ast_node) = begin
     for s in all_assignments
         push!(ixpr.args,:($s = missing))
     end
+    # debugging printout
+    # push!(ixpr.args,:(println("__packet is $__packet")))
     for a in ast_node.args[2].args
         push!(ixpr.args,a)
     end
@@ -333,43 +342,3 @@ cat_to_packet(ast_node,set_cats) = begin
     return ixpr
 end
 
-#== Convert the dREL array representation to the Julia representation...
-recursively. A dREL array is a sequence of potentially nested lists. Each
-element is separated by a comma. This becomes, in Julia, a vector of
-vectors, which is ultimately one-dimensional. So we loop over each element,
-stacking each vector at each level into a 2-D array. Note that, while we
-swap the row and column directions (dimensions 1 and 2) the rest are 
-unchanged. Each invocation of this routine returns the actual level
-that is currently being treated, together with the result of working
-with the previous level.
-
-Vectors in dREL are a bit magic, in that they conform themselves
-to be row or column as required. We have implemented this in
-the runtime, so we need to turn any single-dimensional array
-into a drelvector ==#
-
-to_julia_array(drel_array) = begin
-    if ndims(drel_array) == 1 && eltype(drel_array) <: Number
-        return drelvector(drel_array)
-    else
-        return to_julia_array_rec(drel_array)[2]
-    end
-end
-
-to_julia_array_rec(drel_array) = begin
-    if eltype(drel_array) <: AbstractArray   #can go deeper
-        sep_arrays  = to_julia_array_rec.(drel_array)
-        level = sep_arrays[1][1]  #level same everywhere
-        result = (x->x[2]).(sep_arrays)
-        if level == 2
-            #println("$level:$result")
-            return 3, vcat(result...)
-        else
-            #println("$level:$result")
-            return level+1, cat(result...,dims=level)
-        end
-    else    #primitive elements, make them floats
-        #println("Bottom level: $drel_array")
-        return 2,hcat(Float64.(drel_array)...)
-    end
-end

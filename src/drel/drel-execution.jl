@@ -3,7 +3,7 @@
 
 module drel_exec
 
-export dynamic_dict,dynamic_block
+export dynamic_block
 
 using JuliaCif
 
@@ -52,15 +52,14 @@ lark_transformer(dname,dict,all_funcs,cat_list,func_cat) = begin
     tt = jl_transformer[:TreeToPy](dname,target_cat,target_obj,cat_list,is_func=is_func,func_list=all_funcs)
 end
 
-#== Functions defined in the dictionary are detected and adjusted while parsing. To avoid
-doing this every call, they are pre-processed here.
+#== Functions defined in the dictionary are detected and adjusted while parsing. 
 ==#
 
-get_cat_names(dict::cifdic) = begin
+get_cat_names(dict::abstract_cif_dictionary) = begin
     catlist = [a for a in keys(dict) if String(get(dict[a],"_definition.scope",["Item"])[1]) == "Category"]
 end
 
-get_dict_funcs(dict::cifdic) = begin
+get_dict_funcs(dict::abstract_cif_dictionary) = begin
     func_cat = [a for a in keys(dict) if String(get(dict[a],"_definition.class",["Datum"])[1]) == "Functions"]
     if length(func_cat) > 0
         func_catname = lowercase(String(dict[func_cat[1]]["_name.object_id"][1]))
@@ -72,7 +71,7 @@ get_dict_funcs(dict::cifdic) = begin
     return func_catname,all_funcs
 end
 
-get_drel_methods(cd::cifdic) = begin
+get_drel_methods(cd::abstract_cif_dictionary) = begin
     has_meth = [n for n in cd if "_method.expression" in keys(n) && String(get(n,"_definition.scope",["Item"])[1]) != "Category"]
     meths = [(String(n["_definition.id"][1]),get_loop(n,"_method.expression")) for n in has_meth]
     println("Found $(length(meths)) methods")
@@ -91,7 +90,10 @@ end
 (8) Assigning types to any dictionary items for which this is known
 ==#
 
-make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser,all_funcs,func_cat,cat_names) = begin
+make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary,parser) = begin
+    all_funcs,func_cat = get_dict_funcs(dict)
+    cat_names = get_cat_names(dict)
+    target_cat = find_category(dict,dataname)
     tree = parser[:parse](drel_text)
     transformer = lark_transformer(dataname,dict,all_funcs,cat_names,func_cat)
     tc_aliases,proto = transformer[:transform](tree)
@@ -99,7 +101,6 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     println(proto)
     set_categories = get_set_categories(dict)
     parsed = ast_fix_indexing(Meta.parse(proto),get_categories(dict),dict)
-    println("After indexing fixes: ")
     println(parsed)
     # catch implicit matrix assignments
     container_type = String(dict[dataname]["_type.container"][1])
@@ -107,7 +108,7 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     parsed = find_target(parsed,tc_aliases,transformer[:target_object];is_matrix=is_matrix)
     parsed = fix_scope(parsed)
     parsed = cat_to_packet(parsed,set_categories)  #turn Set categories into packets
-    parsed = ast_assign_types(parsed,Dict(),cifdic=dict,set_cats=set_categories,all_cats=get_categories(dict))
+    parsed = ast_assign_types(parsed,Dict(Symbol("__packet")=>target_cat),cifdic=dict,set_cats=set_categories,all_cats=get_categories(dict))
 end
 
 #== Extract the dREL text from the dictionary
@@ -120,62 +121,34 @@ get_func_text(dict::abstract_cif_dictionary,dataname::String) =  begin
     func_text = String(func_text[Symbol("_method.expression")][1])
 end
 
-#== A dynamic block uses the dREL code defined in the dictionary
-in order to find missing values==#
-
-struct dynamic_dict <: abstract_cif_dictionary
-    dictionary::cifdic
-    cat_names::Array{String,1}
-    func_cat::String
-    func_names::Array{String,1}
-
-    dynamic_dict(c::cifdic) = begin
-        #Parse and evaluate all dictionary-defined functions
-        func_cat,all_funcs = get_dict_funcs(c)
-        cat_names = get_cat_names(c)
-        parser = lark_grammar()
-        for f in all_funcs
+define_dict_funcs(c::abstract_cif_dictionary) = begin
+    #Parse and evaluate all dictionary-defined functions into the scope of the module
+    func_cat,all_funcs = get_dict_funcs(c)
+    parser = lark_grammar()
+    for f in all_funcs
             println("Now processing $f")         
             full_def = get_by_cat_obj(c,(func_cat,f))
             entry_name = String(full_def["_definition.id"][1])
             func_text = get_loop(full_def,"_method.expression")
             func_text = String(func_text[Symbol("_method.expression")][1])
             println("Function text: $func_text")
-            result = make_julia_code(func_text,entry_name,c,parser,all_funcs,func_cat,cat_names)
+            result = make_julia_code(func_text,entry_name,c,parser)
             println("Transformed text: $result")
             eval(result)  #place function name in module scope
-        end
-        return new(c,cat_names,func_cat,all_funcs)
     end
 end
 
-dynamic_dict(s::String) = begin
-    s = cifdic(s)
-    return dynamic_dict(s)
-end
+#== Storage for already-evaluated functions
+==#
 
-Base.getindex(d::dynamic_dict,s::String) = d.dictionary[s]
-Base.keys(d::dynamic_dict) = keys(d.dictionary)
-JuliaCif.get_by_cat_obj(d::dynamic_dict,catobj) = get_by_cat_obj(d.dictionary,catobj)
-JuliaCif.find_category(d::dynamic_dict,s) = find_category(d.dictionary,s)
+const func_lookup = Dict{String,Function}()
 
 struct dynamic_block <: cif_container_with_dict
     block::cif_block_with_dict
-    dictionary::dynamic_dict
 end
 
-dynamic_block(b::NativeBlock,c::cifdic) = begin
-    cbwd = assign_dictionary(b,c)
-    dd = dynamic_dict(c)
-    dynamic_block(cbwd,dd)
-end
-
-JuliaCif.get_datablock(b::dynamic_block) = b.block
-JuliaCif.get_dictionary(b::dynamic_block) = b.dictionary
-
-#== Initialise functions
-==#
-const func_lookup = Dict{String,Function}()
+JuliaCif.get_dictionary(d::dynamic_block) = get_dictionary(d.block)
+JuliaCif.get_datablock(d::dynamic_block) = get_datablock(d.block)
 
 Base.getindex(d::dynamic_block,s::String) = begin
     try
@@ -188,7 +161,7 @@ end
 #==Derive all values in a loop for the given
 dataname==#
 
-derive(d::dynamic_block,s::String) = begin
+derive(d::cif_container_with_dict,s::String) = begin
     if !(s in keys(func_lookup))
         add_new_func(get_dictionary(d),s)
     end
@@ -198,19 +171,19 @@ derive(d::dynamic_block,s::String) = begin
     for p in target_loop
         #println("$(getfield(p,:dfr))")
     end
-    [Base.invokelatest(func_name,d,get_dictionary(d),p) for p in target_loop]
+    [Base.invokelatest(func_name,d,p) for p in target_loop]
 end
 
 #==This is called from within a dREL method when an item is
 found missing from a packet==#
 
-derive(d::dynamic_block,cat::String,obj::String,p::CatPacket) = begin
+derive(d::cif_container_with_dict,cat::String,obj::String,p::CatPacket) = begin
     dataname = String(get_by_cat_obj(get_dictionary(d),(cat,obj))["_definition.id"][1])
     if !(dataname in keys(func_lookup))
         add_new_func(get_dictionary(d),dataname)
     end
     func_name = func_lookup[dataname]
-    Base.invokelatest(func_name,d,get_dictionary(d),p)
+    Base.invokelatest(func_name,d,p)
 end
 
 #== We redefine getproperty to allow derivation
@@ -227,13 +200,12 @@ Base.getproperty(cp::CatPacket,obj::Symbol) = begin
     end
 end
 
-add_new_func(d::dynamic_dict,s::String) = begin
+add_new_func(d::abstract_cif_dictionary,s::String) = begin
     t = get_func_text(d,s)
     parser = lark_grammar()
-    r = make_julia_code(t,s,d,parser,d.func_names,
-                                  d.func_cat,d.cat_names)
-    #println("Transformed code for $s:\n")
-    #println(r)
+    r = make_julia_code(t,s,d,parser)
+    println("Transformed code for $s:\n")
+    println(r)
     f = eval(r)
     merge!(func_lookup,Dict(s=>f))
 end

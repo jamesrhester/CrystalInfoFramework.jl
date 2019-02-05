@@ -102,7 +102,8 @@ def input(self,args):
     if self.is_validation:
         header_code = '(__datablock,__dict,__packet,__dataname,__ddldic) -> begin'
     else:
-        header_code = "(__datablock::dynamic_block,__dict::dynamic_dict,__packet::CatPacket) -> begin"
+        header_code = "(__datablock::dynamic_block,__packet::CatPacket) -> begin"
+        header_code += "\n __dict = get_dictionary(__datablock)"
     debug_string = '\nprintln("' + '%s -> ")\n' % self.target_object
     debug_string += "println(__dreltarget)"
     body = cat_string
