@@ -483,7 +483,7 @@ def call(self,args):
             return " [" +args[2]+ "] "
     # Catch dictionary-defined functions
     if args[0].lower() in self.func_list:
-        return args[0]+"(" + args[2] + ",__datablock)"
+        return 'get_func(_dict,"'+args[0]+'")(' + args[2] + ",__datablock)"
     before,middle,after = get_function_name(args[0])
     if len(args) == 3:
         fstr = before + "(" + middle + ")" + after #no arguments
@@ -491,10 +491,10 @@ def call(self,args):
         fstr = before + "(" + middle + args[2] + ")" + after
     return fstr
 
-# A function definition will be a standalone function, so we insert
-# our category calls here
+# A function definition is transformed into an anonymous function
+# with different arguments, so we insert our category calls here
 def funcdef(self,args):
-    fstr = args[1]+"("+args[2]+",__datablock::dynamic_block)"+"= begin\n"
+    fstr = "("+args[2]+",__datablock::dynamic_block)"+"-> begin\n"
     for c in self.cat_ids:
         fstr = fstr + '%s = CategoryObject(__datablock,"%s")\n' % (c,c)
     fstr += add_indent("\n"+args[-1]+"\nreturn %s" % args[1]) + '\nend'

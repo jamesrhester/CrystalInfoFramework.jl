@@ -1,16 +1,10 @@
-#== This module defines an environment for executing dREL code
-==#
+#== This module defines functions for executing dREL code ==#
 
-module drel_exec
-
-export dynamic_block
-
-using JuliaCif
+export dynamic_block, define_dict_funcs, derive
 
 # Python setup calls
 
 using PyCall
-
 
 lark = PyNULL()
 jl_transformer = PyNULL()
@@ -21,11 +15,6 @@ __init__() = begin
     copy!(lark,pyimport("lark"))
     copy!(jl_transformer,pyimport("jl_transformer"))
 end
-
-using DataFrames
-
-include("drel_runtime.jl")  #functions for runtime execution
-include("drel_ast.jl") #functions for ast manipulation
 
 # Configuration
 const drel_grammar = joinpath(@__DIR__,"lark_grammar.ebnf")
@@ -122,27 +111,22 @@ get_func_text(dict::abstract_cif_dictionary,dataname::String) =  begin
 end
 
 define_dict_funcs(c::abstract_cif_dictionary) = begin
-    #Parse and evaluate all dictionary-defined functions into the scope of the module
+    #Parse and evaluate all dictionary-defined functions and store
     func_cat,all_funcs = get_dict_funcs(c)
     parser = lark_grammar()
     for f in all_funcs
         println("Now processing $f")         
         full_def = get_by_cat_obj(c,(func_cat,f))
         entry_name = String(full_def["_definition.id"][1])
+        full_name = String(full_def["_name.object_id"][1])
         func_text = get_loop(full_def,"_method.expression")
         func_text = String(func_text[Symbol("_method.expression")][1])
         println("Function text: $func_text")
         result = make_julia_code(func_text,entry_name,c,parser)
         println("Transformed text: $result")
-        println("Evaluating in module $(@__MODULE__)")
-        Base.eval(@__MODULE__,result)  #place function name in module scope
+        set_func!(c,full_name,eval(result))  #store in dictionary
     end
 end
-
-#== Storage for already-evaluated functions
-==#
-
-const func_lookup = Dict{String,Function}()
 
 struct dynamic_block <: cif_container_with_dict
     block::cif_block_with_dict
@@ -163,28 +147,26 @@ end
 dataname==#
 
 derive(d::cif_container_with_dict,s::String) = begin
-    if !(s in keys(func_lookup))
-        add_new_func(get_dictionary(d),s)
+    dict = get_dictionary(d)
+    if !(has_func(dict,s))
+        add_new_func(dict,s)
     end
-    func_name = func_lookup[s]
-    target_loop = CategoryObject(d,find_category(get_dictionary(d),s))
-    println("Now deriving $s in loop")
-    for p in target_loop
-        #println("$(getfield(p,:dfr))")
-    end
-    [Base.invokelatest(func_name,d,p) for p in target_loop]
+    func_code = get_func(dict,s)
+    target_loop = CategoryObject(d,find_category(dict,s))
+    [Base.invokelatest(func_code,d,p) for p in target_loop]
 end
 
 #==This is called from within a dREL method when an item is
 found missing from a packet==#
 
 derive(d::cif_container_with_dict,cat::String,obj::String,p::CatPacket) = begin
-    dataname = String(get_by_cat_obj(get_dictionary(d),(cat,obj))["_definition.id"][1])
-    if !(dataname in keys(func_lookup))
-        add_new_func(get_dictionary(d),dataname)
+    dict = get_dictionary(d)
+    dataname = String(get_by_cat_obj(dict,(cat,obj))["_definition.id"][1])
+    if !(has_func(dict,dataname))
+        add_new_func(dict,dataname)
     end
-    func_name = func_lookup[dataname]
-    Base.invokelatest(func_name,d,p)
+    func_code = get_func(dict,dataname)
+    Base.invokelatest(func_code,d,p)
 end
 
 #== We redefine getproperty to allow derivation
@@ -207,9 +189,5 @@ add_new_func(d::abstract_cif_dictionary,s::String) = begin
     r = make_julia_code(t,s,d,parser)
     println("Transformed code for $s:\n")
     println(r)
-    f = eval(r)
-    merge!(func_lookup,Dict(s=>f))
-end
-
-    
+    set_func!(d,s, eval(r))
 end

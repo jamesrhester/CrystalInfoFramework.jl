@@ -4,6 +4,7 @@
 export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
 export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
+export get_func,set_func!,has_func
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 export CaselessString
 
@@ -23,6 +24,7 @@ struct cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
+    func_defs::Dict{String,Function}
 
     cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
@@ -35,7 +37,7 @@ struct cifdic <: abstract_cif_dictionary
             error("""Cifdic: supplied cat-obj lookup contains save frames that are
                    not present in the dictionary block""")
         end
-        return new(b,d,c)
+        return new(b,d,c,Dict())
     end
 end
 
@@ -144,6 +146,23 @@ get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
         obj = String(alternate[1])
     end
     objval = String(d[obj]["_name.object_id"][1])
+end
+
+set_func!(d::abstract_cif_dictionary,func_name::String,func_code) = begin
+    d.func_defs[func_name] = func_code
+end
+
+get_func(d::abstract_cif_dictionary,func_name::String) = begin
+    d.func_defs[func_name]
+end
+
+has_func(d::abstract_cif_dictionary,func_name::String) = begin
+    try
+        d.func_defs[func_name]
+    catch KeyError
+        return false
+    end
+    return true
 end
 
 #== Resolve imports
