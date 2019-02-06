@@ -483,7 +483,7 @@ def call(self,args):
             return " [" +args[2]+ "] "
     # Catch dictionary-defined functions
     if args[0].lower() in self.func_list:
-        return 'get_func(_dict,"'+args[0]+'")(' + args[2] + ",__datablock)"
+        return 'get_func(get_dictionary(__datablock),"'+args[0]+'")(' + args[2] + ",__datablock)"
     before,middle,after = get_function_name(args[0])
     if len(args) == 3:
         fstr = before + "(" + middle + ")" + after #no arguments
@@ -576,6 +576,7 @@ def get_function_name(in_name):
                 "complex":"complex",
                 "max":"max",
                 "min":"min",
+                "current_row":"current_row",
                 "float":"Float64",
                 "strip":"drel_strip",
                 "eigen":"drel_eigen",
@@ -608,8 +609,6 @@ def get_function_name(in_name):
         return "","","." + test_name
     if test_name == 'sort':
         return "sort!","",""
-    if test_name == 'current_row':
-        return "","",".__current_row()"
     # These are our validation builtins
     if test_name in ('known','instance'):
         return test_name,"__dict,__datablock,",""
@@ -656,7 +655,7 @@ def get_type_annotation(ddl_type,ddl_container):
     elif ddl_container == "List":
         annotation = "Array{%s}" % element_type
     elif ddl_container in ["Array","Matrix"]:
-        annotation = "Array{%s}" % element_type
+        annotation = "AbstractArray{Number}"
     elif ddl_container == "Table":
         annotation = "Dict{String,%s}" % element_type      
     return annotation

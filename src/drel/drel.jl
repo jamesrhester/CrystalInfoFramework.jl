@@ -1,7 +1,7 @@
 #== Definitions for running dREL code in Julia.
 ==#
 
-export CategoryObject,CatPacket,get_name,first_packet
+export CategoryObject,CatPacket,get_name,first_packet,current_row
 
 """The following models a dREL category object, that can be looped over,
 with each iteration providing a new packet"""
@@ -124,6 +124,12 @@ end
 
 # Useful for Set categories
 first_packet(c::CategoryObject) = iterate(c)[1]
+
+# Support dREL legacy. Current row in dREL actually
+# numbers from zero
+current_row(c::CatPacket) = begin
+    return parentindices(getfield(c,:dfr))[1]-1
+end
 
 #== The Tables.jl interface functions, commented out for now
 

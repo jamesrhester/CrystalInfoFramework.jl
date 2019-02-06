@@ -1,12 +1,14 @@
-# These definitions override standard Julia definitions to bring
+# These definitions enhance standard Julia definitions to bring
 # function behaviour in line with dREL
 
 # Include this file in any namespace (module) that evaluates Julia
 # code derived from dREL
 
-# getindex of a string produces a character
 using LinearAlgebra
 
+export drelvector
+
+# a character can be compared to a single-character string
 Base.:(==)(c::Char,y::String) = begin
     if length(y) == 1
         return c == y[1]
