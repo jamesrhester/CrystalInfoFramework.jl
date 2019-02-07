@@ -46,7 +46,13 @@ cifdic(c::NativeCif) = begin
         error("Error: Cif dictionary has more than one data block")
     end
     b = c[collect(keys(c))[1]]
-    # now create the definition names
+    return cifdic(b)
+end
+
+cifdic(base_b::NativeBlock) = begin
+    # importation first as it changes the block contents
+    b = resolve_imports!(base_b)
+    # create the definition names
     defs = get_all_frames(b)
     bnames = collect(keys(defs))
     match_dict = Dict()
@@ -64,7 +70,7 @@ cifdic(c::NativeCif) = begin
         merge!(match_dict, Dict(k=>k for k in bnames))
         merge!(match_dict, Dict(lowercase(k)=>k for k in bnames))
     end
-    resolve_imports!(cifdic(b,match_dict,cat_obj_dict))
+    return cifdic(b,match_dict,cat_obj_dict)
 end
 
 cifdic(a::String) = cifdic(NativeCif(a))
@@ -175,44 +181,61 @@ using it.
 URLs containing colons early on ==#
 
 fix_url(s::String,parent::String) = begin
-    try
-        p = URI(s)
-    catch   #something wrong
-        if s[1]=='/'
-            return "file:"*s
-        elseif s[1]=="."
-            return "file://"*parent*s[2:end]
-        else
-            return "file://"*parent*"/"*s
-        end
+    if s[1]=='/'
+        return "file://"*s
+    elseif s[1]=="."
+        return "file://"*parent*s[2:end]
+    else
+        return "file://"*parent*"/"*s
     end
     return s
 end
 
-resolve_imports!(c::cifdic) = begin
+#== We return a NativeBlock for further operations. While the
+templated imports operate directly on the internal Dict entries,
+it appears that the full imports create a copy ==#
+resolve_imports!(b::NativeBlock) = begin
+    c = get_all_frames(b) #dont care about actual non-save data
+    imports = [c[a] for a in keys(c) if haskey(c[a],"_import.get")]
+    if length(imports) == 0
+        return b
+    end
+    resolve_templated_imports!(c,imports)
+    new_c = resolve_full_imports!(c,imports)
+    # remove all import commands
+    for i in imports
+        delete!(i,"_import.get")
+    end
+    return NativeBlock(new_c.contents,b.loop_names,b.data_values,b.original_file)
+end
+
+get_import_info(original_dir,import_entry) = begin
+    # println("Now processing $one_entry")
+    fixed = fix_url(String(import_entry["file"]),original_dir)
+    url = URI(fixed)
+    println("URI is $(url.scheme), $(url.path)")
+    if url.scheme != "file"
+        error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
+    end
+    location = url.path
+    block = String(import_entry["save"])
+    mode = String(get(import_entry,"mode","Contents"))
+    if_dupl = String(get(import_entry,"if_dupl","Exit"))
+    if_miss = String(get(import_entry,"if_miss","Exit"))
+    return location,block,mode,if_dupl,if_miss
+end
+
+resolve_templated_imports!(c::NativeCif,temp_blocks) = begin
     cached_dicts = Dict()   #to save reading twice
-    for one_block in c
-        if !haskey(one_block,"_import.get")
-            continue
-        end
-        original_dir = dirname(c.block.original_file)
+    original_dir = dirname(c.original_file)
+    for one_block in temp_blocks
         import_table = one_block["_import.get"][1]
         import_def = nothing   #define it in the right scope
         for one_entry in import_table
-            # println("Now processing $one_entry")
-            url = URI(fix_url(String(one_entry["file"]),original_dir))
-            if url.scheme != "file"
-                error("Non-file URI cannot be handled: $(one_entry[file])")
-            end
-            location = url.path
-            block = String(one_entry["save"])
-            mode = String(get(one_entry,"mode","Contents"))
+            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
-                println("WARNING: Full mode import not implemented yet; skipping $location")
-                continue
+                continue   # we will do this later
             end
-            if_dupl = String(get(one_entry,"if_dupl","Exit"))
-            if_miss = String(get(one_entry,"if_miss","Exit"))
             # define a combiner function
             combiner(a,b) = begin
                 if if_dupl == "Exit"
@@ -247,16 +270,65 @@ resolve_imports!(c::cifdic) = begin
                     continue
                 end
             end
-            # now merge it all in
-            if mode == "Contents"
-                #println("Now merging $one_block and $import_def")
-                merge!(combiner,one_block,import_def)
-            elseif mode == "Full"
-                println("WARNING: full mode imports not supported yet, ignored")
-            end
+            #println("Now merging $block into $(get(one_block,"_definition.id","?"))")
+            merge!(combiner,one_block,import_def)
         end   #of import list cycle
-        delete!(one_block,"_import.get")
-    end
+    end #of loop over blocks
+    return c
+end
+
+#== A full import of Head into Head will add all definitions from the imported dictionary,
+and in addition will reparent a children of the imported Head category to the new
+Head category.  We first merge the two sets of save frames, and then fix the parent category
+of any definitions that had the old head category as parent. Note that the NativeCif
+object passed to us is just the save frames from a dictionary.
+==#
+resolve_full_imports!(c::NativeCif,imp_blocks) = begin
+    original_dir = dirname(c.original_file)
+    for into_block in imp_blocks
+        import_table = into_block["_import.get"][1]
+        import_def = nothing   #define it in the right scope
+        for one_entry in import_table
+            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
+            if mode == "Contents"
+                continue   # we have done this
+            end
+            if into_block["_definition.class"][1] != "Head"
+                println("WARNING: full mode imports into non-head categories not supported, ignored")
+                continue
+            end
+            importee = cifdic(location)  #this will perform nested imports
+            importee_head = importee[block]
+            if importee_head["_definition.class"][1] != "Head"
+                println("WARNING: full mode imports of non-head categories not supported, ignored")
+                continue
+            end
+            # define a combiner function
+            combiner(a,b) = begin
+                if if_dupl == "Exit"
+                    error("Block duplicated when importing from $location: $a and $b")
+                elseif if_dupl == "Ignore"
+                    return a
+                elseif if_dupl == "Replace"
+                    return b
+                end
+            end
+            # store the name of the old head category...and delete
+            old_head = lowercase(importee_head["_name.object_id"][1])
+            new_head = into_block["_name.object_id"][1]
+            delete!(importee.block.save_frames,block)
+            # merge the save frames
+            println("Before merging, $(length(c.contents)) save frames")
+            merge!(combiner,c.contents,importee.block.save_frames)
+            println("After merging, $(length(c.contents)) save frames")
+            # reparent those blocks that have the old head category as parent
+            for k in keys(c)
+                if lowercase(String(get(c[k],"_name.category_id",[""])[1])) == old_head
+                    c[k]["_name.category_id"] = [native_cif_element(new_head)]
+                end
+            end
+        end   #of one entry
+    end  #of one _import.get statement
     return c
 end
 

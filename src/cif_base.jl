@@ -877,7 +877,7 @@ held in a loop with a single row.
 
 ==#
 
-struct NativeCif <: cif
+struct NativeCif <: AbstractDict{String,cif_container}
     contents::Dict{String,cif_container}
     original_file::String
 end
@@ -940,6 +940,15 @@ end
 
 get_save_frame(c::NativeBlock,s::String) = begin
     c.save_frames[s]
+end
+
+#== Merge the save frame lists of the second block files into the
+first block. This routine is used in order to merge
+dictionaries, for which the data block contents are less important ==#
+
+merge_saves(combiner::Function,c::NativeBlock,d::NativeBlock) = begin
+    merged_saves = merge(combiner,c.save_frames,d.save_frames)
+    NativeBlock(merged_saves,c.loop_names,c.data_values,c.original_file)
 end
 
 """An opaque type representing the parse options object in libcif"""
