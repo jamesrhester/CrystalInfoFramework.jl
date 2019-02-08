@@ -38,7 +38,10 @@ CategoryObject(datablock::cif_container_with_dict,catname) = begin
         key_names = cifdic[catname]["_category_key.name"]
         use_keys, key_names = create_keylists(key_names,have_vals)
     end
-    actual_data = get_loop(datablock,have_vals[1])
+    actual_data = get_loop(datablock,data_names[1])
+    if !is_looped && size(actual_data,2) == 0  #no packets in a set category
+        actual_data[gensym()] = [missing]
+    end
     CategoryObject(datablock,catname,object_names,data_names,actual_data,internal_object_names,
         name_to_object,object_to_name,key_names,is_looped,have_vals,key_index,use_keys)
 end

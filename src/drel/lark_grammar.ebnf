@@ -49,6 +49,8 @@
     OCTINT : /0o[0-7]+/
     HEXINT : /0x[0-9A-Fa-f]+/
     BININT : /0b[0-1]+/
+    MISSING : "?"
+    NULL : "NULL"
     
     real : ((INTEGER "." (INTEGER)*)|("." INTEGER))[("E"|"e"i) ["+"|"-"] INTEGER ]
     
@@ -78,7 +80,7 @@
     WHITESPACE : /[ \t\r\n]+/
     %ignore WHITESPACE
     
-    literal : SHORTSTRING | LONGSTRING | INTEGER | HEXINT | OCTINT | BININT | real | imaginary 
+    literal : SHORTSTRING | LONGSTRING | INTEGER | HEXINT | OCTINT | BININT | NULL | MISSING | real | imaginary 
     
     ident : ID 
     

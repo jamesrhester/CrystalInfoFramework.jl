@@ -78,7 +78,7 @@ def __init__(self, dataname, target_cat, target_obj, cat_list,
 self.cat_ids = set([])   #categories mentioned in the method
 self.target_category_alias = target_cat #
 self.ddlm_cats = set([]) #DDLm categories mentioned, validation only
-self.aug_assign_table = {"++=":"julia-fixme",
+self.aug_assign_table = {"++=":"push!",
                     "--=":"julia-fixme"}
 
 @ 

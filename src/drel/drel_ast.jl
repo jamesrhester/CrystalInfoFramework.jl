@@ -20,6 +20,10 @@ As a special case we pick up assignments of the form
 that creation of a single packet of a Set category look
 like.
 
+If a value is checked against missing, we drop the type assertion as
+it will fail before the check is carried out. We skip annotation
+inside calls of 'ismissing' in order to do this.
+
 ==#
 # Keep a track of assignments, and assign types
 # Each case has implications for the assignment dictionary
@@ -76,6 +80,8 @@ ast_assign_types(ast_node,in_scope_dict;lhs=nothing,cifdic=Dict(),set_cats=Array
                 ixpr.args[3] = :($(ixpr.args[3])+1)
                 return ixpr
             end
+        elseif ast_node.head == :call && ast_node.args[1] == :ismissing
+            return ast_node    #no internal annotations if missing is allowed
         elseif ast_node.head == :ref
             #println("Found subscription")
             if ast_node.args[1] in keys(in_scope_dict)

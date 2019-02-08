@@ -374,7 +374,7 @@ get_loop(b::cif_container_with_dict,s::String) = begin
     #println("All names in category of $s: $all_names")
     loop_names = [l for l in all_names if l in keys(b)]
     if length(loop_names) == 0
-        error("Non-existent loop requested, same category as $s")
+        println("WARNING: Non-existent loop requested, category of $s")
     end
     #println("All names present in datafile: $loop_names")
     # Construct a data frame using Dictionary knowledge
@@ -467,7 +467,7 @@ end
 
 get_dimensions(cifdic,cat,obj) = begin
     definition = get_by_cat_obj(cifdic,(cat,obj))
-    dims = String(get(definition,"_type.dimension","[]")[1])
+    dims = String(get(definition,"_type.dimension",["[]"])[1])
     final = eval(Meta.parse(dims))
     if length(final) > 1
         t = final[1]

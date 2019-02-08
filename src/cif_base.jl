@@ -918,12 +918,22 @@ Base.delete!(b::NativeBlock,s) = begin
     delete!(b.data_values,lowercase(s))
 end
 
+"""
+    get_loop(b,s) -> DataFrame
+
+Return the contents of the loop containing data name s in block
+b. If no data are available, a zero-length DataFrame is returned.
+"""
 get_loop(b::NativeBlock,s) = begin
     loop_names = [l for l in b.loop_names if s in l]
     # Construct a DataFrame
     df = DataFrame()
-    for n in loop_names[1]
-        df[Symbol(n)]=b.data_values[n]
+    if length(loop_names) == 1
+        for n in loop_names[1]
+            df[Symbol(n)]=b.data_values[n]
+        end
+    elseif length(loop_names) > 1
+        error("More than one loop contains data name $s")
     end
     return df
 end

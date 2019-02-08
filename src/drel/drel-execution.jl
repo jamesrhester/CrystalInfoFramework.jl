@@ -100,11 +100,14 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     parsed = ast_assign_types(parsed,Dict(Symbol("__packet")=>target_cat),cifdic=dict,set_cats=set_categories,all_cats=get_categories(dict))
 end
 
-#== Extract the dREL text from the dictionary
+#== Extract the dREL text from the dictionary, if any
 ==#
 get_func_text(dict::abstract_cif_dictionary,dataname::String) =  begin
     full_def = dict[dataname]
     func_text = get_loop(full_def,"_method.expression")
+    if size(func_text,2) == 0   #nothing
+        return ""
+    end
     # TODO: ignore non 'Evaluation' methods
     # TODO: allow multiple methods
     func_text = String(func_text[Symbol("_method.expression")][1])
@@ -185,8 +188,12 @@ end
 
 add_new_func(d::abstract_cif_dictionary,s::String) = begin
     t = get_func_text(d,s)
-    parser = lark_grammar()
-    r = make_julia_code(t,s,d,parser)
+    if t != ""
+        parser = lark_grammar()
+        r = make_julia_code(t,s,d,parser)
+    else
+        r = Meta.parse("(a,b) -> missing")
+    end
     println("Transformed code for $s:\n")
     println(r)
     set_func!(d,s, eval(r))
