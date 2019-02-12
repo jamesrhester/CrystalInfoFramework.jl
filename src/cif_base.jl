@@ -2,7 +2,7 @@
 the libcif API =#
 
 export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
-export get_loop,cif_list,cif_table
+export get_loop,cif_list,cif_table, eachrow
 export get_save_frame, get_all_frames
 export NativeCif,native_cif_element,NativeBlock
 
@@ -725,6 +725,7 @@ Base.iterate(i::native_cif_element) = Base.iterate(i.element)
 Base.iterate(i::native_cif_element,j::Integer) = Base.iterate(i.element,j)
 Base.getindex(n::native_cif_element,s) = n.element[s]
 Base.get(n::native_cif_element,s,d) = get(n.element,s,d)
+Broadcast.broadcastable(x::native_cif_element) = Ref(x)
 
 # Turn all primitive elements into strings
 
@@ -891,6 +892,7 @@ Base.setindex!(c::NativeCif,v,s) = begin
     c.contents[s]=v
 end
 
+Base.first(c::NativeCif) = first(c.contents)
 Base.keys(c::NativeCif) = keys(c.contents)
 Base.haskey(c::NativeCif,s::String) = haskey(c.contents,s)
 
@@ -908,6 +910,20 @@ Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
 Base.length(b::NativeBlock) = length(b.data_values)
 Base.getindex(b::NativeBlock,s::String) = begin
     getproperty.(b.data_values[lowercase(s)],:element)
+end
+
+# We can specify a particular row in a loop by giving the
+# values of the datanames.
+Base.getindex(b::NativeBlock,s::Dict) = begin
+    l = get_loop(b,first(s).first)
+    for pr in s
+        k,v = pr
+        l = l[l[Symbol(k)] .== native_cif_element(v), :]
+    end
+    if size(l,1) != 1
+        println("WARNING: $s does not identify a unique row")
+    end
+    first(l)
 end
 
 Base.setindex!(b::NativeBlock,v,s) = begin

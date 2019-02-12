@@ -84,6 +84,10 @@ Base.keys(cdic::cifdic) = begin
     keys(cdic.definitions)    
 end
 
+Base.haskey(cdic::cifdic,k::String) = begin
+    haskey(cdic.definitions,k)
+end
+
 # We iterate over the definitions
 Base.iterate(c::cifdic) = begin
     everything = collect(keys(c.definitions))
@@ -336,6 +340,8 @@ end
 ==#
 
 abstract type cif_container_with_dict <: cif_container{native_cif_element} end
+
+abstract type cif_with_dict end   #TODO: find a spot in the type tree
 
 #== Should always define the following methods
 ==#
