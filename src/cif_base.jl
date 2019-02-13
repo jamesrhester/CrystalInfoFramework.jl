@@ -9,10 +9,6 @@ export NativeCif,native_cif_element,NativeBlock
 import Base.Libc:FILE
 
 keep_alive = Any[]   #to stop GC freeing memory
-"""
-The abstract cif type
-"""
-abstract type cif end
 
 """
 This represents the opaque cifapi cif_tp type.
@@ -21,7 +17,7 @@ mutable struct cif_tp
 end
 
 """A pointer to a cif_tp type managed by C"""
-mutable struct cif_tp_ptr <: cif
+mutable struct cif_tp_ptr
     handle::Ptr{cif_tp}
 end
 
@@ -61,28 +57,10 @@ end
 #==
 Routines for accessing parts of the CIF file
 ==#
-
 #==
 Data blocks
 ==#
 
-"""The type of blocks and save frames"""
-
-abstract type cif_container{V} <: AbstractDict{String,V} end
-
-"""Without a dictionary we could have lists, tables or strings"""
-
-get_dataname_type(c::cif_container,d::AbstractString) = begin
-    return Any
-end
-
-Base.length(c::cif_container) = length(keys(c))
-
-"""An empty dummy container for when we havent kept track
-of where a value comes from...may be removed with better
-design"""
-
-struct empty_cif_container{V} <: cif_container{V} end
 
 """An opaque type representing a CIF block"""
 mutable struct cif_container_tp   #cif_block_tp in libcif
@@ -102,10 +80,11 @@ longer referenced in a program.  This will cause a
 segmentation fault whenever the block is subsequently
 referenced."""
 
-struct cif_block <: cif_container{cif_container_tp_ptr}
+struct cif_block
     handle::cif_container_tp_ptr   #*cif_container_tp
     cif_handle::cif_tp_ptr         #keep a reference to this
 end
+
 
 container_destroy!(cb::cif_container_tp_ptr) =  begin
     #error_string = "Finalizing cif block ptr $cb"
@@ -189,9 +168,9 @@ end
 
 Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
 
-struct cif_frame <: cif_container{cif_container_tp_ptr}
+struct cif_frame
     handle::cif_container_tp_ptr
-    parent::cif_container   #Stop garbage collection of the parent block
+    parent::cif_frame   #Stop garbage collection of the parent block
 end
 
 
@@ -333,7 +312,7 @@ get_syntactical_type(t::cif_value_tp_ptr) = begin
 end
     
 """Return the value of an item"""
-Base.getindex(b::cif_container,name::AbstractString) = begin
+Base.getindex(b::cif_frame,name::AbstractString) = begin
     new_val = cif_value_tp_ptr(0)
     uname = transcode(UInt16,name)
     append!(uname,0)
@@ -360,7 +339,7 @@ Base.getindex(b::cif_container,name::AbstractString) = begin
     return new_val
 end
 
-Base.get(b::cif_container,name::AbstractString,default) = begin
+Base.get(b::cif_frame,name::AbstractString,default) = begin
     retval = default
     try
         retval = b[name]
@@ -386,7 +365,7 @@ end
 mutable struct cif_loop
     handle::cif_loop_tp_ptr
     length::Int             #to allow generators
-    block::cif_container    #to avoid early garbage collection
+    block::cif_frame    #to avoid early garbage collection
 end
 
 mutable struct cif_loop_tp_ptr_ptr
@@ -459,7 +438,7 @@ end
 # Return all datanames in the container. As all items belong to a loop, we get all loops,
 # then get all keys in each loop.
 
-Base.keys(c::cif_container) = begin
+Base.keys(c::cif_frame) = begin
     llist = cif_loop_tp_ptr_ptr(0)
     val = ccall((:cif_container_get_all_loops,"libcif"),Cint,(cif_container_tp_ptr,Ptr{cif_loop_tp_ptr_ptr}),
                 c.handle,Ref(llist))
@@ -499,7 +478,7 @@ end
 
 mutable struct cif_packet
     handle::Ptr{cif_packet_tp}
-    parent::cif_container      #for type lookup
+    parent::cif_frame      #for type lookup
 end
 
 packet_free!(cif_packet) = begin
@@ -659,57 +638,36 @@ get_c_length(s::Ptr,max=-1) = begin
     return n
 end
 
-#== CIF compound values ==#
-
-struct cif_list
-    handle::cif_value_tp_ptr
-    parent::cif_container #for type information
-    dataname::String #for type information
-    length::Int  # for efficiency
-
-    cif_list(cc::cif_container,dname::String,cv::cif_value_tp_ptr) = begin
-        cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
-        if cif_type != 2
-            error("$val is not a cif list value")
-        end
-        elctptr = Ref{Cint}(0)
-        val = ccall((:cif_value_get_element_count,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cint}),cv.handle,elctptr)
-        if val != 0
-            error(error_codes[val])
-        end
-        elct = elctptr[]
-        new(cv,cc,dname,elct)
+cif_list(cv::cif_value_tp_ptr) = begin
+    cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
+    if cif_type != 2
+        error("$val is not a cif list value")
     end
-end
-
-cif_list(t) = cif_list(empty_cif_container{cif_value_tp_ptr}(),"",t)
-
-#== Remember that we conventionally start at element 1 in Julia
-
-This could fail miserably if we access the same value, then the garbage collector
-frees it, then we access that value again...maybe?
-==#
-
-Base.iterate(cl::cif_list,el_num) = begin
-    if cl.length < el_num
-        return nothing
-    end
-    new_element = cif_value_tp_ptr(0)
-    val = ccall((:cif_value_get_element_at,"libcif"),Cint,(Ptr{cif_value_tp},Cint,Ptr{cif_value_tp_ptr}),cl.handle.handle,el_num-1,Ref(new_element))
+    elctptr = Ref{Cint}(0)
+    val = ccall((:cif_value_get_element_count,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cint}),cv.handle,elctptr)
     if val != 0
         error(error_codes[val])
     end
-    return (new_element,el_num+1)
+    elct = elctptr[]
+    so_far = Vector{native_cif_element}()
+    for el_num in 1:elct
+        new_element = cif_value_tp_ptr(0)
+        val = ccall((:cif_value_get_element_at,"libcif"),Cint,(Ptr{cif_value_tp},Cint,Ptr{cif_value_tp_ptr}),cv.handle,el_num-1,Ref(new_element))
+        if val != 0
+            error(error_codes[val])
+        end
+        t = get_syntactical_type(new_element)
+        if t == cif_value_tp_ptr
+            push!(so_far,native_cif_element(String(new_element)))
+        elseif t == cif_list
+            push!(so_far,native_cif_element(cif_list(new_element)))
+        elseif t == cif_table
+            push!(so_far,native_cif_element(cif_table(new_element)))
+        else push!(so_far,native_cif_element(t()))
+        end
+    end
+    return so_far
 end
-
-Base.iterate(cl::cif_list) = begin
-    iterate(cl,1)
-end
-
-Base.length(cl::cif_list) = cl.length
-Base.eltype(::Type{cif_list}) = Any
-Base.firstindex(::cif_list) = 1
-Base.lastindex(cl::cif_list) = cl.length
 
 # And now our native version
 struct native_cif_element
@@ -727,69 +685,33 @@ Base.getindex(n::native_cif_element,s) = n.element[s]
 Base.get(n::native_cif_element,s,d) = get(n.element,s,d)
 Broadcast.broadcastable(x::native_cif_element) = Ref(x)
 
-# Turn all primitive elements into strings
-
-process_to_strings(c::cif_list,so_far::Vector{native_cif_element}) = begin
-    for el in c
-        t = get_syntactical_type(el)
-        if t == cif_value_tp_ptr
-            push!(so_far,native_cif_element(String(el)))
-        elseif t == cif_list
-            push!(so_far,native_cif_element(process_to_strings(t(el),Vector{native_cif_element}())))
-        elseif t == cif_table
-            push!(so_far,native_cif_element(process_to_strings(t(el),Dict{String,native_cif_element}())))
-        else push!(so_far,native_cif_element(t()))
-        end
+cif_table(cv::cif_value_tp_ptr) = begin
+    cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
+    if cif_type != 3
+        error("$val is not a cif table value")
     end
-    return so_far
-end               
-            
-#== Table values
-==#
-
-struct cif_table
-    handle::cif_value_tp_ptr
-    parent::cif_container    #for type information
-    dataname::AbstractString #for type information
-    length::Int  # for efficiency
-
-    cif_table(enclosing,dataname,cv::cif_value_tp_ptr) = begin
-        cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
-        if cif_type != 3
-            error("$val is not a cif table value")
-        end
-        elctptr = Ref{Cint}(0)
-        val = ccall((:cif_value_get_element_count,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cint}),cv.handle,elctptr)
-        if val != 0
-            error(error_codes[val])
-        end
-        elct = elctptr[]
-        new(cv,enclosing,dataname,elct)
-    end
-end
-
-cif_table(t) = cif_table(empty_cif_container{cif_value_tp_ptr}(),"",t)
-
-process_to_strings(c::cif_table,so_far::Dict{String,native_cif_element}) = begin
-    for el in keys(c)
-        t = get_syntactical_type(c[el])
+    so_far = Dict{String,native_cif_element}()
+    for el in keys(cv)
+        new_val = cv[el]
+        t = get_syntactical_type(new_val)
         if t == cif_value_tp_ptr
-            so_far[el]=native_cif_element(String(c[el]))
+            so_far[el]=native_cif_element(String(new_val))
         elseif t == cif_list
-            so_far[el]=native_cif_element(process_to_strings(t(c[el]),Vector{native_cif_element}()))
+            so_far[el]=native_cif_element(cif_list(new_val))
         elseif t == cif_table
-            so_far[el]=native_cif_element(process_to_strings(t(c[el]),Dict{String,native_cif_element}()))
+            so_far[el]=native_cif_element(cif_table(new_val))
         else so_far[el]=native_cif_element(t())
         end
     end
     return so_far
-end               
+end
 
-Base.keys(ct::cif_table) = begin
+# The pointer passed to us should point to a table
+Base.keys(ct::cif_value_tp_ptr) = begin
     ukeys = Uchar_list(0)
     #q = time_ns()
     #println("$q: accessing keys for $(ct.handle.handle)")
-    val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle.handle,Ref(ukeys))
+    val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle,Ref(ukeys))
     if val != 0
         error(error_codes[val])
     end
@@ -808,9 +730,6 @@ Base.keys(ct::cif_table) = begin
     end
     n = n - 1
     #println("Number of keys: $n")
-    if n != ct.length
-        error("Number of keys does not match stated length")
-    end
     # Load in the UChar string pointers
     ukey_list = Vector{Uchar}(undef,n)
     for j=1:n
@@ -822,28 +741,13 @@ Base.keys(ct::cif_table) = begin
     key_list = make_jl_string.(ukey_list)
 end
 
-Base.iterate(ct::cif_table,keys) = begin
-    if length(keys) == 0
-        return nothing
-    end
-    next_key = pop!(keys)
-    return ct[next_key]
-end
-
-# To start the iteration we need a list of keys
-
-Base.iterate(ct::cif_table) = begin
-    iterate(ct,keys(ct))
-end
-
-Base.length(ct::cif_table) = ct.length
-
-Base.getindex(ct::cif_table,key::AbstractString) = begin
+# Access the value through the C library
+Base.getindex(ct::cif_value_tp_ptr,key::AbstractString) = begin
     ukey = transcode(UInt16,key)
     append!(ukey,0)
     new_element = cif_value_tp_ptr(0)
     val = ccall((:cif_value_get_item_by_key,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
-        ct.handle.handle,ukey,Ref(new_element))
+        ct.handle,ukey,Ref(new_element))
     if val == 73
         throw(KeyError(key))
         end
@@ -877,8 +781,25 @@ themselves data blocks. A loop is a DataFrame. Single-valued items are
 held in a loop with a single row.
 
 ==#
+"""The type of blocks and save frames"""
 
-struct NativeCif <: AbstractDict{String,cif_container}
+abstract type cif_container{V} <: AbstractDict{String,V} end
+
+"""
+The abstract cif type where the block elements all have primitive 
+datatypes given by V
+"""
+abstract type Cif{V} <: AbstractDict{String,cif_container{V}} end
+
+"""V, list(V) and table(string:V) all possible"""
+
+get_dataname_type(c::cif_container{V} where V,d::AbstractString) = begin
+    return Any
+end
+
+Base.length(c::cif_container) = length(keys(c))
+
+struct NativeCif <: Cif{cif_container{String}}
     contents::Dict{String,cif_container}
     original_file::String
 end
@@ -1091,11 +1012,9 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     if syntax_type == cif_value_tp_ptr
         val = String(b)
     elseif syntax_type == cif_list
-        tl = cif_list(current_block,keyname,b)
-        val = process_to_strings(tl,Vector{native_cif_element}())
+        val = cif_list(b)
     elseif syntax_type == cif_table
-        tt = cif_table(current_block,keyname,b)
-        val = process_to_strings(tt,Dict{String,native_cif_element}())
+        val = cif_table(b)
     else val = syntax_type()
     end
     #==if !ismissing(val) && val != nothing
@@ -1113,17 +1032,7 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     return 0    
 end
 
-default_options() = begin
-    p_opts = cpo_ptr(0)
-    val = ccall((:cif_parse_options_create,"libcif"),Cint,(Ref{cpo_ptr},),Ref(p_opts))
-    println("Parse options: $p_opts")
-    local_structure = unsafe_load(p_opts.handle)
-    #pos_destroy!(p_opts) 
-    println("Containing $local_structure")
-    return local_structure
-end
-
-default_options_new(s::String) = begin
+default_options(s::String) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -1158,7 +1067,7 @@ NativeCif() = begin
 end
 
 NativeCif(s::AbstractString) = begin
-    p_opts = default_options_new(s)
+    p_opts = default_options(s)
     result = cif_tp_ptr(p_opts)
     # the real result is in our user data context
     return NativeCif(p_opts.user_data.actual_cif,s)
