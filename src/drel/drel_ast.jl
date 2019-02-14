@@ -157,7 +157,7 @@ not touch slices, as are assumed to have been caught earlier.
 If we find a category[object] reference where ``object`` is not a dictionary,
 when convert it to a dictionary of form category_key => object ==#
 
-ast_fix_indexing(ast_node,in_scope_list,cifdic;lhs=nothing) = begin
+ast_fix_indexing(ast_node,in_scope_list::Array{String,1},cifdic;lhs=nothing) = begin
     #println("$ast_node: in scope $in_scope_list")
     ixpr = :(:call,:f)  #dummy
     if typeof(ast_node) == Expr
@@ -213,11 +213,11 @@ ast_fix_indexing(ast_node,in_scope_list,cifdic;lhs=nothing) = begin
                         ixpr.args[i] = :($(ixpr.args[i])+1)
                     end
                 end
-            elseif lhs != nothing    #the subscripted item is known to us, if we have an assignment store it
-                push!(in_scope_list,String(lhs))
-                println("Expanding key-based indexing for $(ast_node.args[1])")
-                keyname = get_single_keyname(cifdic,String(ast_node.args[1]))
-                ixpr.args[2] = :(Dict($keyname=>$(ixpr.args[2])))
+            elseif lhs != nothing
+                #the subscripted item is known to us, if we have an assignment store it
+                #println("Expanding key-based indexing for $(ast_node.args[1])")
+                #keyname = get_single_keyname(cifdic,String(ast_node.args[1]))
+                #ixpr.args[2] = :(Dict($keyname=>$(ixpr.args[2])))
             end
             return ixpr
         else 

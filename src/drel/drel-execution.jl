@@ -32,8 +32,8 @@ end
 lark_transformer(dname,dict,all_funcs,cat_list,func_cat) = begin
     # extract information to pass to python
     println("Now preparing dREL transformer for $dname (functions in $func_cat)")
-    target_cat = String(dict[dname]["_name.category_id"][1])
-    target_obj = String(dict[dname]["_name.object_id"][1])
+    target_cat = dict[dname]["_name.category_id"][1]
+    target_obj = dict[dname]["_name.object_id"][1]
     is_func = false
     if lowercase(target_cat) == func_cat
         is_func = true
@@ -45,15 +45,15 @@ end
 ==#
 
 get_cat_names(dict::abstract_cif_dictionary) = begin
-    catlist = [a for a in keys(dict) if String(get(dict[a],"_definition.scope",["Item"])[1]) == "Category"]
+    catlist = [a for a in keys(dict) if get(dict[a],"_definition.scope",["Item"])[1] == "Category"]
 end
 
 get_dict_funcs(dict::abstract_cif_dictionary) = begin
-    func_cat = [a for a in keys(dict) if String(get(dict[a],"_definition.class",["Datum"])[1]) == "Functions"]
+    func_cat = [a for a in keys(dict) if get(dict[a],"_definition.class",["Datum"])[1] == "Functions"]
     if length(func_cat) > 0
-        func_catname = lowercase(String(dict[func_cat[1]]["_name.object_id"][1]))
-        all_funcs = [a for a in keys(dict) if lowercase(String(dict[a]["_name.category_id"][1])) == func_catname]
-        all_funcs = lowercase.([String(dict[a]["_name.object_id"][1]) for a in all_funcs])
+        func_catname = lowercase(dict[func_cat[1]]["_name.object_id"][1])
+        all_funcs = [a for a in keys(dict) if lowercase(dict[a]["_name.category_id"][1]) == func_catname]
+        all_funcs = lowercase.([dict[a]["_name.object_id"][1] for a in all_funcs])
     else
         all_funcs = []
     end
@@ -61,8 +61,8 @@ get_dict_funcs(dict::abstract_cif_dictionary) = begin
 end
 
 get_drel_methods(cd::abstract_cif_dictionary) = begin
-    has_meth = [n for n in cd if "_method.expression" in keys(n) && String(get(n,"_definition.scope",["Item"])[1]) != "Category"]
-    meths = [(String(n["_definition.id"][1]),get_loop(n,"_method.expression")) for n in has_meth]
+    has_meth = [n for n in cd if "_method.expression" in keys(n) && get(n,"_definition.scope",["Item"])[1] != "Category"]
+    meths = [(n["_definition.id"][1],get_loop(n,"_method.expression")) for n in has_meth]
     println("Found $(length(meths)) methods")
     return meths
 end
@@ -92,7 +92,7 @@ make_julia_code(drel_text::String,dataname::String,dict::abstract_cif_dictionary
     parsed = ast_fix_indexing(Meta.parse(proto),get_categories(dict),dict)
     println(parsed)
     # catch implicit matrix assignments
-    container_type = String(dict[dataname]["_type.container"][1])
+    container_type = dict[dataname]["_type.container"][1]
     is_matrix = (container_type == "Matrix" || container_type == "Array")
     parsed = find_target(parsed,tc_aliases,transformer[:target_object];is_matrix=is_matrix)
     parsed = fix_scope(parsed)
@@ -110,7 +110,7 @@ get_func_text(dict::abstract_cif_dictionary,dataname::String) =  begin
     end
     # TODO: ignore non 'Evaluation' methods
     # TODO: allow multiple methods
-    func_text = String(func_text[Symbol("_method.expression")][1])
+    func_text = func_text[Symbol("_method.expression")][1]
 end
 
 define_dict_funcs(c::abstract_cif_dictionary) = begin
@@ -120,10 +120,10 @@ define_dict_funcs(c::abstract_cif_dictionary) = begin
     for f in all_funcs
         println("Now processing $f")         
         full_def = get_by_cat_obj(c,(func_cat,f))
-        entry_name = String(full_def["_definition.id"][1])
-        full_name = String(full_def["_name.object_id"][1])
+        entry_name = full_def["_definition.id"][1]
+        full_name = full_def["_name.object_id"][1]
         func_text = get_loop(full_def,"_method.expression")
-        func_text = String(func_text[Symbol("_method.expression")][1])
+        func_text = func_text[Symbol("_method.expression")][1]
         println("Function text: $func_text")
         result = make_julia_code(func_text,entry_name,c,parser)
         println("Transformed text: $result")
@@ -164,7 +164,7 @@ found missing from a packet==#
 
 derive(d::cif_container_with_dict,cat::String,obj::String,p::CatPacket) = begin
     dict = get_dictionary(d)
-    dataname = String(get_by_cat_obj(dict,(cat,obj))["_definition.id"][1])
+    dataname = get_by_cat_obj(dict,(cat,obj))["_definition.id"][1]
     if !(has_func(dict,dataname))
         add_new_func(dict,dataname)
     end

@@ -18,7 +18,6 @@ const db = setup()
     @test get_func(d,"SymEquiv")("2_555",drelvector([0.5,0.5,0.5]),db) == drelvector([0.0,1.0,-0.5])
 end
 
-#==
 @testset "Test dictionary-defined functions" begin
     # Test that our functions are available
     d = get_dictionary(db)
@@ -55,4 +54,3 @@ end
     println("$(code_typed(get_func(get_dictionary(db),"_atom_site.tensor_beta"),(dynamic_block,CatPacket)))")
     true
 end
-==#

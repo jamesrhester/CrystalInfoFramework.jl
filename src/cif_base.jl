@@ -4,7 +4,7 @@ the libcif API =#
 export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
 export get_loop,cif_list,cif_table, eachrow
 export get_save_frame, get_all_frames
-export NativeCif,native_cif_element,NativeBlock
+export NativeCif,NativeBlock
 
 import Base.Libc:FILE
 
@@ -649,7 +649,7 @@ cif_list(cv::cif_value_tp_ptr) = begin
         error(error_codes[val])
     end
     elct = elctptr[]
-    so_far = Vector{native_cif_element}()
+    so_far = Vector()
     for el_num in 1:elct
         new_element = cif_value_tp_ptr(0)
         val = ccall((:cif_value_get_element_at,"libcif"),Cint,(Ptr{cif_value_tp},Cint,Ptr{cif_value_tp_ptr}),cv.handle,el_num-1,Ref(new_element))
@@ -658,49 +658,33 @@ cif_list(cv::cif_value_tp_ptr) = begin
         end
         t = get_syntactical_type(new_element)
         if t == cif_value_tp_ptr
-            push!(so_far,native_cif_element(String(new_element)))
+            push!(so_far,String(new_element))
         elseif t == cif_list
-            push!(so_far,native_cif_element(cif_list(new_element)))
+            push!(so_far,cif_list(new_element))
         elseif t == cif_table
-            push!(so_far,native_cif_element(cif_table(new_element)))
-        else push!(so_far,native_cif_element(t()))
+            push!(so_far,cif_table(new_element))
+        else push!(so_far,t())
         end
     end
     return so_far
 end
-
-# And now our native version
-struct native_cif_element
-    element::Union{Vector{native_cif_element},Dict{String,native_cif_element},String,Missing,Nothing}
-end
-
-Base.String(s::native_cif_element) = String(s.element)
-Base.length(s::native_cif_element) = begin
-    if typeof(s.element) <: AbstractString return 1 end
-    length(s.element)
-end
-Base.iterate(i::native_cif_element) = Base.iterate(i.element)
-Base.iterate(i::native_cif_element,j::Integer) = Base.iterate(i.element,j)
-Base.getindex(n::native_cif_element,s) = n.element[s]
-Base.get(n::native_cif_element,s,d) = get(n.element,s,d)
-Broadcast.broadcastable(x::native_cif_element) = Ref(x)
 
 cif_table(cv::cif_value_tp_ptr) = begin
     cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
     if cif_type != 3
         error("$val is not a cif table value")
     end
-    so_far = Dict{String,native_cif_element}()
+    so_far = Dict{String,Any}()
     for el in keys(cv)
         new_val = cv[el]
         t = get_syntactical_type(new_val)
         if t == cif_value_tp_ptr
-            so_far[el]=native_cif_element(String(new_val))
+            so_far[el]=String(new_val)
         elseif t == cif_list
-            so_far[el]=native_cif_element(cif_list(new_val))
+            so_far[el]=cif_list(new_val)
         elseif t == cif_table
-            so_far[el]=native_cif_element(cif_table(new_val))
-        else so_far[el]=native_cif_element(t())
+            so_far[el]=cif_table(new_val)
+        else so_far[el]=t()
         end
     end
     return so_far
@@ -817,10 +801,10 @@ Base.first(c::NativeCif) = first(c.contents)
 Base.keys(c::NativeCif) = keys(c.contents)
 Base.haskey(c::NativeCif,s::String) = haskey(c.contents,s)
 
-mutable struct NativeBlock <: cif_container{native_cif_element}
-    save_frames::Dict{String,cif_container{native_cif_element}}
+mutable struct NativeBlock <: cif_container{Any}
+    save_frames::Dict{String,cif_container{Any}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{native_cif_element}}
+    data_values::Dict{String,Vector{Any}}
     original_file::String
 end
 
@@ -829,9 +813,8 @@ Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,lowercase(s))
 Base.iterate(b::NativeBlock) = iterate(b.data_values)
 Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
 Base.length(b::NativeBlock) = length(b.data_values)
-Base.getindex(b::NativeBlock,s::String) = begin
-    getproperty.(b.data_values[lowercase(s)],:element)
-end
+Base.getindex(b::NativeBlock,s::String) = b.data_values[lowercase(s)]
+Base.get(b::NativeBlock,s::String,a) = get(b.data_values,lowercase(s),a)
 
 # We can specify a particular row in a loop by giving the
 # values of the datanames.
@@ -839,7 +822,7 @@ Base.getindex(b::NativeBlock,s::Dict) = begin
     l = get_loop(b,first(s).first)
     for pr in s
         k,v = pr
-        l = l[l[Symbol(k)] .== native_cif_element(v), :]
+        l = l[l[Symbol(k)] .== v, :]
     end
     if size(l,1) != 1
         println("WARNING: $s does not identify a unique row")
@@ -1025,9 +1008,9 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     end ==#
     lc_keyname = lowercase(keyname)
     if !(lc_keyname in keys(current_block.data_values))
-        current_block.data_values[lc_keyname] = [native_cif_element(val)]
+        current_block.data_values[lc_keyname] = [val]
     else
-        push!(current_block.data_values[lc_keyname],native_cif_element(val))
+        push!(current_block.data_values[lc_keyname],val)
     end
     return 0    
 end
@@ -1067,10 +1050,12 @@ NativeCif() = begin
 end
 
 NativeCif(s::AbstractString) = begin
-    p_opts = default_options(s)
+    # get the full filename
+    full = realpath(s)
+    p_opts = default_options(full)
     result = cif_tp_ptr(p_opts)
     # the real result is in our user data context
-    return NativeCif(p_opts.user_data.actual_cif,s)
+    return NativeCif(p_opts.user_data.actual_cif,full)
 end
 
 

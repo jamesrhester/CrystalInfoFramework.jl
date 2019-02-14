@@ -58,14 +58,14 @@ cifdic(base_b::NativeBlock) = begin
     match_dict = Dict()
     # create lookup tables for cat,obj if not a template dictionary
     cat_obj_dict = Dict()
-    if String(b["_dictionary.class"][1]) != "Template"
-        merge!(match_dict, Dict(String(lowercase(defs[k]["_definition.id"][1])) => k for k in bnames))
+    if b["_dictionary.class"][1] != "Template"
+        merge!(match_dict, Dict(lowercase(defs[k]["_definition.id"][1]) => k for k in bnames))
         # create all aliases
         extra_aliases = generate_aliases(defs)
         merge!(match_dict,extra_aliases)
         # now the information for cat/obj lookup
         defblocks = [(defs[k]["_name.category_id"][1],defs[k]["_name.object_id"][1],k) for k in bnames if "_name.category_id" in keys(defs[k]) && "_name.object_id" in keys(defs[k])]
-        merge!(cat_obj_dict, Dict((lowercase.((String(s[1]),String(s[2]))),s[3]) for s in defblocks))
+        merge!(cat_obj_dict, Dict((lowercase.((s[1],s[2])),s[3]) for s in defblocks))
     else   # template dictionary, no cat/obj lookup, the save frame is the id
         merge!(match_dict, Dict(k=>k for k in bnames))
         merge!(match_dict, Dict(lowercase(k)=>k for k in bnames))
@@ -108,7 +108,7 @@ generate_aliases(b::NativeCif) = begin
     start_dict = Dict()
     for def in keys(b)
         if "_alias.definition_id" in keys(b[def])
-            alias_names = lowercase.(String.(b[def]["_alias.definition_id"]))
+            alias_names = lowercase.(b[def]["_alias.definition_id"])
             map(a->setindex!(start_dict,def,a),alias_names)
         end
     end
@@ -119,22 +119,22 @@ get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lo
 
 find_category(c::cifdic,dataname::String) = begin
     block = c[dataname]
-    catname = String(block["_name.category_id"][1])
+    catname = block["_name.category_id"][1]
 end
 
 get_categories(c::abstract_cif_dictionary) = begin
-    cats = [x for x in keys(c) if String(get(c[x],"_definition.scope",["Item"])[])=="Category"]
-    lowercase.([String(c[x]["_definition.id"][]) for x in cats])
+    cats = [x for x in keys(c) if get(c[x],"_definition.scope",["Item"])[]=="Category"]
+    lowercase.([c[x]["_definition.id"][] for x in cats])
 end
 
 get_set_categories(c::abstract_cif_dictionary) = begin
     all_cats = get_categories(c)
-    [x for x in all_cats if String(get(c[x],"_definition.class",["Datum"])[]) == "Set"] 
+    [x for x in all_cats if get(c[x],"_definition.class",["Datum"])[] == "Set"] 
 end
 
 get_loop_categories(c::abstract_cif_dictionary) = begin
     all_cats = get_categories(c)
-    [x for x in all_cats if String(get(c[x],"_definition.class",["Datum"])[]) == "Loop"]
+    [x for x in all_cats if get(c[x],"_definition.class",["Datum"])[] == "Loop"]
 end
 
 #== Get the object part of a single dataname that acts as a key
@@ -147,15 +147,15 @@ get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
         error("Category $c has no key datanames defined")
     end
     if length(cat_keys) == 1
-        obj = String(cat_keys[1])
+        obj = cat_keys[1]
     else
         alternate = get(definition,"_category.key_id",[])
         if length(alternate) == 0
             error("Category $c has no primitive key available")
         end
-        obj = String(alternate[1])
+        obj = alternate[1]
     end
-    objval = String(d[obj]["_name.object_id"][1])
+    objval = d[obj]["_name.object_id"][1]
 end
 
 set_func!(d::abstract_cif_dictionary,func_name::String,func_code) = begin
@@ -215,17 +215,17 @@ end
 
 get_import_info(original_dir,import_entry) = begin
     # println("Now processing $one_entry")
-    fixed = fix_url(String(import_entry["file"]),original_dir)
+    fixed = fix_url(import_entry["file"],original_dir)
     url = URI(fixed)
     println("URI is $(url.scheme), $(url.path)")
     if url.scheme != "file"
         error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
     end
     location = url.path
-    block = String(import_entry["save"])
-    mode = String(get(import_entry,"mode","Contents"))
-    if_dupl = String(get(import_entry,"if_dupl","Exit"))
-    if_miss = String(get(import_entry,"if_miss","Exit"))
+    block = import_entry["save"]
+    mode = get(import_entry,"mode","Contents")
+    if_dupl = get(import_entry,"if_dupl","Exit")
+    if_miss = get(import_entry,"if_miss","Exit")
     return location,block,mode,if_dupl,if_miss
 end
 
@@ -327,8 +327,8 @@ resolve_full_imports!(c::NativeCif,imp_blocks) = begin
             println("After merging, $(length(c.contents)) save frames")
             # reparent those blocks that have the old head category as parent
             for k in keys(c)
-                if lowercase(String(get(c[k],"_name.category_id",[""])[1])) == old_head
-                    c[k]["_name.category_id"] = [native_cif_element(new_head)]
+                if lowercase(get(c[k],"_name.category_id",[""])[1]) == old_head
+                    c[k]["_name.category_id"] = [new_head]
                 end
             end
         end   #of one entry
@@ -339,7 +339,7 @@ end
 #== Adding dictionary information to a data block
 ==#
 
-abstract type cif_container_with_dict <: cif_container{native_cif_element} end
+abstract type cif_container_with_dict <: cif_container{Any} end
 
 abstract type cif_with_dict end   #TODO: find a spot in the type tree
 
@@ -363,7 +363,24 @@ get_dictionary(c::cif_block_with_dict) = c.dictionary
 get_datablock(c::cif_block_with_dict) = c.data
 
 Base.getindex(c::cif_container_with_dict,s::String) = begin
-    as_string = get_datablock(c)[s]
+    # go through all aliases
+    root_def = get_dictionary(c)[s]  #will find definition
+    as_string = missing
+    try
+        as_string = get_datablock(c)[root_def["_definition.id"][1]]
+    catch KeyError
+        println("Couldn't find $(root_def["_definition.id"])")
+        for a in get(root_def,"_alias.definition_id",[root_def["_definition.id"][1]])
+            try
+                as_string = get_datablock(c)[a]
+                break
+            catch KeyError
+                println("And couldn't find $a")
+                continue
+            end
+            throw(KeyError(s))
+        end
+    end
     actual_type = get_julia_type(get_dictionary(c),s,as_string)
 end
 
@@ -386,7 +403,7 @@ get_loop(b::cif_container_with_dict,s::String) = begin
     # Construct a data frame using Dictionary knowledge
     df = DataFrame()
     for n in loop_names
-        obj_name = String(dict[n]["_name.object_id"][1])
+        obj_name = dict[n]["_name.object_id"][1]
         df[Symbol(lowercase(obj_name))] = b[n]
     end
     return df
@@ -430,8 +447,8 @@ const type_mapping = Dict( "Text" => String,
 
 get_julia_type_name(cifdic,cat::String,obj::String) = begin
     definition = get_by_cat_obj(cifdic,(cat,obj))
-    base_type = String(definition["_type.contents"][1])
-    cont_type = String(get(definition,"_type.container",["Single"])[1])
+    base_type = definition["_type.contents"][1]
+    cont_type = get(definition,"_type.container",["Single"])[1]
     jl_base_type = type_mapping[base_type]
     return jl_base_type,cont_type
 end
@@ -463,7 +480,7 @@ end
 
 get_julia_type(cifdic,dataname::String,value) = begin
     definition = cifdic[dataname]
-    return get_julia_type(cifdic,String(definition["_name.category_id"][1]),String(definition["_name.object_id"][1]),value)
+    return get_julia_type(cifdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
 end
 
 # return dimensions as an Array. Note that we do not handle
@@ -473,7 +490,7 @@ end
 
 get_dimensions(cifdic,cat,obj) = begin
     definition = get_by_cat_obj(cifdic,(cat,obj))
-    dims = String(get(definition,"_type.dimension",["[]"])[1])
+    dims = get(definition,"_type.dimension",["[]"])[1]
     final = eval(Meta.parse(dims))
     if length(final) > 1
         t = final[1]
@@ -484,16 +501,14 @@ get_dimensions(cifdic,cat,obj) = begin
 end
     
 real_from_meas(value) = begin
-    as_string = String(value)
-    if '(' in as_string
-        return parse(Float64,as_string[1:findfirst(isequal('('),as_string)-1])
+    if '(' in value
+        return parse(Float64,value[1:findfirst(isequal('('),value)-1])
     end
-    return parse(Float64,as_string)
+    return parse(Float64,value)
 end
 
-Range(v::native_cif_element) = begin
-    as_string = String(v)
-    lower,upper = split(as_string,":")
+Range(v::String) = begin
+    lower,upper = split(v,":")
     parse(Number,lower),parse(Number,upper)
 end
 

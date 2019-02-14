@@ -18,51 +18,34 @@ struct CategoryObject
     key_names
     is_looped
     have_vals
-    key_index
-    use_keys
 end
 
 CategoryObject(datablock::cif_container_with_dict,catname) = begin
     cifdic = get_dictionary(datablock)
-    object_names = [a for a in keys(cifdic) if lowercase(String(get(cifdic[a],"_name.category_id",[""])[1])) == lowercase(catname)]
-    data_names = [String(cifdic[a]["_definition.id"][1]) for a in object_names]
-    internal_object_names = [String(cifdic[a]["_name.object_id"][1]) for a in data_names]
+    object_names = [a for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
+    data_names = [cifdic[a]["_definition.id"][1] for a in object_names]
+    internal_object_names = [cifdic[a]["_name.object_id"][1] for a in data_names]
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(zip(internal_object_names,data_names))
-    is_looped = String(get(cifdic[catname],"_definition.class",["Set"])[1]) == "Loop"
+    is_looped = get(cifdic[catname],"_definition.class",["Set"])[1] == "Loop"
     have_vals = [k for k in data_names if k in keys(datablock)]
-    use_keys = false
-    key_index = []
     key_names = []
     if is_looped
-        key_names = cifdic[catname]["_category_key.name"]
-        use_keys, key_names = create_keylists(key_names,have_vals)
+        key_names = [name_to_object[a] for a in cifdic[catname]["_category_key.name"]]
     end
     actual_data = get_loop(datablock,data_names[1])
     if !is_looped && size(actual_data,2) == 0  #no packets in a set category
         actual_data[gensym()] = [missing]
     end
     CategoryObject(datablock,catname,object_names,data_names,actual_data,internal_object_names,
-        name_to_object,object_to_name,key_names,is_looped,have_vals,key_index,use_keys)
-end
-
-# This function creates lists of data names that can be used as keys of the category
-create_keylists(key_names,have_vals) = begin
-    have_keys = [k for k in key_names if k in have_vals]
-    println("Found keys $have_keys")
-    use_keys = true
-    if length(have_keys) < length(key_names) #use all keys
-        have_keys = have_vals
-        use_keys = false
-    end
-    return use_keys, have_keys
+        name_to_object,object_to_name,key_names,is_looped,have_vals)
 end
 
 # Allow access using a dictionary of object names. It is possible
 # that a single key dataname does not exist, in which case it
 # can be created arbitrarily.
 
-Base.getindex(c::CategoryObject,keydict) = begin
+Base.getindex(c::CategoryObject,keydict::Dict) = begin
     pack = c.data_frame
     println("Loop is $pack")
     # Try to create missing key data values - only
@@ -84,6 +67,16 @@ Base.getindex(c::CategoryObject,keydict) = begin
         error("$keydict does not identify a unique row")
     end
     return CatPacket(eachrow(pack)[1],c.catname,c)
+end
+
+# If a single value is provided, we can turn this into a keyed
+# access using the single unique key
+Base.getindex(c::CategoryObject, x::Union{String,Array{Any},Number}) = begin
+    if length(c.key_names) == 1
+        return c[Dict(c.key_names[1]=>x)]
+    else throw(KeyError(x))
+    end
+    # TODO: check for _category.key_id as alternative
 end
 
 Base.length(c::CategoryObject) = size(c.data_frame,1)

@@ -52,16 +52,16 @@ end
 @testset "List values" begin
     b = prepare_block("list_data.cif","list_data")
     l = b["_digit_list"]
-    println("digit list is $l")
-    @test String.(l[1]) == ["0","1","2","3","4","5","6","7","8","9"]
+    #println("digit list is $l")
+    @test l[1] == ["0","1","2","3","4","5","6","7","8","9"]
 end
 
 # Test tables
 @testset "Table values" begin
 b = prepare_block("table_data.cif","table_data")
 l = b["_type_examples"]
-@test String(l[1]["numb"])=="-123.4e+67(5)"
-@test String(l[1]["char"])=="char"
+@test l[1]["numb"]=="-123.4e+67(5)"
+@test l[1]["char"]=="char"
 @test "unknown" in keys(l[1])
 end
 
@@ -69,8 +69,8 @@ end
 @testset "Lists and tables" begin
     b = prepare_block("table_list_data.cif","tl_data")
     l = b["_import.get"]
-    @test l[1][1]["block"]==native_cif_element(missing)
-    @test String(l[1][2]["c"])=="whatever"
+    @test ismissing(l[1][1]["block"])
+    @test l[1][2]["c"]=="whatever"
     q = b["_list_in_table"]
-    @test String(q[1]["q"][2]) == "b"
+    @test q[1]["q"][2] == "b"
 end

@@ -30,7 +30,8 @@ _description.text
    Head categories from other dictionaries are reparented to this category.
 ;
 _import.get  [{"file":"cif_core.dic" "save":"CIF_CORE" "mode":"Full"}
-              {"file":"cif_ms.dic"   "save":"CIF_MS"   "mode":"Full"}]
+#              {"file":"cif_ms.dic"   "save":"CIF_MS"   "mode":"Full"}
+]
 save_
 
 

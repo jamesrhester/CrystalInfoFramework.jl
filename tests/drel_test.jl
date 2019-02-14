@@ -16,18 +16,19 @@ end
 
 @testset "Testing expression processing" begin
     #ud = prepare_system()
+    t = cifdic("cif_core.dic")
     rawtext = :(a = [1,2,3,4]; b = a[0]; return b)
-    newtext = ast_fix_indexing(rawtext,[])
+    newtext = ast_fix_indexing(rawtext,String[],t)
     println("New text: $newtext")
     @test eval(newtext) == 1
     # So in the next test b becomes [1,3,5,7,9] and b[2] is 5 
     rawtext = :(a = [1,2,3,4,5,6,7,8,9]; c = 4; b = a[c-4:2:c+4]; return b[2])
-    newtext = ast_fix_indexing(rawtext,[])
+    newtext = ast_fix_indexing(rawtext,String[],t)
     println("New text: $newtext")
     @test eval(newtext) == 5
-    rawtext = :(a = atom_site_moment::CategoryObject;a["label"] = "Hello";return true)
-    newtext = ast_fix_indexing(rawtext,Symbol.(["__packet","atom_site_moment"]))
-    println("New text: $newtext")
+    #rawtext = :(a = atom_site_moment::CategoryObject;a["label"] = "Hello";return true)
+    #newtext = ast_fix_indexing(rawtext,["__packet","atom_site_moment"],t)
+    #println("New text: $newtext")
     @test true
     rawtext = :(f(x) = begin s = 1;for i = 1:5 if i == 3 q = 1 elseif i == 4 a = q end end; a end)
     newtext = fix_scope(rawtext)
