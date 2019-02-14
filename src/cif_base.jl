@@ -1,7 +1,12 @@
-#= This file provides the functions that interact directly with
-the libcif API =#
+#= This file defines the basic methods for interaction with CIF files.
 
-export cif_tp_ptr,cif_block,get_all_blocks,get_block_code
+Note that the earlier methods define types and provide functions 
+that interact directly with the libcif C API. The minimum required
+are defined here, plus some no longer used destructors. Comprehensive
+functions for working with a CIF held within the C API have been
+removed. =#
+
+export cif_tp_ptr,get_block_code
 export get_loop,cif_list,cif_table, eachrow
 export get_save_frame, get_all_frames
 export NativeCif,NativeBlock
@@ -33,13 +38,6 @@ cif_destroy!(x) =  begin
     end
 end
 
-"""Parse input stream and return a CIF object"""
-cif_tp_ptr(f::IOStream) = begin
-    error("Creating CIF from stream not yet implemented")
-    # get the underlying file descriptor, turn it into a FILE*
-    # then call...
-end
-
 struct cif_handler_tp
     cif_start::Ptr{Nothing}
     cif_end::Ptr{Nothing}
@@ -55,12 +53,8 @@ struct cif_handler_tp
 end
 
 #==
-Routines for accessing parts of the CIF file
-==#
-#==
 Data blocks
 ==#
-
 
 """An opaque type representing a CIF block"""
 mutable struct cif_container_tp   #cif_block_tp in libcif
@@ -71,90 +65,11 @@ mutable struct cif_container_tp_ptr
     handle::Ptr{cif_container_tp}  # *cif_block_tp
 end
 
-
-"""A simple wrapper for external use.
-
-We must keep a reference to the CIF that contains this
-block, otherwise it could be finalised once it is no
-longer referenced in a program.  This will cause a
-segmentation fault whenever the block is subsequently
-referenced."""
-
-struct cif_block
-    handle::cif_container_tp_ptr   #*cif_container_tp
-    cif_handle::cif_tp_ptr         #keep a reference to this
-end
-
-
 container_destroy!(cb::cif_container_tp_ptr) =  begin
     #error_string = "Finalizing cif block ptr $cb"
     #t = @task println(error_string)
     #schedule(t)
     ccall((:cif_container_free,"libcif"),Cvoid,(Ptr{cif_container_tp},),cb.handle)
-end
-
-Base.getindex(c::cif_tp_ptr,block_name::AbstractString) = begin
-    cbt = cif_container_tp_ptr(0)
-    bn_as_uchar = transcode(UInt16,block_name)
-    append!(bn_as_uchar,0)
-    val = ccall((:cif_get_block,"libcif"),Cint,(Ptr{cif_tp},Ptr{UInt16},Ptr{cif_container_tp_ptr}),
-    c.handle,bn_as_uchar,Ref(cbt))
-    # check val
-    if val != 0
-        error(error_codes[val])
-    end
-    finalizer(container_destroy!,cbt)
-    #q = time_ns()
-    #println("$q: Created cif block ptr: $cbt")
-    return cif_block(cbt,c)
-end
-
-# Libcif requires a pointer to a location where it can store a pointer to an array of block handles.
-# After the call our pointer points to the start of an array of pointers
-mutable struct container_list_ptr
-    handle::Ptr{cif_container_tp_ptr}  #**cif_block_tp
-end
-
-"""Get handles to all blocks in a data file"""
-Base.values(c::cif_tp_ptr) = begin
-    array_address = container_list_ptr(0)  #**cif_block_tp
-    #println("Array address before: $array_address")
-    val = ccall((:cif_get_all_blocks,"libcif"),Cint,(Ptr{cif_tp},Ptr{container_list_ptr}),c.handle,Ref(array_address))
-    if val!=0
-        error(error_codes[val])
-    end
-    #println("Array address after: $array_address")
-    if array_address.handle == C_NULL
-        error("Unable to get block array address")
-    end
-    # Now count how many values we have
-    n = 1
-    b = unsafe_load(array_address.handle,n)
-    #println("Start of actual array: $(b.handle)")
-    while b.handle!=C_NULL
-        n = n + 1
-        b = unsafe_load(array_address.handle,n)
-        #println("Ptr is $(b.handle)")
-    end
-    n = n - 1
-    #println("Number of blocks: $n")
-    # Total length is n
-    block_list = Vector{cif_container_tp_ptr}(undef,n)
-    for j=1:n
-        block_list[j]=unsafe_load(array_address.handle,j)
-        finalizer(container_destroy!,block_list[j])
-    end
-    # Now create an array of cif_blocks
-    cif_blocks = Vector{cif_block}()
-    for p in block_list
-        push!(cif_blocks,cif_block(p,c))
-    end
-    return cif_blocks
-end
-
-"""Obtain the name of a frame or block"""
-get_block_code(b::cif_block) = begin
-    get_block_code(b.handle)
 end
 
 get_block_code(b::cif_container_tp_ptr) = begin
@@ -167,69 +82,6 @@ get_block_code(b::cif_container_tp_ptr) = begin
 end
 
 Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
-
-struct cif_frame
-    handle::cif_container_tp_ptr
-    parent::cif_frame   #Stop garbage collection of the parent block
-end
-
-
-"""Get handles to all save frames in a data block"""
-get_all_frames(b::cif_frame) = begin
-    array_address = container_list_ptr(0)  #**cif_block_tp
-    #println("Array address before: $array_address")
-    val = ccall((:cif_container_get_all_frames,"libcif"),Cint,(cif_container_tp_ptr,Ptr{container_list_ptr}),
-        b.handle,Ref(array_address))
-    if val!=0
-        error(error_codes[val])
-    end
-    #println("Array address after: $array_address")
-    if array_address.handle == C_NULL
-        error("Unable to get save frame list address")
-    end
-    # Now count how many values we have
-    n = 1
-    f = unsafe_load(array_address.handle,n)
-    #println("Start of actual array: $(b.handle)")
-    while f.handle!=C_NULL
-        n = n + 1
-        f = unsafe_load(array_address.handle,n)
-        #println("Ptr is $(b.handle)")
-    end
-    n = n - 1
-    #println("Number of blocks: $n")
-    # Total length is n
-    block_list = Vector{cif_container_tp_ptr}(undef,n)
-    for j=1:n
-        block_list[j]=unsafe_load(array_address.handle,j)
-        finalizer(container_destroy!,block_list[j])
-    end
-    # Now create an array of cif_blocks
-    save_frames = Vector{cif_frame}()
-    for p in block_list
-        push!(save_frames,cif_frame(p,b))
-    end
-    return save_frames
-end
-
-get_save_frame(b::cif_frame,s::AbstractString) = begin
-    new_frame = cif_container_tp_ptr(0)
-    uname = transcode(UInt16,s)
-    append!(uname,0)
-    q = time_ns()
-    #println("$q: Transcoded to $uname")
-    val = ccall((:cif_container_get_frame,"libcif"),Cint,(cif_container_tp_ptr,Ptr{UInt16},Ptr{cif_container_tp_ptr}),
-    b.handle,uname,Ref(new_frame))
-    if val != 0
-        error(error_codes[val])
-    end
-    q = time_ns()
-    #println("$q: Successfully found frame $name")
-    #end
-    #println("$q:Allocated new frame $new_val")
-    finalizer(container_destroy!,new_frame)
-    return cif_frame(new_frame,b)
-end
 
 #==
 
@@ -258,36 +110,6 @@ value_free!(x::cif_value_tp_ptr) = begin
     ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
-Base.Number(t::cif_value_tp_ptr) = begin
-    dd = Ref{Cdouble}(0)
-    val = ccall((:cif_value_get_number,"libcif"),Cint,(Ptr{cif_value_tp},Ref{Cdouble}),t.handle,dd)
-    if val != 0
-        error(error_codes[val])
-    end
-    return dd[]
-end
-
-Base.Float64(t::cif_value_tp_ptr) = Base.Number(t)
-
-Base.Integer(t::cif_value_tp_ptr) = begin
-    i = Number(t)
-    if !isinteger(i)
-        InexactError(Integer,i)
-    end
-    return Integer(i)
-end
-
-Base.Array{T,1}(t::cif_value_tp_ptr) where {T <:Number} = begin
-    a = cif_list(t)
-    Number.(a)
-end
-
-Base.Array{T,2}(t::cif_value_tp_ptr) where {T <: Number} = begin
-    a = cif_list(t)
-    b = cif_list.(a)
-    [Number.(c) for c in b]
-end
-
 Base.String(t::cif_value_tp_ptr) = begin
    #Get the textual representation
    s = Uchar(0)
@@ -311,43 +133,6 @@ get_syntactical_type(t::cif_value_tp_ptr) = begin
     end
 end
     
-"""Return the value of an item"""
-Base.getindex(b::cif_frame,name::AbstractString) = begin
-    new_val = cif_value_tp_ptr(0)
-    uname = transcode(UInt16,name)
-    append!(uname,0)
-    q = time_ns()
-    #println("$q: Transcoded to $uname")
-    val = ccall((:cif_container_get_value,"libcif"),Cint,(cif_container_tp_ptr,Ptr{UInt16},Ptr{cif_value_tp_ptr}),
-    b.handle,uname,Ref(new_val))
-    if val != 0
-        error("Error reading $name:"* error_codes[val])
-    end
-    q = time_ns()
-    #println("$q: Successfully found value $name")
-    #end
-    #println("$q:Allocated new cif value $new_val")
-    finalizer(value_free!,new_val)
-    #Now type it up!
-    new_type = get_dataname_type(b,name)
-    if new_type == Any #try and do a little better
-        new_type = get_syntactical_type(new_val) 
-    end
-    if typeof(new_val) != new_type
-        return new_type(new_val)
-    end
-    return new_val
-end
-
-Base.get(b::cif_frame,name::AbstractString,default) = begin
-    retval = default
-    try
-        retval = b[name]
-    catch
-    end
-    return retval
-end
-    
 #==
    Loops.
 
@@ -361,42 +146,9 @@ end
 mutable struct cif_loop_tp_ptr
     handle::Ptr{cif_loop_tp}
 end
-
-mutable struct cif_loop
-    handle::cif_loop_tp_ptr
-    length::Int             #to allow generators
-    block::cif_frame    #to avoid early garbage collection
-end
-
-mutable struct cif_loop_tp_ptr_ptr
-    handle::Ptr{cif_loop_tp_ptr}
-end
                 
 loop_free!(cl::cif_loop_tp_ptr) = begin
     ccall((:cif_loop_free,"libcif"),Cvoid,(Ptr{cif_loop_tp},),cl.handle)
-end
-
-cif_loop(handle,block) = begin
-    # determine length
-    final = cif_loop(handle,0,block)
-    i = 0
-    for x in final i=i+1 end
-    #println("Loop has length $i")
-    final.length = i
-    return final
-end
-
-get_loop(b::cif_frame,name) = begin
-    loop = cif_loop_tp_ptr(0)
-    utfname = transcode(UInt16,name)
-    append!(utfname,0)
-    val = ccall((:cif_container_get_item_loop,"libcif"),Cint,(cif_container_tp_ptr,Ptr{UInt16},Ptr{cif_loop_tp_ptr}),
-     b.handle,utfname,Ref(loop))
-    if val != 0
-         error(error_codes[val])
-    end
-    finalizer(loop_free!,loop)
-    return cif_loop(loop,b)
 end
 
 Base.keys(l::Ptr{cif_loop_tp}) = begin
@@ -431,197 +183,14 @@ Base.keys(l::Ptr{cif_loop_tp}) = begin
     return key_list
 end
     
-Base.keys(l::cif_loop) = begin
-    keys(l.handle)
-end
-
-# Return all datanames in the container. As all items belong to a loop, we get all loops,
-# then get all keys in each loop.
-
-Base.keys(c::cif_frame) = begin
-    llist = cif_loop_tp_ptr_ptr(0)
-    val = ccall((:cif_container_get_all_loops,"libcif"),Cint,(cif_container_tp_ptr,Ptr{cif_loop_tp_ptr_ptr}),
-                c.handle,Ref(llist))
-    if val != 0
-        error(error_codes[val])
-    end
-    if llist.handle == C_NULL
-        error("Unable to get list of loops in block")
-    end
-    # Count values
-    n = 1
-    f = unsafe_load(llist.handle,n)
-    while f.handle != C_NULL
-        n = n + 1
-        f = unsafe_load(llist.handle,n)
-    end
-    n = n - 1
-    #println("Number of loops: $n")
-    loop_list = Vector{cif_loop}(undef,n)
-    for j = 1:n
-        loop_list[j] = cif_loop(unsafe_load(llist.handle,j),c)
-        finalizer(loop_free!,loop_list[j].handle)
-    end
-    # now get the keys
-    keylist = []
-    [append!(keylist,keys(l)) for l in loop_list]
-    return keylist
-end
 
 #==
- Loop packets. These are not linked with other resources, so we do not
- need to keep a loop, block or CIF object alive while the packet is alive.
+ Loop packets. Only used as a pointer type for the callbacks
  ==#
 
 struct cif_packet_tp
 end
 
-mutable struct cif_packet
-    handle::Ptr{cif_packet_tp}
-    parent::cif_frame      #for type lookup
-end
-
-packet_free!(cif_packet) = begin
-    val = ccall((:cif_packet_free,"libcif"),Cint,(Ptr{cif_packet_tp},),cif_packet.handle)
-    if val != 0
-        error(error_codes[val])
-    end
-end
-
-# Note that values are freed when their packet is freed, so we do not need an
-# explicit finalizer here
-Base.getindex(p::cif_packet,key) = begin
-    new_val = cif_value_tp_ptr(0)
-    uname = transcode(UInt16,key)
-    append!(uname,0)   #null terminated just in case
-    val = ccall((:cif_packet_get_item,"libcif"),Cint,(Ptr{cif_packet_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
-       p.handle,uname,Ref(new_val))
-    if val == 35
-        throw(KeyError(key))
-    end
-    if val != 0
-        error(error_code[val])
-    end
-    new_type = get_dataname_type(p.parent,key)
-    if new_type == Any
-        new_type = get_syntactical_type(new_val)
-    end
-    if typeof(new_val) != new_type
-        return new_type(new_val)
-    end
-    return new_val
-end
-
-# In order to broadcast over packets, we need to have a length
-# We get the number of names and discard them!
-
-Base.length(p::cif_packet) = begin
-    ukeys = Uchar_list(0)
-    val = ccall((:cif_packet_get_names,"libcif"),Cint,(Ptr{cif_packet_tp},Ptr{Cvoid}),p.handle,Ref(ukeys))
-    if val != 0
-        error(error_codes[val])
-    end
-    # ukeys will actually be a **UInt16, that is, after return it will hold a pointer to an array of UInt16
-    if ukeys.strings == C_NULL
-        error("Unable to get key list address")
-    end
-    # Now count how many values we have
-    n = 1
-    b = unsafe_load(ukeys.strings,n)
-    while b.string!=C_NULL
-        n = n + 1
-        b = unsafe_load(ukeys.strings,n)
-    end
-    n = n - 1
-    return n
-end
-#==
-Loops can be iterated. However, a condition of the libcif API
-is that iterators cannot iterate over the same loop, or over
-separate loops, simulataneously. Therefore we have to pre-determine
-the length in order for generator expressions to work.
-==#
-
-struct cif_pktitr_tp
-end
-
-mutable struct cif_pktitr_tp_ptr
-    handle::Ptr{cif_pktitr_tp}
-end
-
-mutable struct loop_iterator
-    handle::cif_pktitr_tp_ptr
-    loop::cif_loop
-end
-
-close_pktitr!(t::cif_pktitr_tp_ptr) = begin
-    #error_string = "Closing pktitr $t"
-    #tt = @task println(error_string)
-    #schedule(tt)
-    val = ccall((:cif_pktitr_close,"libcif"),Cint,(Ptr{cif_pktitr_tp},),t.handle)
-    if val != 0
-        error(error_codes[val])
-    end
-end
-
-Base.iterate(cl::cif_loop) = begin
-    pktptr = cif_pktitr_tp_ptr(0)
-    val = ccall((:cif_loop_get_packets,"libcif"),Cint,(cif_loop_tp_ptr,Ptr{cif_pktitr_tp_ptr}),
-        cl.handle,Ref(pktptr))
-    if val != 0
-        error("Failed to get packet iterator for loop $(cl.handle):"* error_codes[val])
-    end
-    #println("New pktitr $pktptr for loop $(cl.handle)")
-    finalizer(close_pktitr!,pktptr)
-    final_iter = loop_iterator(pktptr,cl)
-    # We should return the first item
-    new_packet = cif_packet(0,cl.block)
-    val = ccall((:cif_pktitr_next_packet,"libcif"),Cint,(cif_pktitr_tp_ptr,Ptr{cif_packet}),
-        final_iter.handle,Ref(new_packet))
-    # If iteration has finished already, return the appropriate Julia value
-    if val > 1
-        # remove the iterator
-        error("Failed to get first packet: " * error_codes[val])
-    end
-    if val == 1
-        println("Finalising $pktptr now")
-        finalize(pktptr)
-        return nothing
-    end
-    finalizer(packet_free!,new_packet)
-    new_packet.parent = cl.block
-    return (new_packet,final_iter)
-end
-
-Base.iterate(cl::cif_loop,pktitr) = begin
-    # Make sure that the iterator belongs to the loop
-    if pktitr.loop != cl
-        error("Iterator $pktitr belongs to loop $(pktitr.cif_loop) not $cl!")
-    end
-    new_packet = cif_packet(0,cl.block)
-    val = ccall((:cif_pktitr_next_packet,"libcif"),Cint,(cif_pktitr_tp_ptr,Ptr{cif_packet}),
-        pktitr.handle,Ref(new_packet))
-    if val > 1
-        #println("Error, finalising $(pktitr.handle) now")
-        finalize(pktitr.handle)
-        error("Failed to get next packet :" * error_codes[val])
-    end
-    if val == 1
-        #println("End, finalising $(pktitr.handle) now")
-        finalize(pktitr.handle)
-        return nothing
-    end
-    finalizer(packet_free!,new_packet)
-    return (new_packet,pktitr)
-end
-
-Base.length(cl::cif_loop) = cl.length
-
-"""Get the dataname type of the provided dataname, which should belong to the packet,
-although this is not checked"""
-get_dataname_type(cp::cif_packet,d::AbstractString) = begin
-    return get_dataname_type(cp.parent,d)
-end
 
 """Utility routine to get the length of a C null-terminated array"""
 get_c_length(s::Ptr,max=-1) = begin
@@ -751,7 +320,7 @@ mutable struct Uchar_list
     strings::Ptr{Uchar}
 end
 
-#== Walking a CIF
+#== A CIF in Native Julia
 
 The dREL approach requires multiple loops over data to be in process
 simultaneously, which is not guaranteed to give coherent data for the
