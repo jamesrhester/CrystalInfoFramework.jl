@@ -2,21 +2,21 @@
 
 @testset "Testing dictionary access and construction" begin
     @test begin
-        t = cifdic(joinpath(@__DIR__,"ddl.dic"))
+        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
         true
     end
     @test begin
-        t = cifdic(joinpath(@__DIR__,"ddl.dic"))
+        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
         String(t["_alias.deprecation_date"]["_type.source"][1]) == "Assigned"
     end
     @test begin
-        t = cifdic(joinpath(@__DIR__,"ddl.dic"))
+        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
         String(get_by_cat_obj(t,("Type","Contents"))["_definition.class"][1]) == "Attribute"
     end
 end
 
 prepare_system() = begin
-    t = cifdic(joinpath(@__DIR__,"cif_mag.dic"))
+    t = Cifdic(joinpath(@__DIR__,"cif_mag.dic"))
     u = NativeCif(joinpath(@__DIR__,"AgCrS2.mcif")) #
     ud = assign_dictionary(u["AgCrS2_OG"],t)
 end

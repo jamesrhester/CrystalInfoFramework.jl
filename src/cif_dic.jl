@@ -1,8 +1,8 @@
 # CIF Dictionaries...built on CIF files
 # Only DDLm dictionaries supported
 
-export cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
-export cif_block_with_dict,cifdic, abstract_cif_dictionary,cif_container_with_dict
+export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
+export cif_block_with_dict, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
 export get_func,set_func!,has_func
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
@@ -20,13 +20,13 @@ Base.length(d::abstract_cif_dictionary) = begin
     return length(keys(d))
 end
 
-struct cifdic <: abstract_cif_dictionary
+struct Cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
     func_defs::Dict{String,Function}
 
-    cifdic(b,d,c) = begin
+    Cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
         if !issubset(values(d),all_names)
             miss_vals = setdiff(values(d),all_names)
@@ -41,15 +41,14 @@ struct cifdic <: abstract_cif_dictionary
     end
 end
 
-cifdic(c::NativeCif) = begin
+Cifdic(c::NativeCif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
-    b = c[collect(keys(c))[1]]
-    return cifdic(b)
+    return Cifdic(first(c).second)
 end
 
-cifdic(base_b::NativeBlock) = begin
+Cifdic(base_b::NativeBlock) = begin
     # importation first as it changes the block contents
     b = resolve_imports!(base_b)
     # create the definition names
@@ -70,26 +69,26 @@ cifdic(base_b::NativeBlock) = begin
         merge!(match_dict, Dict(k=>k for k in bnames))
         merge!(match_dict, Dict(lowercase(k)=>k for k in bnames))
     end
-    return cifdic(b,match_dict,cat_obj_dict)
+    return Cifdic(b,match_dict,cat_obj_dict)
 end
 
-cifdic(a::String) = cifdic(NativeCif(a))
+Cifdic(a::String) = Cifdic(NativeCif(a))
 
 # The index in a dictionary is the _definition.id or an alias
-Base.getindex(cdic::cifdic,definition::String) = begin
+Base.getindex(cdic::Cifdic,definition::String) = begin
     get_save_frame(cdic.block,cdic.definitions[lowercase(definition)])
 end
 
-Base.keys(cdic::cifdic) = begin
+Base.keys(cdic::Cifdic) = begin
     keys(cdic.definitions)    
 end
 
-Base.haskey(cdic::cifdic,k::String) = begin
+Base.haskey(cdic::Cifdic,k::String) = begin
     haskey(cdic.definitions,k)
 end
 
 # We iterate over the definitions
-Base.iterate(c::cifdic) = begin
+Base.iterate(c::Cifdic) = begin
     everything = collect(keys(c.definitions))
     if length(everything) == 0 return nothing
     end
@@ -97,7 +96,7 @@ Base.iterate(c::cifdic) = begin
     return c[popfirst!(everything)],everything
 end
 
-Base.iterate(c::cifdic,s) = begin
+Base.iterate(c::Cifdic,s) = begin
     if length(s) == 0 return nothing
     end
     return c[popfirst!(s)],s
@@ -115,9 +114,9 @@ generate_aliases(b::NativeCif) = begin
     return start_dict
 end
 
-get_by_cat_obj(c::cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
+get_by_cat_obj(c::Cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
 
-find_category(c::cifdic,dataname::String) = begin
+find_category(c::Cifdic,dataname::String) = begin
     block = c[dataname]
     catname = block["_name.category_id"][1]
 end
@@ -254,7 +253,7 @@ resolve_templated_imports!(c::NativeCif,temp_blocks) = begin
             if !(location in keys(cached_dicts))
                 #println("Now trying to import $location")
                 try
-                    cached_dicts[location] = cifdic(location)
+                    cached_dicts[location] = Cifdic(location)
                 catch y
                     #println("Error $y, backtrace $(backtrace())")
                     if if_miss == "Exit"
@@ -301,7 +300,7 @@ resolve_full_imports!(c::NativeCif,imp_blocks) = begin
                 println("WARNING: full mode imports into non-head categories not supported, ignored")
                 continue
             end
-            importee = cifdic(location)  #this will perform nested imports
+            importee = Cifdic(location)  #this will perform nested imports
             importee_head = importee[block]
             if importee_head["_definition.class"][1] != "Head"
                 println("WARNING: full mode imports of non-head categories not supported, ignored")
@@ -355,10 +354,10 @@ end
 
 struct cif_block_with_dict <: cif_container_with_dict
     data::NativeBlock
-    dictionary::cifdic
+    dictionary::Cifdic
 end
 
-assign_dictionary(c::NativeBlock,d::cifdic) = cif_block_with_dict(c,d)
+assign_dictionary(c::NativeBlock,d::Cifdic) = cif_block_with_dict(c,d)
 get_dictionary(c::cif_block_with_dict) = c.dictionary
 get_datablock(c::cif_block_with_dict) = c.data
 
@@ -445,8 +444,8 @@ const type_mapping = Dict( "Text" => String,
                            "List" => Array{Any}
                            )
 
-get_julia_type_name(cifdic,cat::String,obj::String) = begin
-    definition = get_by_cat_obj(cifdic,(cat,obj))
+get_julia_type_name(cdic,cat::String,obj::String) = begin
+    definition = get_by_cat_obj(cdic,(cat,obj))
     base_type = definition["_type.contents"][1]
     cont_type = get(definition,"_type.container",["Single"])[1]
     jl_base_type = type_mapping[base_type]
@@ -455,8 +454,8 @@ end
 
 """Convert to the julia type for a given category, object and String value.
 This is clearly insufficient as it only handles one level of arrays."""
-get_julia_type(cifdic,cat,obj,value) = begin
-    julia_base_type,cont_type = get_julia_type_name(cifdic,cat,obj)
+get_julia_type(cdic,cat,obj,value) = begin
+    julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
     change_func = (x->x)
     # println("Julia type for $base_type is $julia_base_type, converting $value")
     if julia_base_type == Integer
@@ -478,9 +477,9 @@ get_julia_type(cifdic,cat,obj,value) = begin
     end
 end
 
-get_julia_type(cifdic,dataname::String,value) = begin
-    definition = cifdic[dataname]
-    return get_julia_type(cifdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
+get_julia_type(cdic,dataname::String,value) = begin
+    definition = cdic[dataname]
+    return get_julia_type(cdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
 end
 
 # return dimensions as an Array. Note that we do not handle
@@ -488,8 +487,8 @@ end
 # The first dimension in Julia is number of rows, then number
 # of columns. This is the opposite to dREL
 
-get_dimensions(cifdic,cat,obj) = begin
-    definition = get_by_cat_obj(cifdic,(cat,obj))
+get_dimensions(cdic,cat,obj) = begin
+    definition = get_by_cat_obj(cdic,(cat,obj))
     dims = get(definition,"_type.dimension",["[]"])[1]
     final = eval(Meta.parse(dims))
     if length(final) > 1

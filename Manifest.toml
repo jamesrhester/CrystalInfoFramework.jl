@@ -25,12 +25,6 @@ git-tree-sha1 = "49269e311ffe11ac5b334681d212329002a9832a"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
 version = "1.5.1"
 
-[[Conda]]
-deps = ["Compat", "JSON", "VersionParsing"]
-git-tree-sha1 = "b625d802587c2150c279a40a646fba63f9bd8187"
-uuid = "8f4d0f93-b110-5947-807f-2305c1781a2d"
-version = "1.2.0"
-
 [[DataFrames]]
 deps = ["CategoricalArrays", "CodecZlib", "Compat", "DataStreams", "Dates", "InteractiveUtils", "IteratorInterfaceExtensions", "LinearAlgebra", "Missings", "Printf", "Random", "Reexport", "SortingAlgorithms", "Statistics", "StatsBase", "TableTraits", "Tables", "Test", "TranscodingStreams", "Unicode", "WeakRefStrings"]
 git-tree-sha1 = "9cfed75401d25d281076eb5d82de148ac2933f9e"
@@ -75,12 +69,6 @@ git-tree-sha1 = "5484e5ede2a4137b9643f4d646e8e7b87b794415"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "0.1.1"
 
-[[JSON]]
-deps = ["Dates", "Distributed", "Mmap", "Sockets", "Test", "Unicode"]
-git-tree-sha1 = "1f7a25b53ec67f5e9422f1f551ee216503f4a0fa"
-uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "0.20.0"
-
 [[LibGit2]]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 
@@ -93,12 +81,6 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
-
-[[MacroTools]]
-deps = ["Compat"]
-git-tree-sha1 = "3fd1a3022952128935b449c33552eb65895380c1"
-uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.4.5"
 
 [[Markdown]]
 deps = ["Base64"]
@@ -126,12 +108,6 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-
-[[PyCall]]
-deps = ["Conda", "Dates", "Libdl", "LinearAlgebra", "MacroTools", "Serialization", "Statistics", "Test", "VersionParsing"]
-git-tree-sha1 = "a77c1841800535a02b65be1e2b8202b0d66f8b92"
-uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-version = "1.90.0"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
@@ -220,12 +196,6 @@ uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
-
-[[VersionParsing]]
-deps = ["Compat"]
-git-tree-sha1 = "c9d5aa108588b978bd859554660c8a5c4f2f7669"
-uuid = "81def892-9a0e-5fdd-b105-ffc91e053289"
-version = "1.1.3"
 
 [[WeakRefStrings]]
 deps = ["Missings", "Random", "Test"]

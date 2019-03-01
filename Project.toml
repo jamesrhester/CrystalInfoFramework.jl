@@ -5,5 +5,4 @@ version = "0.1.0"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 URIParser = "30578b45-9adc-5946-b283-645ec420af67"
