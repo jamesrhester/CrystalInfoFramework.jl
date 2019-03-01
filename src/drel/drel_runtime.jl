@@ -6,7 +6,7 @@
 
 using LinearAlgebra
 
-export drelvector
+export drelvector,to_julia_array
 
 # a character can be compared to a single-character string
 Base.:(==)(c::Char,y::String) = begin

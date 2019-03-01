@@ -13,7 +13,7 @@ Julia code assuming the following environment:
 
 2. The outer function also takes a cif data block object with a specified interface.
 
-3. The CIF interactions are mediated by the JuliaCif package.
+3. The CIF interactions are mediated by the CrystalInfoFramework package.
    
 The transformer methods will assume that any interior nodes have already been processed.
 
@@ -340,7 +340,7 @@ def attributeref(self,args):
 @ Lists and tables.
 
 Julia, bless its cotton socks, indexes from 1. We rely on a Julia
-macro provided with JuliaCif to insert index corrections in the
+macro provided with CrystalInfoFramework to insert index corrections in the
 appropriate places. Also, the second element in a three-element
 slice is the step, unlike Python or dREL, for which it is the end, so
 we swap things around below.

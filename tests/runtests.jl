@@ -1,5 +1,5 @@
 #Testing CIF routines
-using JuliaCif
+using CrystalInfoFramework
 using Test
 using DataFrames
 
@@ -12,5 +12,5 @@ end
 include("creation.jl")
 include("data_access.jl")
 include("save_frames.jl")
-#include("dictionaries.jl")
-#include("drel_test.jl")
+include("dictionaries.jl")
+include("drel_test.jl")

@@ -135,8 +135,8 @@ struct dynamic_block <: cif_container_with_dict
     block::cif_block_with_dict
 end
 
-JuliaCif.get_dictionary(d::dynamic_block) = get_dictionary(d.block)
-JuliaCif.get_datablock(d::dynamic_block) = get_datablock(d.block)
+CrystalInfoFramework.get_dictionary(d::dynamic_block) = get_dictionary(d.block)
+CrystalInfoFramework.get_datablock(d::dynamic_block) = get_datablock(d.block)
 
 Base.getindex(d::dynamic_block,s::String) = begin
     try

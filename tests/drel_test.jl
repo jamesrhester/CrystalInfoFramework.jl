@@ -1,5 +1,5 @@
 #Testing dREL runtime support
-using JuliaCif
+using CrystalInfoFramework
 
 prepare_system() = begin
     t = cifdic(joinpath(@__DIR__,"cif_mag.dic"))
@@ -16,7 +16,7 @@ end
 
 @testset "Testing expression processing" begin
     #ud = prepare_system()
-    t = cifdic("cif_core.dic")
+    t = cifdic(joinpath(@__DIR__,"cif_core.dic"))
     rawtext = :(a = [1,2,3,4]; b = a[0]; return b)
     newtext = ast_fix_indexing(rawtext,String[],t)
     println("New text: $newtext")
@@ -39,7 +39,7 @@ end
     eval(newtext)
     @test f(2) == 1
     #Now test that we properly process matrices
-    rawtext = :(a.label = [[1,2,3],[4,5,6]]; return a)
+    rawtext = :(a.label = [[1,2,3],[4,5,6]]; return a.label)
     newtext = find_target(rawtext,"a","label";is_matrix=true)
     println("$newtext")
     @test eval(newtext) == [[1 2 3];[4 5 6]]

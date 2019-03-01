@@ -1,6 +1,6 @@
 # Test execution of dREL code
 using Test
-using JuliaCif
+using CrystalInfoFramework
 
 setup() = begin
     p = cifdic("/home/jrh/COMCIFS/cif_core/cif_core.dic")
