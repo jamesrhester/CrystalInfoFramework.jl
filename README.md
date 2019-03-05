@@ -12,8 +12,7 @@ as the PDB uses DDL2 dictionaries).
 
 While usable for the bulk of typical tasks, this package is still in
 an early version. Type and method names may change in later versions.
-Various debugging messages are printed, some types lack informative
-display.  Documentation strings are patchy.
+Various debugging messages are printed, documentation strings are patchy.
 
 On the other hand, if you see ways to improve the naming or architecture, 
 now is the time to raise an issue.
@@ -27,7 +26,7 @@ place on your system.
 ## Getting started
 
 Type ``NativeCif`` is like a ``Dict{String,NativeBlock}``. A
-``NativeBlock`` works like a ``Dict{String,Any}``.  All returned
+``NativeBlock`` works like a ``Dict{String,Array{Any,1}}``.  All returned
 values are Arrays, **even if the data name appears as a key-value
 pair in the file**. Primitive values are always Strings, unless a DDLm dictionary
 has been assigned to the ``NativeBlock``, in which case types are
@@ -48,7 +47,7 @@ julia> using CrystalInfoFramework
 
 julia> nc = NativeCif("my_cif.cif")
 ...
-julia> my_block = nc["only_block"]  #could also use first(d).second
+julia> my_block = nc["only_block"]  #could also use first(nc).second
 ...
 julia> l = my_block["_cell.length_a"]
 1-element Array{Any,1}:
