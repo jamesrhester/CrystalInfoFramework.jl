@@ -36,11 +36,16 @@ get_dataname_type(c::cif_container{V} where V,d::AbstractString) = begin
 end
 
 Base.length(c::cif_container) = length(keys(c))
+Base.length(c::Cif{V} where V) = length(keys(c))
+Base.iterate(c::Cif{V} where V) = iterate(get_contents(c))
+Base.iterate(c::Cif{V} where V,i::Integer) = iterate(get_contents(c),i)
 
 struct NativeCif <: Cif{cif_container{String}}
     contents::Dict{String,cif_container}
     original_file::String
 end
+
+get_contents(c::NativeCif) = c.contents
 
 # Operations on Cifs
 Base.getindex(c::NativeCif,s) = begin
