@@ -144,6 +144,10 @@ create_loop!(b::NativeBlock,names::Array{String,1}) = begin
     if length(l) != 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
     end
+    # drop names from other loops
+    b.loop_names = map(x -> filter!(y -> !(y in names),x), b.loop_names)
+    # drop empty loops
+    filter!(x->!isempty(x),b.loop_names)
     push!(b.loop_names,names)
 end
 
