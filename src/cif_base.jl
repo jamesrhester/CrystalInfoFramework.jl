@@ -16,7 +16,7 @@ held in a loop with a single row.
 
 export NativeCif,NativeBlock
 export get_save_frame, get_all_frames
-export get_loop, eachrow, add_to_loop
+export get_loop, eachrow, add_to_loop!, create_loop!
 
 
 """The type of blocks and save frames"""
@@ -118,11 +118,11 @@ get_loop(b::NativeBlock,s) = begin
 end
 
 """
-    add_to_loop(b::NativeBlock, tgt, newname)
+    add_to_loop!(b::NativeBlock, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
 be present and have the same length as other values in the loop."""
-add_to_loop(b::NativeBlock, tgt, newname) = begin
+add_to_loop!(b::NativeBlock, tgt, newname) = begin
     loop_id = filter(l -> tgt in l, b.loop_names)
     if length(loop_id) != 1
         throw(error("No single unique loop containing dataname $tgt"))
@@ -131,6 +131,20 @@ add_to_loop(b::NativeBlock, tgt, newname) = begin
         throw(error("Mismatch in lengths: $(length(b[tgt])) and $(length(b[newname]))"))
     end
     push!(loop_id[1],newname)
+end
+
+"""
+    create_loop!(b::NativeBlock,names::Array{String,1})
+
+Create a loop in ``b`` containing the datanames in ``names``. No checking is performed
+on duplication of datanames between loops. All data attached to ``names`` should have the
+same length."""
+create_loop!(b::NativeBlock,names::Array{String,1}) = begin
+    l = unique(length.([b[n] for n in names]))
+    if length(l) != 1
+        throw(error("Attempt to create loop with mismatching data name lengths: $l"))
+    end
+    push!(b.loop_names,names)
 end
 
 mutable struct cif_builder_context
@@ -243,7 +257,7 @@ end
 
 handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     #println("Loop is finished,recording packets")
-    push!(b.block_stack[end].loop_names,keys(a))
+    create_loop!(b.block_stack[end],keys(a))
     0
 end
 
