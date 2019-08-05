@@ -1,11 +1,14 @@
 # CIF Dictionaries...built on CIF files
 # Only DDLm dictionaries supported
 
-export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias
+export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias, is_alias
 export cif_block_with_dict, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
+export get_single_key_cats
+export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
 export get_func,set_func!,has_func
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
+export get_ultimate_link
 export CaselessString
 
 abstract type abstract_cif_dictionary end
@@ -25,6 +28,7 @@ struct Cifdic <: abstract_cif_dictionary
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
     func_defs::Dict{String,Function}
+    func_text::Dict{String,Expr} #unevaluated Julia code
 
     Cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
@@ -37,7 +41,7 @@ struct Cifdic <: abstract_cif_dictionary
             error("""Cifdic: supplied cat-obj lookup contains save frames that are
                    not present in the dictionary block""")
         end
-        return new(b,d,c,Dict())
+        return new(b,d,c,Dict(),Dict())
     end
 end
 
@@ -72,13 +76,21 @@ Cifdic(base_b::NativeBlock) = begin
     return Cifdic(b,match_dict,cat_obj_dict)
 end
 
-Cifdic(a::String) = Cifdic(NativeCif(a))
+Cifdic(a::String;verbose=false) = Cifdic(NativeCif(a,verbose=verbose))
 
 # The index in a dictionary is the _definition.id or an alias
 Base.getindex(cdic::Cifdic,definition::String) = begin
     get_save_frame(cdic.block,cdic.definitions[lowercase(definition)])
 end
 
+Base.get(cdic::Cifdic,definition::String,default) = begin
+    try
+        return cdic[definition]
+    catch KeyError
+        return default
+    end
+end
+        
 Base.keys(cdic::Cifdic) = begin
     keys(cdic.definitions)    
 end
@@ -114,6 +126,14 @@ generate_aliases(b::NativeCif) = begin
     return start_dict
 end
 
+"""
+Determine whether or not dataname d is a definition or simply an alias
+"""
+is_alias(c::Cifdic,d::String) = begin
+    if !haskey(c,d) return false end
+    c[d]["_definition.id"][1] != d
+end
+
 get_by_cat_obj(c::Cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
 
 find_category(c::Cifdic,dataname::String) = begin
@@ -124,6 +144,22 @@ end
 get_categories(c::abstract_cif_dictionary) = begin
     cats = [x for x in keys(c) if get(c[x],"_definition.scope",["Item"])[]=="Category"]
     lowercase.([c[x]["_definition.id"][] for x in cats])
+end
+
+get_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
+    names = [n for n in keys(c) if lowercase(get(c[n],"_name.category_id",[""])[1]) == lowercase(cat)]
+    return names
+end
+
+get_keys_for_cat(c::abstract_cif_dictionary,cat::String) = begin
+    keys = c[cat]["_category_key.name"]
+    return keys
+end
+
+get_linked_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
+    names = [n for n in get_names_in_cat(c,cat) if length(get(c[n],"_name.linked_item_id",[]))==1]
+    names = [n for n in names if get(c[n],"_type.purpose",["Datum"])[1] != "SU"]
+    return names
 end
 
 get_set_categories(c::abstract_cif_dictionary) = begin
@@ -157,14 +193,43 @@ get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
     objval = d[obj]["_name.object_id"][1]
 end
 
-set_func!(d::abstract_cif_dictionary,func_name::String,func_code) = begin
+"""
+Return a list (category,keyname) for all categories that have
+a single key, where that key is not a child key of another
+category. This latter case corresponds to a split single
+category.
+"""
+get_single_key_cats(d::abstract_cif_dictionary) = begin
+    candidates = get_loop_categories(d)
+    result = [x for x in candidates if length(get(d[x],"_category_key.name",[]))==1]
+    keynames = [(r,first(d[r]["_category_key.name"])) for r in result]
+    keynames = [(k[1],k[2]) for k in keynames if length(get(d[k[2]],"_name.linked_item_id",[]))==0]
+    return keynames
+end
+
+"""
+Find the ultimately-linked dataname, if there is one. Protect against
+simple self-referential loops.
+"""
+get_ultimate_link(d::abstract_cif_dictionary,dataname::String) = begin
+    if haskey(d,dataname)
+        #println("Searching for ultimate value of $dataname")
+        if haskey(d[dataname],"_name.linked_item_id") &&
+            d[dataname]["_name.linked_item_id"][1] != dataname
+            return get_ultimate_link(d,d[dataname]["_name.linked_item_id"][1])
+        end
+    end
+    return dataname
+end
+
+# Methods for setting and retrieving evaluated functions
+set_func!(d::abstract_cif_dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
+    d.func_text[func_name] = func_text
 end
 
-get_func(d::abstract_cif_dictionary,func_name::String) = begin
-    d.func_defs[func_name]
-end
-
+get_func(d::abstract_cif_dictionary,func_name::String) = d.func_defs[func_name]
+get_func_text(d::abstract_cif_dictionary,func_name::String) = d.func_text[func_name]
 has_func(d::abstract_cif_dictionary,func_name::String) = begin
     try
         d.func_defs[func_name]
@@ -335,8 +400,11 @@ resolve_full_imports!(c::NativeCif,imp_blocks) = begin
     return c
 end
 
-#== Adding dictionary information to a data block
-==#
+#== ===========================================
+
+Adding dictionary information to a data block
+
+===========================================  ==#
 
 abstract type cif_container_with_dict <: cif_container{Any} end
 
@@ -385,6 +453,23 @@ end
 
 Base.iterate(c::cif_container_with_dict) = iterate(get_datablock(c))
 Base.iterate(c::cif_container_with_dict,s) = iterate(get_datablock(c),s)
+
+Base.haskey(c::cif_container_with_dict,s) = begin
+    actual_data = get_datablock(c)
+    # go through all aliases
+    ref_dic = get_dictionary(c)
+    if !(haskey(ref_dic,s)) #no alias information
+        return haskey(actual_data,s)
+    end
+    root_def = ref_dic[s]  #will find definition
+    if haskey(actual_data,root_def["_definition.id"][1])
+        return true
+    end
+    for a in get(root_def,"_alias.definition_id",[])
+        if haskey(actual_data,a) return true end
+    end
+    return false
+end
 
 # As a dictionary is available, we return the loop that
 # would contain the name, even if it is absent

@@ -33,6 +33,9 @@ end
     # test aliases
     @test "Cr1_1" in ud["_atom_site_moment_label"]
     @test "Cr1_1" in ud["_atom_site_moment.label"]
+    # test key checks
+    @test haskey(ud,"_atom_site_moment_crystalaxis_x")
+    @test !haskey(ud,"_atom_site_moment_crystalaxis.q")
 end
 
 @testset "Importation" begin

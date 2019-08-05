@@ -16,7 +16,7 @@ held in a loop with a single row.
 
 export NativeCif,NativeBlock
 export get_save_frame, get_all_frames
-export get_loop, eachrow, add_to_loop!, create_loop!
+export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
 """The type of blocks and save frames"""
@@ -67,6 +67,10 @@ mutable struct NativeBlock <: cif_container{Any}
     original_file::String
 end
 
+NativeBlock() = begin
+    NativeBlock(Dict(),[],Dict(),"")
+end
+
 Base.keys(b::NativeBlock) = keys(b.data_values)
 Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,lowercase(s))
 Base.iterate(b::NativeBlock) = iterate(b.data_values)
@@ -74,7 +78,8 @@ Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
 Base.length(b::NativeBlock) = length(b.data_values)
 Base.getindex(b::NativeBlock,s::String) = b.data_values[lowercase(s)]
 Base.get(b::NativeBlock,s::String,a) = get(b.data_values,lowercase(s),a)
-
+get_datablock(b::NativeBlock) = b
+                   
 # We can specify a particular row in a loop by giving the
 # values of the datanames.
 Base.getindex(b::NativeBlock,s::Dict) = begin
@@ -118,6 +123,19 @@ get_loop(b::NativeBlock,s) = begin
 end
 
 """
+
+Convenience method: return the rows for which the requested data names
+take the values provided in the dictionary.
+"""
+lookup_loop(b::NativeBlock,request::Dict{String,String}) = begin
+    df = get_loop(b,first(request).first)
+    for (k,v) in request
+        df = df[df[Symbol(k)] .== v,:]
+    end
+    return df
+end
+
+"""
     add_to_loop!(b::NativeBlock, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
@@ -127,6 +145,10 @@ add_to_loop!(b::NativeBlock, tgt, newname) = begin
     if length(loop_id) != 1
         throw(error("No single unique loop containing dataname $tgt"))
     end
+    # remove new name from any other loops
+    b.loop_names = map(x -> filter!(y -> !(y == newname),x), b.loop_names)
+    # and drop any that are now empty
+    filter!(x -> !isempty(x),b.loop_names)
     if length(b[tgt]) != length(b[newname])
         throw(error("Mismatch in lengths: $(length(b[tgt])) and $(length(b[newname]))"))
     end
@@ -136,9 +158,9 @@ end
 """
     create_loop!(b::NativeBlock,names::Array{String,1})
 
-Create a loop in ``b`` containing the datanames in ``names``. No checking is performed
-on duplication of datanames between loops. All data attached to ``names`` should have the
-same length."""
+Create a loop in ``b`` containing the datanames in ``names``.  Datanames assigned to
+other loops are silently transferred to the new loop. All data attached to ``names`` 
+should have the same length."""
 create_loop!(b::NativeBlock,names::Array{String,1}) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) != 1
@@ -155,6 +177,7 @@ mutable struct cif_builder_context
     actual_cif::Dict{String,cif_container}
     block_stack::Array{cif_container}
     filename::String
+    verbose::Bool
 end
 
 get_all_frames(c::NativeBlock) = begin
@@ -221,7 +244,9 @@ end
 
 handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
-    #println("New blockname $(blockname)")
+    if b.verbose
+        println("New blockname $(blockname)")
+    end
     newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
@@ -237,8 +262,10 @@ end
 
 
 handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
-    #println("Frame started")
     blockname = get_block_code(a)
+    if b.verbose
+        println("Frame started: $blockname")
+    end
     newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
@@ -260,7 +287,9 @@ handle_loop_start(a,b)::Cint = begin
 end
 
 handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
-    #println("Loop is finished,recording packets")
+    if b.verbose
+        println("Loop header $(keys(a))")
+    end
     create_loop!(b.block_stack[end],keys(a))
     0
 end
@@ -282,7 +311,9 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     a_as_uchar = Uchar(a)
     val = ""
     keyname = make_jl_string(a_as_uchar)
-    #println("Processing name $keyname")
+    if c.verbose
+        println("Processing name $keyname")
+    end
     current_block = c.block_stack[end]
     syntax_type = get_syntactical_type(b)
     if syntax_type == cif_value_tp_ptr
@@ -293,12 +324,14 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         val = cif_table(b)
     else val = syntax_type()
     end
-    #==if !ismissing(val) && val != nothing
-        println("With value $val")
-    elseif ismissing(val)
-        println("With value ?")
-    else println("With value .")
-    end ==#
+    if c.verbose
+        if !ismissing(val) && val != nothing
+            println("With value $val")
+        elseif ismissing(val)
+            println("With value ?")
+        else println("With value .")
+        end
+    end
     lc_keyname = lowercase(keyname)
     if !(lc_keyname in keys(current_block.data_values))
         current_block.data_values[lc_keyname] = [val]
@@ -308,7 +341,7 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     return 0    
 end
 
-default_options(s::String) = begin
+default_options(s::String;verbose=false) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -333,7 +366,7 @@ default_options(s::String) = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),cif_container[],s)
+    context = cif_builder_context(Dict(),cif_container[],s,verbose)
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
@@ -342,10 +375,10 @@ NativeCif() = begin
     return NativeCif(Dict{String,NativeBlock}(),"")
 end
 
-NativeCif(s::AbstractString) = begin
+NativeCif(s::AbstractString;verbose=false) = begin
     # get the full filename
     full = realpath(s)
-    p_opts = default_options(full)
+    p_opts = default_options(full,verbose=verbose)
     result = cif_tp_ptr(p_opts)
     # the real result is in our user data context
     return NativeCif(p_opts.user_data.actual_cif,full)
