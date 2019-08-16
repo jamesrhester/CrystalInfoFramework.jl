@@ -114,7 +114,7 @@ get_loop(b::NativeBlock,s) = begin
     df = DataFrame()
     if length(loop_names) == 1
         for n in loop_names[1]
-            df[Symbol(n)]=b.data_values[n]
+            df[!,Symbol(n)]=b.data_values[n]
         end
     elseif length(loop_names) > 1
         error("More than one loop contains data name $s")

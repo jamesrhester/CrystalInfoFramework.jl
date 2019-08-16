@@ -4,6 +4,7 @@
 export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias, is_alias
 export cif_block_with_dict, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
+export get_typed_datablock
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
 export get_func,set_func!,has_func
@@ -29,6 +30,8 @@ struct Cifdic <: abstract_cif_dictionary
     by_cat_obj::Dict{Tuple,String} #by category/object
     func_defs::Dict{String,Function}
     func_text::Dict{String,Expr} #unevaluated Julia code
+    def_meths::Dict{Tuple,Function}
+    def_meths_text::Dict{Tuple,Expr}
 
     Cifdic(b,d,c) = begin
         all_names = collect(keys(get_all_frames(b)))
@@ -41,7 +44,7 @@ struct Cifdic <: abstract_cif_dictionary
             error("""Cifdic: supplied cat-obj lookup contains save frames that are
                    not present in the dictionary block""")
         end
-        return new(b,d,c,Dict(),Dict())
+        return new(b,d,c,Dict(),Dict(),Dict(),Dict())
     end
 end
 
@@ -222,6 +225,12 @@ get_ultimate_link(d::abstract_cif_dictionary,dataname::String) = begin
     return dataname
 end
 
+# get the default value specified for s
+
+get_default(b::abstract_cif_dictionary,s::String) = begin
+    get(b[s],"_enumeration.default",[missing])[1]
+end
+    
 # Methods for setting and retrieving evaluated functions
 set_func!(d::abstract_cif_dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
@@ -237,6 +246,16 @@ has_func(d::abstract_cif_dictionary,func_name::String) = begin
         return false
     end
     return true
+end
+
+# Methods for setting and retrieving definition functions
+
+get_def_meth(d::abstract_cif_dictionary,func_name::String,ddlm_attr::String) = d.def_meths[(func_name,ddlm_attr)]
+get_def_meth_txt(d::abstract_cif_dictionary,func_name::String,ddlm_attr::String) = d.def_meths_text[(func_name,ddlm_attr)]
+
+set_func!(d::abstract_cif_dictionary,func_name::String,ddlm_attr::String,func_text::Expr,func_code) = begin
+    d.def_meths[(func_name,ddlm_attr)] = func_code
+    d.def_meths_text[(func_name,ddlm_attr)] = func_text
 end
 
 #== Resolve imports
@@ -402,7 +421,9 @@ end
 
 #== ===========================================
 
-Adding dictionary information to a data block
+Adding dictionary information to a data block. Dictionary
+information is used statically (types and default
+values) and dynamically (derivation).
 
 ===========================================  ==#
 
@@ -429,6 +450,14 @@ assign_dictionary(c::NativeBlock,d::Cifdic) = cif_block_with_dict(c,d)
 get_dictionary(c::cif_block_with_dict) = c.dictionary
 get_datablock(c::cif_block_with_dict) = c.data
 
+"""
+get_typed_datablock(c)
+
+Return a data block that is aware of typing information, but will not
+attempt to derive missing values.
+"""
+get_typed_datablock(c::cif_block_with_dict) = c
+
 Base.getindex(c::cif_container_with_dict,s::String) = begin
     # go through all aliases
     root_def = get_dictionary(c)[s]  #will find definition
@@ -436,20 +465,36 @@ Base.getindex(c::cif_container_with_dict,s::String) = begin
     try
         as_string = get_datablock(c)[root_def["_definition.id"][1]]
     catch KeyError
-        println("Couldn't find $(root_def["_definition.id"])")
+        println("Couldn't find $(root_def["_definition.id"][1])")
         for a in get(root_def,"_alias.definition_id",[root_def["_definition.id"][1]])
             try
                 as_string = get_datablock(c)[a]
                 break
             catch KeyError
                 println("And couldn't find $a")
-                continue
             end
-            throw(KeyError(s))
+        end
+        if ismissing(as_string)   #no joy
+            backup = get_default(get_dictionary(c),s)
+            if !ismissing(backup)
+                as_string = backup
+            else
+                println("Can't find $s")
+                throw(Base.KeyError(s))
+            end
         end
     end
     actual_type = get_julia_type(get_dictionary(c),s,as_string)
 end
+
+Base.get(c::cif_container_with_dict,s::String,default) = begin
+    try
+        c[s]
+    catch KeyError
+        return default
+    end
+end
+
 
 Base.iterate(c::cif_container_with_dict) = iterate(get_datablock(c))
 Base.iterate(c::cif_container_with_dict,s) = iterate(get_datablock(c),s)
@@ -476,19 +521,21 @@ end
 
 get_loop(b::cif_container_with_dict,s::String) = begin
     dict = get_dictionary(b)
+    raw_data = get_typed_datablock(b)  #no derivation
     category = dict[s]["_name.category_id"]
     all_names = [n for n in keys(dict) if get(dict[n],"_name.category_id",nothing) == category]
     #println("All names in category of $s: $all_names")
-    loop_names = [l for l in all_names if l in keys(b)]
+    loop_names = [l for l in all_names if l in keys(raw_data)]
     if length(loop_names) == 0
         println("WARNING: Non-existent loop requested, category of $s")
     end
-    #println("All names present in datafile: $loop_names")
+    println("All names present in datafile: $loop_names")
     # Construct a data frame using Dictionary knowledge
     df = DataFrame()
     for n in loop_names
+        println("$n")
         obj_name = dict[n]["_name.object_id"][1]
-        df[Symbol(lowercase(obj_name))] = b[n]
+        df[Symbol(lowercase(obj_name))] = raw_data[n]
     end
     return df
 end
