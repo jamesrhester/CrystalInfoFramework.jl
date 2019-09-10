@@ -7,6 +7,7 @@ export get_dictionary,get_datablock,find_category,get_categories,get_set_categor
 export get_typed_datablock
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
+export get_parent_category,get_child_categories
 export get_func,set_func!,has_func
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
@@ -28,12 +29,13 @@ struct Cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
+    parent_lookup::Dict{String,String} #child -> parent
     func_defs::Dict{String,Function}
     func_text::Dict{String,Expr} #unevaluated Julia code
     def_meths::Dict{Tuple,Function}
     def_meths_text::Dict{Tuple,Expr}
 
-    Cifdic(b,d,c) = begin
+    Cifdic(b,d,c,parents) = begin
         all_names = collect(keys(get_all_frames(b)))
         if !issubset(values(d),all_names)
             miss_vals = setdiff(values(d),all_names)
@@ -44,7 +46,7 @@ struct Cifdic <: abstract_cif_dictionary
             error("""Cifdic: supplied cat-obj lookup contains save frames that are
                    not present in the dictionary block""")
         end
-        return new(b,d,c,Dict(),Dict(),Dict(),Dict())
+        return new(b,d,c,parents,Dict(),Dict(),Dict(),Dict())
     end
 end
 
@@ -64,6 +66,7 @@ Cifdic(base_b::NativeBlock) = begin
     match_dict = Dict()
     # create lookup tables for cat,obj if not a template dictionary
     cat_obj_dict = Dict()
+    parent_dict = Dict()
     if b["_dictionary.class"][1] != "Template"
         merge!(match_dict, Dict(lowercase(defs[k]["_definition.id"][1]) => k for k in bnames))
         # create all aliases
@@ -72,11 +75,15 @@ Cifdic(base_b::NativeBlock) = begin
         # now the information for cat/obj lookup
         defblocks = [(defs[k]["_name.category_id"][1],defs[k]["_name.object_id"][1],k) for k in bnames if "_name.category_id" in keys(defs[k]) && "_name.object_id" in keys(defs[k])]
         merge!(cat_obj_dict, Dict((lowercase.((s[1],s[2])),s[3]) for s in defblocks))
+        # now find the parents for every category
+        all_cats = [s for s in keys(defs) if get(defs[s],"_definition.scope",["Item"])[1]=="Category"]
+        all_parents = [get(defs[c],"_name.category_id",[c])[1] for c in all_cats]
+        parent_dict = Dict(zip(lowercase.([defs[c]["_definition.id"][1] for c in all_cats]),lowercase.(all_parents)))
     else   # template dictionary, no cat/obj lookup, the save frame is the id
         merge!(match_dict, Dict(k=>k for k in bnames))
         merge!(match_dict, Dict(lowercase(k)=>k for k in bnames))
     end
-    return Cifdic(b,match_dict,cat_obj_dict)
+    return Cifdic(b,match_dict,cat_obj_dict,parent_dict)
 end
 
 Cifdic(a::String;verbose=false) = Cifdic(NativeCif(a,verbose=verbose))
@@ -175,6 +182,15 @@ get_loop_categories(c::abstract_cif_dictionary) = begin
     [x for x in all_cats if get(c[x],"_definition.class",["Datum"])[] == "Loop"]
 end
 
+get_parent_category(c::Cifdic,child) = begin
+    c.parent_lookup[child]
+end
+
+get_child_categories(c::abstract_cif_dictionary,parent) = begin
+    [d for d in get_categories(c) if get_parent_category(c,d) == lowercase(parent)]
+end
+
+    
 #== Get the object part of a single dataname that acts as a key
 ==#
 get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
