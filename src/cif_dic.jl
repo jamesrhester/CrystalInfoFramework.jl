@@ -25,6 +25,20 @@ Base.length(d::abstract_cif_dictionary) = begin
     return length(keys(d))
 end
 
+# TODO: add more universal methods here
+
+#==
+A Cifdic is a DDLm dictionary. The following semantics are important:
+(1) Importation. A DDLm dictionary can import parts of definitions,
+or complete dictionaries in order to describe the whole semantic space
+(2) Parent-child. An object name may be referenced as if it were
+part of the parent category; so if <c> is a child of <p>, and <q> is
+an object in <c> (that is, "_c.q" is the dataname), then "p.q" refers
+to the same item as "c.q" in dREL methods. It is not the case that
+"_p.q" is a defined dataname.  The code here therefore implements only
+the methods needed to find parents and children. 
+==#
+
 struct Cifdic <: abstract_cif_dictionary
     block::NativeBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
@@ -337,7 +351,7 @@ resolve_templated_imports!(c::NativeCif,temp_blocks) = begin
         for one_entry in import_table
             (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
-                continue   # we will do this later
+                continue   # these are done separately
             end
             # define a combiner function
             combiner(a,b) = begin
