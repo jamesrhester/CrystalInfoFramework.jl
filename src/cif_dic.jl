@@ -9,6 +9,7 @@ export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
 export get_parent_category,get_child_categories
 export get_func,set_func!,has_func
+export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
 export CaselessString
@@ -158,7 +159,18 @@ is_alias(c::Cifdic,d::String) = begin
     c[d]["_definition.id"][1] != d
 end
 
-get_by_cat_obj(c::Cifdic,catobj::Tuple) = get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
+get_by_cat_obj(c::Cifdic,catobj::Tuple) = begin
+    if get(c[catobj[1]],"_definition.class",["Set"])[1] == "Loop"
+        children = get_child_categories(c,catobj[1])
+        for one_child in children
+            extra_objects = lowercase.([c[k]["_name.object_id"][1] for k in get_names_in_cat(c,one_child)])
+            if lowercase(catobj[2]) in extra_objects
+                return get_save_frame(c.block,c.by_cat_obj[one_child,lowercase(catobj[2])])
+            end
+        end
+    end
+    get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
+end
 
 find_category(c::Cifdic,dataname::String) = begin
     block = c[dataname]

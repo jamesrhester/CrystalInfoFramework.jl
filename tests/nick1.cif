@@ -25,6 +25,9 @@ _exptl_crystal.density_diffrn          1.444
 _exptl_crystal.density_meas            1.234
 _diffrn_radiation.type                'Cu K\a'
 _diffrn_radiation_wavelength.value     1.5418
+# inserted by JRH; should be able to calculate a default
+# based on presence of other items??
+_diffrn_radiation.probe                x-ray
 
 loop_
 _atom_type.symbol
