@@ -6,7 +6,7 @@
     @test b["_numb_su"] == ["0.0625(2)"]
     @test b["_unquoted_string"] == ["unquoted"]
     @test b["_text_string"] == ["text"]
-    known_dnames =  Set(["_unknown_value",
+    known_dnames =  Set([    # "_unknown_value", # missing values are dropped
 "_na_value",
 "_unquoted_string",
 "_sq_string",      
@@ -85,4 +85,13 @@ end
     @test l[1][2]["c"]=="whatever"
     q = b["_list_in_table"]
     @test q[1]["q"][2] == "b"
+end
+
+# Test missing values are dropped completely
+
+@testset "Missing values" begin
+    b = prepare_block("missing_data.cif","miss_data")
+    @test !haskey(b,"_col_missing")
+    @test !haskey(b,"_scalar_b")
+    @test !haskey(b,"_forget_it")
 end

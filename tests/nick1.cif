@@ -28,6 +28,9 @@ _diffrn_radiation_wavelength.value     1.5418
 # inserted by JRH; should be able to calculate a default
 # based on presence of other items??
 _diffrn_radiation.probe                x-ray
+# inserted by JRH; there is no way to figure out a
+# sensible default here
+_reflns.apply_dispersion_to_Fcalc       Yes
 
 loop_
 _atom_type.symbol

@@ -500,15 +500,17 @@ attempt to derive missing values.
 """
 get_typed_datablock(c::cif_block_with_dict) = c
 
+
 Base.getindex(c::cif_container_with_dict,s::String) = begin
     # go through all aliases
     root_def = get_dictionary(c)[s]  #will find definition
+    true_name = root_def["_definition.id"][1]
     as_string = missing
     try
-        as_string = get_datablock(c)[root_def["_definition.id"][1]]
+        as_string = get_datablock(c)[true_name]
     catch KeyError
-        println("Couldn't find $(root_def["_definition.id"][1])")
-        for a in get(root_def,"_alias.definition_id",[root_def["_definition.id"][1]])
+        println("Couldn't find $true_name")
+        for a in get(root_def,"_alias.definition_id",[true_name])
             try
                 as_string = get_datablock(c)[a]
                 break
@@ -563,7 +565,7 @@ end
 
 get_loop(b::cif_container_with_dict,s::String) = begin
     dict = get_dictionary(b)
-    raw_data = get_typed_datablock(b)  #no derivation
+    raw_data = get_typed_datablock(b)  #
     category = dict[s]["_name.category_id"]
     all_names = [n for n in keys(dict) if get(dict[n],"_name.category_id",nothing) == category]
     #println("All names in category of $s: $all_names")
@@ -627,7 +629,11 @@ get_julia_type_name(cdic,cat::String,obj::String) = begin
 end
 
 """Convert to the julia type for a given category, object and String value.
-This is clearly insufficient as it only handles one level of arrays."""
+This is clearly insufficient as it only handles one level of arrays.
+
+The value is assumed to be an array containing string values of the particular 
+dataname, which is as usually returned by the CIF readers, even for single values.
+"""
 get_julia_type(cdic,cat,obj,value) = begin
     julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
     change_func = (x->x)
@@ -702,8 +708,30 @@ end
 
 Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
 
+#== the following don't work, for now we have explicit types 
+Base.:(==)(a::AbstractString,b::SubString{T} where {T}) = a == T(b)
+
+Base.:(==)(a::SubString{T} where {T},b::AbstractString) = T(a) == b
+==#
+
+Base.:(==)(a::SubString{CaselessString},b::AbstractString) = CaselessString(a) == b
+Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = CaselessString(b) == a
+Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = a == CaselessString(b)
+
 Base.iterate(c::CaselessString) = iterate(c.actual_string)
 Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
 Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
 Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
-Base.codeunit(c::CaselessString) = codeunit(c.actual_string) 
+Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
+
+#== A caseless string should match both upper and lower case
+==#
+Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
+    for (k,v) in d
+        if lowercase(k) == lowercase(key)
+            return v
+        end
+    end
+    KeyError("$key not found")
+end
+

@@ -254,6 +254,15 @@ end
 
 
 handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
+    # Remove missing values
+    all_names = keys(b.block_stack[end].data_values)
+    # Length > 1 dealt with already
+    all_names = filter(x -> length(b.block_stack[end].data_values[x]) == 1,all_names)
+    # Remove any whose first and only entry is 'missing'
+    drop_names = filter(x -> ismissing(b.block_stack[end].data_values[x][1]),all_names)
+    # println("Removing $drop_names from block")
+    [delete!(b.block_stack[end].data_values,x) for x in drop_names]
+    # and finish off
     blockname = get_block_code(a)
     #println("Block is finished: $blockname")
     b.actual_cif[blockname] = pop!(b.block_stack)
@@ -274,6 +283,13 @@ end
 
 handle_frame_end(a,b)::Cint = begin
     #println("Frame is finished")
+    # Remove missing values
+    all_names = keys(b.block_stack[end].data_values)
+    # Length > 1 dealt with already
+    all_names = filter(x -> length(b.block_stack[end].data_values[x]) == 1,all_names)
+    # Remove any whose first and only entry is 'missing'
+    drop_names = filter(x -> ismissing(b.block_stack[end].data_values[x][1]),all_names)
+    [delete!(b.block_stack[end].data_values,x) for x in drop_names]
     final_frame = pop!(b.block_stack)
     blockname = get_block_code(a)
     b.block_stack[end].save_frames[blockname] = final_frame 
@@ -290,7 +306,14 @@ handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     if b.verbose
         println("Loop header $(keys(a))")
     end
-    create_loop!(b.block_stack[end],keys(a))
+    # ignore missing values
+    loop_names = lowercase.(keys(a))
+    not_missing = filter(x->any(y->!ismissing(y),b.block_stack[end].data_values[x]),loop_names)
+    create_loop!(b.block_stack[end],not_missing)
+    # and remove the data
+    missing_ones = setdiff(Set(loop_names),not_missing)
+    #println("Removing $missing_ones from loop")
+    [delete!(b.block_stack[end].data_values,x) for x in missing_ones]
     0
 end
 
