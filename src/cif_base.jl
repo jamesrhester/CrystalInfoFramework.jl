@@ -264,7 +264,7 @@ handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
     [delete!(b.block_stack[end].data_values,x) for x in drop_names]
     # and finish off
     blockname = get_block_code(a)
-    #println("Block is finished: $blockname")
+    if b.verbose println("Block is finished: $blockname") end
     b.actual_cif[blockname] = pop!(b.block_stack)
     0
 end
@@ -282,7 +282,6 @@ end
 
 
 handle_frame_end(a,b)::Cint = begin
-    #println("Frame is finished")
     # Remove missing values
     all_names = keys(b.block_stack[end].data_values)
     # Length > 1 dealt with already
@@ -292,7 +291,8 @@ handle_frame_end(a,b)::Cint = begin
     [delete!(b.block_stack[end].data_values,x) for x in drop_names]
     final_frame = pop!(b.block_stack)
     blockname = get_block_code(a)
-    b.block_stack[end].save_frames[blockname] = final_frame 
+    b.block_stack[end].save_frames[blockname] = final_frame
+    if b.verbose println("Frame $blockname is finished") end
     0
 end
 

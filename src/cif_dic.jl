@@ -7,6 +7,7 @@ export get_dictionary,get_datablock,find_category,get_categories,get_set_categor
 export get_typed_datablock
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
+export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
 export get_func,set_func!,has_func
 export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
@@ -49,21 +50,22 @@ struct Cifdic <: abstract_cif_dictionary
     func_text::Dict{String,Expr} #unevaluated Julia code
     def_meths::Dict{Tuple,Function}
     def_meths_text::Dict{Tuple,Expr}
-
-    Cifdic(b,d,c,parents) = begin
-        all_names = collect(keys(get_all_frames(b)))
-        if !issubset(values(d),all_names)
-            miss_vals = setdiff(values(d),all_names)
-            error("""Cifdic: supplied definition lookup contains save frames that are
-                    not present in the dictionary block: $miss_vals not in $all_names""")
-        end
-        if !issubset(values(c),all_names)
-            error("""Cifdic: supplied cat-obj lookup contains save frames that are
-                   not present in the dictionary block""")
-        end
-        return new(b,d,c,parents,Dict(),Dict(),Dict(),Dict())
-    end
 end
+
+Cifdic(b,d,c,parents) = begin
+    all_names = collect(keys(get_all_frames(b)))
+    if !issubset(values(d),all_names)
+        miss_vals = setdiff(values(d),all_names)
+        error("""Cifdic: supplied definition lookup contains save frames that are
+                        not present in the dictionary block: $miss_vals not in $all_names""")
+    end
+    if !issubset(values(c),all_names)
+        error("""Cifdic: supplied cat-obj lookup contains save frames that are
+                       not present in the dictionary block""")
+    end
+    Cifdic(b,d,c,parents,Dict(),Dict(),Dict(),Dict())
+end
+
 
 Cifdic(c::NativeCif) = begin
     if length(keys(c))!= 1
@@ -208,6 +210,21 @@ get_loop_categories(c::abstract_cif_dictionary) = begin
     [x for x in all_cats if get(c[x],"_definition.class",["Datum"])[] == "Loop"]
 end
 
+"""
+Return the names of all functions defined in the dictionary, together with the function category
+"""
+get_dict_funcs(dict::abstract_cif_dictionary) = begin
+    func_cat = [a for a in keys(dict) if get(dict[a],"_definition.class",["Datum"])[1] == "Functions"]
+    if length(func_cat) > 0
+        func_catname = lowercase(dict[func_cat[1]]["_name.object_id"][1])
+        all_funcs = [a for a in keys(dict) if lowercase(dict[a]["_name.category_id"][1]) == func_catname]
+        all_funcs = lowercase.([dict[a]["_name.object_id"][1] for a in all_funcs])
+    else
+        all_funcs = []
+    end
+    return func_catname,all_funcs
+end
+
 get_parent_category(c::Cifdic,child) = begin
     c.parent_lookup[child]
 end
@@ -277,6 +294,7 @@ end
 set_func!(d::abstract_cif_dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
+    println("All funcs: $(keys(d.func_defs))")
 end
 
 get_func(d::abstract_cif_dictionary,func_name::String) = d.func_defs[func_name]
@@ -342,7 +360,7 @@ get_import_info(original_dir,import_entry) = begin
     # println("Now processing $one_entry")
     fixed = fix_url(import_entry["file"],original_dir)
     url = URI(fixed)
-    println("URI is $(url.scheme), $(url.path)")
+    #println("URI is $(url.scheme), $(url.path)")
     if url.scheme != "file"
         error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
     end
