@@ -31,7 +31,7 @@ abstract type Cif{V} <: AbstractDict{String,cif_container{V}} end
 
 """V, list(V) and table(string:V) all possible"""
 
-get_dataname_type(c::cif_container{V} where V,d::AbstractString) = begin
+get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
     return Any
 end
 
@@ -39,6 +39,12 @@ Base.length(c::cif_container) = length(keys(c))
 Base.length(c::Cif{V} where V) = length(keys(c))
 Base.iterate(c::Cif{V} where V) = iterate(get_contents(c))
 Base.iterate(c::Cif{V} where V,i::Integer) = iterate(get_contents(c),i)
+Base.show(io::IO,c::Cif{V} where V) = begin
+    for k in keys(c)
+        write(io,"save_$k\n")
+        show(io,c[k])
+    end
+end
 
 struct NativeCif <: Cif{cif_container{String}}
     contents::Dict{String,cif_container}
@@ -59,7 +65,14 @@ end
 Base.first(c::NativeCif) = first(c.contents)
 Base.keys(c::NativeCif) = keys(c.contents)
 Base.haskey(c::NativeCif,s::String) = haskey(c.contents,s)
+Base.show(io::IO,c::NativeCif) = begin
+    for k in keys(c)
+        write(io,"data_$k\n")
+        show(io,c[k])
+    end
+end
 
+#TODO: Get type hierarchy to encompass save frames
 mutable struct NativeBlock <: cif_container{Any}
     save_frames::Dict{String,cif_container{Any}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
@@ -101,6 +114,55 @@ end
 Base.delete!(b::NativeBlock,s) = begin
     delete!(b.data_values,lowercase(s))
 end
+
+# Show does not produce a conformant CIF (yet) but a
+# quasi-CIF for informational purposes
+Base.show(io::IO,b::NativeBlock) = begin
+    # first output the save frames
+    for s in b.save_frames
+        write(io,"save_$(first(s))")
+        show(io,last(s))
+        write(io,"save_\n\n")
+    end
+    write(io,"\n")
+    key_vals = setdiff(collect(keys(b)),b.loop_names)
+    for k in key_vals
+        item = format_for_cif(first(b[k]))
+        write(io,"$k\t$item\n")
+    end
+    
+    # now go through the loops
+    for one_loop in b.loop_names
+        write(io,"\nloop_\n")
+        values = map(x -> getindex(b,x),one_loop)
+        for o in one_loop
+            write(io,"$o\n")
+        end
+        for value_pkt in zip(values...)
+            for one_val in value_pkt
+                write(io,"$(format_for_cif(one_val)) ")
+            end
+            write(io,"\n")
+        end
+    end
+end
+
+# Obviously not CIF conformant as doesn't deal with internal inverted commas
+format_for_cif(s::String) = "'$s'"
+
+format_for_cif(l::Array) = "[\n"* join(format_for_cif.(l)," ") * "\n]"
+
+format_for_cif(d::Dict) = begin
+    outstring = "{"
+    for k in keys(d)
+        outstring *= "$k:$(format_for_cif(d[k])) "
+    end
+    return outstring * "}"
+end
+
+format_for_cif(n::Nothing) = "."
+format_for_cif(n::Missing) = "?"
+format_for_cif(a) = "#Unknown type below \n$a"
 
 """
     get_loop(b,s) -> DataFrame

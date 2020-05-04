@@ -425,7 +425,7 @@ resolve_templated_imports!(c::NativeCif,temp_blocks) = begin
 end
 
 #== A full import of Head into Head will add all definitions from the imported dictionary,
-and in addition will reparent a children of the imported Head category to the new
+and in addition will reparent all children of the imported Head category to the new
 Head category.  We first merge the two sets of save frames, and then fix the parent category
 of any definitions that had the old head category as parent. Note that the NativeCif
 object passed to us is just the save frames from a dictionary.
