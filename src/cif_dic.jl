@@ -29,6 +29,8 @@ end
 
 # TODO: add more universal methods here
 
+# Read in ddl2 dictionaries as well, uniform interface.
+# include("ddl2_dic.jl")
 #==
 A Cifdic is a DDLm dictionary. The following semantics are important:
 (1) Importation. A DDLm dictionary can import parts of definitions,
@@ -153,6 +155,10 @@ generate_aliases(b::NativeCif) = begin
     return start_dict
 end
 
+list_aliases(b::Cifdic,n) = begin
+    return get(b[n],"_alias.definition_id",[])
+end
+
 """
 Determine whether or not dataname d is a definition or simply an alias
 """
@@ -198,6 +204,12 @@ get_linked_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
     names = [n for n in get_names_in_cat(c,cat) if length(get(c[n],"_name.linked_item_id",[]))==1]
     names = [n for n in names if get(c[n],"_type.purpose",["Datum"])[1] != "SU"]
     return names
+end
+
+"""
+Follow linked data names
+"""
+get_link_groups(c::Cifdic) = begin
 end
 
 get_set_categories(c::abstract_cif_dictionary) = begin
