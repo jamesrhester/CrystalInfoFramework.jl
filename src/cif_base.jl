@@ -15,7 +15,7 @@ held in a loop with a single row.
 ==#
 
 export NativeCif,NativeBlock,cif_container
-export get_save_frame, get_all_frames
+export get_save_frame, get_all_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
