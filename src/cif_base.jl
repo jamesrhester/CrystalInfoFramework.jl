@@ -14,28 +14,29 @@ held in a loop with a single row.
 
 ==#
 
-export NativeCif,NativeBlock,cif_container
+export NativeCif,NativeBlock,simple_cif_container, nested_cif_container
 export get_save_frame, get_all_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
-"""The type of blocks and save frames"""
+"""A container with no nested levels"""
 
-abstract type cif_container{V} <: AbstractDict{String,V} end
+abstract type simple_cif_container{V} <: AbstractDict{String,V} end
 
+abstract type nested_cif_container{V} <: simple_cif_container{V} end
 """
 The abstract cif type where the block elements all have primitive 
 datatypes given by V
 """
-abstract type Cif{V} <: AbstractDict{String,cif_container{V}} end
+abstract type Cif{V} <: AbstractDict{String,nested_cif_container{V}} end
 
 """V, list(V) and table(string:V) all possible"""
 
 get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
-    return Any
+    return V
 end
 
-Base.length(c::cif_container) = length(keys(c))
+Base.length(c::simple_cif_container) = length(keys(c))
 Base.length(c::Cif{V} where V) = length(keys(c))
 Base.iterate(c::Cif{V} where V) = iterate(get_contents(c))
 Base.iterate(c::Cif{V} where V,i::Integer) = iterate(get_contents(c),i)
@@ -46,8 +47,8 @@ Base.show(io::IO,c::Cif{V} where V) = begin
     end
 end
 
-struct NativeCif <: Cif{cif_container{String}}
-    contents::Dict{String,cif_container}
+struct NativeCif <: Cif{nested_cif_container{String}}
+    contents::Dict{String,nested_cif_container}
     original_file::String
 end
 
@@ -72,9 +73,8 @@ Base.show(io::IO,c::NativeCif) = begin
     end
 end
 
-#TODO: Get type hierarchy to encompass save frames
-mutable struct NativeBlock <: cif_container{Any}
-    save_frames::Dict{String,cif_container{Any}}
+mutable struct NativeBlock <: nested_cif_container{Any}
+    save_frames::Dict{String,simple_cif_container{Any}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{Any}}
     original_file::String
@@ -236,8 +236,8 @@ create_loop!(b::NativeBlock,names::Array{String,1}) = begin
 end
 
 mutable struct cif_builder_context
-    actual_cif::Dict{String,cif_container}
-    block_stack::Array{cif_container}
+    actual_cif::Dict{String,nested_cif_container}
+    block_stack::Array{nested_cif_container}
     filename::String
     verbose::Bool
 end
