@@ -499,7 +499,7 @@ values) and dynamically (derivation).
 
 ===========================================  ==#
 
-abstract type cif_container_with_dict <: cif_container{Any} end
+abstract type cif_container_with_dict <: nested_cif_container{Any} end
 
 abstract type cif_with_dict end   #TODO: find a spot in the type tree
 

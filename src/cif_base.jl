@@ -451,7 +451,7 @@ default_options(s::String;verbose=false) = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),cif_container[],s,verbose)
+    context = cif_builder_context(Dict(),nested_cif_container[],s,verbose)
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
