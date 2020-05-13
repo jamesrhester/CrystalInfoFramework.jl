@@ -32,7 +32,7 @@ abstract type Cif{V} <: AbstractDict{String,nested_cif_container{V}} end
 
 """V, list(V) and table(string:V) all possible"""
 
-get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
+get_dataname_type(c::simple_cif_container{V} where V, d::AbstractString) = begin
     return V
 end
 
