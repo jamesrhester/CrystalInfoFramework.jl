@@ -14,16 +14,23 @@ held in a loop with a single row.
 
 ==#
 
-export NativeCif,NativeBlock,simple_cif_container, nested_cif_container
+export NativeCif,NativeBlock
+export cif_container, nested_cif_container
 export get_save_frame, get_all_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
-"""A container with no nested levels"""
+"""
+A container for CIF data
+"""
+abstract type cif_container{V} <: AbstractDict{String,V} end
 
-abstract type simple_cif_container{V} <: AbstractDict{String,V} end
+"""
+A container with nested blocks (save frames)
+"""
+abstract type nested_cif_container{V} <: cif_container{V} end
 
-abstract type nested_cif_container{V} <: simple_cif_container{V} end
+
 """
 The abstract cif type where the block elements all have primitive 
 datatypes given by V
@@ -32,11 +39,11 @@ abstract type Cif{V} <: AbstractDict{String,nested_cif_container{V}} end
 
 """V, list(V) and table(string:V) all possible"""
 
-get_dataname_type(c::simple_cif_container{V} where V, d::AbstractString) = begin
+get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
     return V
 end
 
-Base.length(c::simple_cif_container) = length(keys(c))
+Base.length(c::cif_container) = length(keys(c))
 Base.length(c::Cif{V} where V) = length(keys(c))
 Base.iterate(c::Cif{V} where V) = iterate(get_contents(c))
 Base.iterate(c::Cif{V} where V,i::Integer) = iterate(get_contents(c),i)
@@ -47,8 +54,8 @@ Base.show(io::IO,c::Cif{V} where V) = begin
     end
 end
 
-struct NativeCif <: Cif{nested_cif_container{String}}
-    contents::Dict{String,nested_cif_container}
+struct NativeCif <: Cif{cif_container{String}}
+    contents::Dict{String,cif_container}
     original_file::String
 end
 
@@ -73,29 +80,53 @@ Base.show(io::IO,c::NativeCif) = begin
     end
 end
 
-mutable struct NativeBlock <: nested_cif_container{Any}
-    save_frames::Dict{String,simple_cif_container{Any}}
+"""
+We define both `NativeBlock`, which has no save frames, and
+`FullBlock` which also has save frames
+"""
+mutable struct NativeBlock <: cif_container{Any}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{Any}}
     original_file::String
 end
 
 NativeBlock() = begin
-    NativeBlock(Dict(),[],Dict(),"")
+    NativeBlock([],Dict(),"")
 end
 
-Base.keys(b::NativeBlock) = keys(b.data_values)
-Base.haskey(b::NativeBlock,s::String) = haskey(b.data_values,lowercase(s))
-Base.iterate(b::NativeBlock) = iterate(b.data_values)
-Base.iterate(b::NativeBlock,s) = iterate(b.data_values,s)
-Base.length(b::NativeBlock) = length(b.data_values)
-Base.getindex(b::NativeBlock,s::String) = b.data_values[lowercase(s)]
-Base.get(b::NativeBlock,s::String,a) = get(b.data_values,lowercase(s),a)
-get_datablock(b::NativeBlock) = b
+mutable struct FullBlock <: nested_cif_container{Any}
+    save_frames::Dict{String,cif_container{Any}}
+    loop_names::Vector{Vector{String}} #one loop is a list of datanames
+    data_values::Dict{String,Vector{Any}}
+    original_file::String
+end
+
+NativeBlock(f::FullBlock) = NativeBlock(f.loop_names,f.data_values,f.original_file)
+FullBlock(n::NativeBlock) = FullBlock(Dict(),get_loop_names(n),get_data_values(n),n.original_file)
+FullBlock(f::FullBlock) = f
+
+# And a simple access API
+get_data_values(b::NativeBlock) = b.data_values
+get_data_values(b::FullBlock) = b.data_values
+set_data_values(b::NativeBlock,v) = begin b.data_values = v end
+set_data_values(b::FullBlock,v) = begin b.data_values = v end
+
+get_loop_names(b::NativeBlock) = b.loop_names
+get_loop_names(b::FullBlock) = b.loop_names
+set_loop_names(b::NativeBlock,n) = begin b.loop_names = n end
+set_loop_names(b::FullBlock,n) = begin b.loop_names = n end
+
+Base.keys(b::cif_container) = keys(get_data_values(b))
+Base.haskey(b::cif_container,s::String) = haskey(get_data_values(b),lowercase(s))
+Base.iterate(b::cif_container) = iterate(get_data_values(b))
+Base.iterate(b::cif_container,s) = iterate(get_data_values(b),s)
+Base.getindex(b::cif_container,s::String) = get_data_values(b)[lowercase(s)]
+Base.get(b::cif_container,s::String,a) = get(get_data_values(b),lowercase(s),a)
+get_datablock(b::cif_container) = b
                    
 # We can specify a particular row in a loop by giving the
 # values of the datanames.
-Base.getindex(b::NativeBlock,s::Dict) = begin
+Base.getindex(b::cif_container,s::Dict) = begin
     l = get_loop(b,first(s).first)
     for pr in s
         k,v = pr
@@ -107,34 +138,28 @@ Base.getindex(b::NativeBlock,s::Dict) = begin
     first(l)
 end
 
-Base.setindex!(b::NativeBlock,v,s) = begin
-    b.data_values[lowercase(s)]=v
+Base.setindex!(b::cif_container,v,s) = begin
+    get_data_values(b)[lowercase(s)]=v
 end
 
-Base.delete!(b::NativeBlock,s) = begin
-    delete!(b.data_values,lowercase(s))
+Base.delete!(b::cif_container,s) = begin
+    delete!(get_data_values(b),lowercase(s))
 end
 
 # Show does not produce a conformant CIF (yet) but a
 # quasi-CIF for informational purposes
-Base.show(io::IO,b::NativeBlock) = begin
-    # first output the save frames
-    for s in b.save_frames
-        write(io,"save_$(first(s))")
-        show(io,last(s))
-        write(io,"save_\n\n")
-    end
+Base.show(io::IO,c::cif_container) = begin
     write(io,"\n")
-    key_vals = setdiff(collect(keys(b)),b.loop_names)
+    key_vals = setdiff(collect(keys(c)),get_loop_names(c))
     for k in key_vals
-        item = format_for_cif(first(b[k]))
+        item = format_for_cif(first(c[k]))
         write(io,"$k\t$item\n")
     end
     
     # now go through the loops
-    for one_loop in b.loop_names
+    for one_loop in get_loop_names(c)
         write(io,"\nloop_\n")
-        values = map(x -> getindex(b,x),one_loop)
+        values = map(x -> getindex(c,x),one_loop)
         for o in one_loop
             write(io,"$o\n")
         end
@@ -145,6 +170,16 @@ Base.show(io::IO,b::NativeBlock) = begin
             write(io,"\n")
         end
     end
+end
+
+Base.show(io::IO,b::FullBlock) = begin
+    # first output the save frames
+    for s in b.save_frames
+        write(io,"save_$(first(s))")
+        show(io,last(s))
+        write(io,"save_\n\n")
+    end
+    show(io,NativeBlock(b))
 end
 
 # Obviously not CIF conformant as doesn't deal with internal inverted commas
@@ -170,13 +205,13 @@ format_for_cif(a) = "#Unknown type below \n$a"
 Return the contents of the loop containing data name s in block
 b. If no data are available, a zero-length DataFrame is returned.
 """
-get_loop(b::NativeBlock,s) = begin
-    loop_names = [l for l in b.loop_names if s in l]
+get_loop(b::cif_container,s) = begin
+    loop_names = [l for l in get_loop_names(b) if s in l]
     # Construct a DataFrame
     df = DataFrame()
     if length(loop_names) == 1
         for n in loop_names[1]
-            df[!,Symbol(n)]=b.data_values[n]
+            df[!,Symbol(n)]=get_data_values(b)[n]
         end
     elseif length(loop_names) > 1
         error("More than one loop contains data name $s")
@@ -189,7 +224,7 @@ end
 Convenience method: return the rows for which the requested data names
 take the values provided in the dictionary.
 """
-lookup_loop(b::NativeBlock,request::Dict{String,String}) = begin
+lookup_loop(b::cif_container,request::Dict{String,String}) = begin
     df = get_loop(b,first(request).first)
     for (k,v) in request
         df = df[df[Symbol(k)] .== v,:]
@@ -198,19 +233,19 @@ lookup_loop(b::NativeBlock,request::Dict{String,String}) = begin
 end
 
 """
-    add_to_loop!(b::NativeBlock, tgt, newname)
+    add_to_loop!(b::cif_container, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
 be present and have the same length as other values in the loop."""
-add_to_loop!(b::NativeBlock, tgt, newname) = begin
-    loop_id = filter(l -> tgt in l, b.loop_names)
+add_to_loop!(b::cif_container, tgt, newname) = begin
+    loop_id = filter(l -> tgt in l, get_loop_names(b))
     if length(loop_id) != 1
         throw(error("No single unique loop containing dataname $tgt"))
     end
     # remove new name from any other loops
-    b.loop_names = map(x -> filter!(y -> !(y == newname),x), b.loop_names)
+    set_loop_names(b, map(x -> filter!(y -> !(y == newname),x), get_loop_names(b)))
     # and drop any that are now empty
-    filter!(x -> !isempty(x),b.loop_names)
+    set_loop_names(b,filter(x -> !isempty(x),get_loop_names(b)))
     if length(b[tgt]) != length(b[newname])
         throw(error("Mismatch in lengths: $(length(b[tgt])) and $(length(b[newname]))"))
     end
@@ -218,35 +253,35 @@ add_to_loop!(b::NativeBlock, tgt, newname) = begin
 end
 
 """
-    create_loop!(b::NativeBlock,names::Array{String,1})
+    create_loop!(b::cif_container,names::Array{String,1})
 
 Create a loop in ``b`` containing the datanames in ``names``.  Datanames assigned to
 other loops are silently transferred to the new loop. All data attached to ``names`` 
 should have the same length."""
-create_loop!(b::NativeBlock,names::Array{String,1}) = begin
+create_loop!(b::cif_container,names::Array{String,1}) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) != 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
     end
     # drop names from other loops
-    b.loop_names = map(x -> filter!(y -> !(y in names),x), b.loop_names)
+    set_loop_names(b, map(x -> filter!(y -> !(y in names),x), get_loop_names(b)))
     # drop empty loops
-    filter!(x->!isempty(x),b.loop_names)
-    push!(b.loop_names,names)
+    set_loop_names(b,filter!(x->!isempty(x),get_loop_names(b)))
+    push!(get_loop_names(b),names)
 end
 
 mutable struct cif_builder_context
-    actual_cif::Dict{String,nested_cif_container}
-    block_stack::Array{nested_cif_container}
+    actual_cif::Dict{String,cif_container}
+    block_stack::Array{cif_container}
     filename::String
     verbose::Bool
 end
 
-get_all_frames(c::NativeBlock) = begin
+get_all_frames(c::FullBlock) = begin
     NativeCif(c.save_frames,c.original_file)
 end
 
-get_save_frame(c::NativeBlock,s::String) = begin
+get_save_frame(c::FullBlock,s::String) = begin
     c.save_frames[s]
 end
 
@@ -254,9 +289,9 @@ end
 first block. This routine is used in order to merge
 dictionaries, for which the data block contents are less important ==#
 
-merge_saves(combiner::Function,c::NativeBlock,d::NativeBlock) = begin
+merge_saves(combiner::Function,c::FullBlock,d::FullBlock) = begin
     merged_saves = merge(combiner,c.save_frames,d.save_frames)
-    NativeBlock(merged_saves,c.loop_names,c.data_values,c.original_file)
+    FullBlock(merged_saves,c.loop_names,c.data_values,c.original_file)
 end
 
 """An opaque type representing the parse options object in libcif"""
@@ -309,7 +344,7 @@ handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("New blockname $(blockname)")
     end
-    newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
+    newblock = NativeBlock(Vector(),Dict(),b.filename)
     push!(b.block_stack,newblock)
     0
 end
@@ -317,13 +352,13 @@ end
 
 handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
     # Remove missing values
-    all_names = keys(b.block_stack[end].data_values)
+    all_names = keys(get_data_values(b.block_stack[end]))
     # Length > 1 dealt with already
-    all_names = filter(x -> length(b.block_stack[end].data_values[x]) == 1,all_names)
+    all_names = filter(x -> length(get_data_values(b.block_stack[end])[x]) == 1,all_names)
     # Remove any whose first and only entry is 'missing'
-    drop_names = filter(x -> ismissing(b.block_stack[end].data_values[x][1]),all_names)
+    drop_names = filter(x -> ismissing(get_data_values(b.block_stack[end])[x][1]),all_names)
     # println("Removing $drop_names from block")
-    [delete!(b.block_stack[end].data_values,x) for x in drop_names]
+    [delete!(b.block_stack[end],x) for x in drop_names]
     # and finish off
     blockname = get_block_code(a)
     if b.verbose println("Block is finished: $blockname") end
@@ -337,7 +372,8 @@ handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("Frame started: $blockname")
     end
-    newblock = NativeBlock(Dict(),Vector(),Dict(),b.filename)
+    newblock = NativeBlock(Vector(),Dict(),b.filename)
+    b.block_stack[end] = FullBlock(b.block_stack[end])
     push!(b.block_stack,newblock)
     0
 end
@@ -345,12 +381,12 @@ end
 
 handle_frame_end(a,b)::Cint = begin
     # Remove missing values
-    all_names = keys(b.block_stack[end].data_values)
+    all_names = keys(get_data_values(b.block_stack[end]))
     # Length > 1 dealt with already
-    all_names = filter(x -> length(b.block_stack[end].data_values[x]) == 1,all_names)
+    all_names = filter(x -> length(get_data_values(b.block_stack[end])[x]) == 1,all_names)
     # Remove any whose first and only entry is 'missing'
-    drop_names = filter(x -> ismissing(b.block_stack[end].data_values[x][1]),all_names)
-    [delete!(b.block_stack[end].data_values,x) for x in drop_names]
+    drop_names = filter(x -> ismissing(get_data_values(b.block_stack[end])[x][1]),all_names)
+    [delete!(b.block_stack[end],x) for x in drop_names]
     final_frame = pop!(b.block_stack)
     blockname = get_block_code(a)
     b.block_stack[end].save_frames[blockname] = final_frame
@@ -370,12 +406,12 @@ handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     end
     # ignore missing values
     loop_names = lowercase.(keys(a))
-    not_missing = filter(x->any(y->!ismissing(y),b.block_stack[end].data_values[x]),loop_names)
+    not_missing = filter(x->any(y->!ismissing(y),get_data_values(b.block_stack[end])[x]),loop_names)
     create_loop!(b.block_stack[end],not_missing)
     # and remove the data
     missing_ones = setdiff(Set(loop_names),not_missing)
     #println("Removing $missing_ones from loop")
-    [delete!(b.block_stack[end].data_values,x) for x in missing_ones]
+    [delete!(b.block_stack[end],x) for x in missing_ones]
     0
 end
 
@@ -418,10 +454,10 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         end
     end
     lc_keyname = lowercase(keyname)
-    if !(lc_keyname in keys(current_block.data_values))
-        current_block.data_values[lc_keyname] = [val]
+    if !(lc_keyname in keys(get_data_values(current_block)))
+        get_data_values(current_block)[lc_keyname]=[val]
     else
-        push!(current_block.data_values[lc_keyname],val)
+        push!(get_data_values(current_block)[lc_keyname],val)
     end
     return 0    
 end
@@ -451,13 +487,13 @@ default_options(s::String;verbose=false) = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),nested_cif_container[],s,verbose)
+    context = cif_builder_context(Dict(),cif_container[],s,verbose)
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
 
 NativeCif() = begin
-    return NativeCif(Dict{String,NativeBlock}(),"")
+    return NativeCif(Dict{String,cif_container}(),"")
 end
 
 NativeCif(s::AbstractString;verbose=false) = begin

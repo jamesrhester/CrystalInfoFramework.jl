@@ -44,7 +44,7 @@ the methods needed to find parents and children.
 ==#
 
 struct Cifdic <: abstract_cif_dictionary
-    block::NativeBlock    #the underlying CIF block
+    block::FullBlock    #the underlying CIF block
     definitions::Dict{String,String} #dataname -> blockname
     by_cat_obj::Dict{Tuple,String} #by category/object
     parent_lookup::Dict{String,String} #child -> parent
@@ -76,7 +76,7 @@ Cifdic(c::NativeCif) = begin
     return Cifdic(first(c).second)
 end
 
-Cifdic(base_b::NativeBlock) = begin
+Cifdic(base_b::FullBlock) = begin
     # importation first as it changes the block contents
     b = resolve_imports!(base_b)
     # create the definition names
@@ -350,10 +350,10 @@ fix_url(s::String,parent::String) = begin
     return s
 end
 
-#== We return a NativeBlock for further operations. While the
+#== We return a FullBlock for further operations. While the
 templated imports operate directly on the internal Dict entries,
 it appears that the full imports create a copy ==#
-resolve_imports!(b::NativeBlock) = begin
+resolve_imports!(b::nested_cif_container) = begin
     c = get_all_frames(b) #dont care about actual non-save data
     imports = [c[a] for a in keys(c) if haskey(c[a],"_import.get")]
     if length(imports) == 0
@@ -365,7 +365,7 @@ resolve_imports!(b::NativeBlock) = begin
     for i in imports
         delete!(i,"_import.get")
     end
-    return NativeBlock(new_c.contents,b.loop_names,b.data_values,b.original_file)
+    return FullBlock(new_c.contents,b.loop_names,b.data_values,b.original_file)
 end
 
 get_import_info(original_dir,import_entry) = begin
@@ -499,7 +499,7 @@ values) and dynamically (derivation).
 
 ===========================================  ==#
 
-abstract type cif_container_with_dict <: nested_cif_container{Any} end
+abstract type cif_container_with_dict <: cif_container{Any} end
 
 abstract type cif_with_dict end   #TODO: find a spot in the type tree
 
@@ -514,13 +514,16 @@ get_datablock(c::cif_container_with_dict) = begin
 end
 
 struct cif_block_with_dict <: cif_container_with_dict
-    data::NativeBlock
+    data::cif_container
     dictionary::Cifdic
 end
 
-assign_dictionary(c::NativeBlock,d::Cifdic) = cif_block_with_dict(c,d)
+assign_dictionary(c::cif_container,d::Cifdic) = cif_block_with_dict(c,d)
 get_dictionary(c::cif_block_with_dict) = c.dictionary
 get_datablock(c::cif_block_with_dict) = c.data
+get_loop_names(c::cif_block_with_dict) = get_loop_names(c.data)
+
+Base.show(io::IO,c::cif_block_with_dict) = show(io,c.data)
 
 """
 get_typed_datablock(c)
@@ -573,7 +576,7 @@ end
 Base.iterate(c::cif_container_with_dict) = iterate(get_datablock(c))
 Base.iterate(c::cif_container_with_dict,s) = iterate(get_datablock(c),s)
 
-Base.haskey(c::cif_container_with_dict,s) = begin
+Base.haskey(c::cif_container_with_dict,s::String) = begin
     actual_data = get_datablock(c)
     # go through all aliases
     ref_dic = get_dictionary(c)
@@ -609,7 +612,7 @@ get_loop(b::cif_container_with_dict,s::String) = begin
     for n in loop_names
         println("$n")
         obj_name = dict[n]["_name.object_id"][1]
-        df[Symbol(lowercase(obj_name))] = raw_data[n]
+        df[!,Symbol(lowercase(obj_name))] = raw_data[n]
     end
     return df
 end
@@ -709,8 +712,10 @@ get_dimensions(cdic,cat,obj) = begin
     return final
 end
     
-real_from_meas(value) = begin
+real_from_meas(value::String) = begin
+    println("Getting real value from $value")
     if '(' in value
+        println("NB $(value[1:findfirst(isequal('('),value)])")
         return parse(Float64,value[1:findfirst(isequal('('),value)-1])
     end
     return parse(Float64,value)
