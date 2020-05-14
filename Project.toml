@@ -1,0 +1,8 @@
+name = "DataContainer"
+uuid = "68b4d804-f79d-4e5f-bef9-7e30fa1fd457"
+authors = ["James.Hester <jxh@ansto.gov.au>"]
+version = "0.1.0"
+
+[deps]
+CrystalInfoFramework = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
