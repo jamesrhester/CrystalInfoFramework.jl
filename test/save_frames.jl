@@ -4,7 +4,7 @@ c = get_save_frame(b,"nested")
 @test c["_nesting_level"][1] == "1"
 
 @testset "Working with lists of save frames" begin
-    fl = get_all_frames(b)
+    fl = get_frames(b)
     fn = collect(keys(fl))
     @test length(fn) == 1
     @test fn[1] == "nested"

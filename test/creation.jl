@@ -13,7 +13,7 @@ testdir = @__DIR__
 end
 
 @test begin
-    p=NativeCif()
+    p=NativeCif{CifValue}()
     true    #if we succeed we are happy
 end
 

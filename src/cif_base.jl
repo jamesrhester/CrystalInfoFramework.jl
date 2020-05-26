@@ -1,12 +1,6 @@
 
 #== A CIF in Native Julia
 
-The dREL approach requires multiple loops over data to be in process
-simultaneously, which is not guaranteed to give coherent data for the
-CIFAPI.  Therefore we use cif_walk to read in the data, using the cifapi
-for parsing services only. We must define all handler functions in
-this case.
-
 Our Julia datastructure is built of a Dictionary of data blocks. A
 data block is a List of Loops and a List of save frames, which are
 themselves data blocks. A loop is a DataFrame. Single-valued items are
@@ -14,108 +8,27 @@ held in a loop with a single row.
 
 ==#
 
-export NativeCif,NativeBlock
+export CifValue,NativeCif,NativeBlock
 export cif_container, nested_cif_container
-export get_save_frame, get_all_frames,get_contents
+export get_save_frame,get_frames
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
 """
-A container for CIF data
+A container for CIF data. A dictionary which might remember where
+it came from.
 """
 abstract type cif_container{V} <: AbstractDict{String,V} end
 
-"""
-A container with nested blocks (save frames)
-"""
-abstract type nested_cif_container{V} <: cif_container{V} end
-
+get_source_file(c::cif_container) = error("Implement `get_source_file` for $(typeof(c))")
+get_data_values(c::cif_container) = error("Implement `get_data_values` for $(typeof(c))")
 
 """
-The abstract cif type where the block elements all have primitive 
-datatypes given by V
+A basic type for input CIFS
 """
-abstract type Cif{V} <: AbstractDict{String,nested_cif_container{V}} end
-
-"""V, list(V) and table(string:V) all possible"""
-
-get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
-    return V
-end
+CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
 
 Base.length(c::cif_container) = length(keys(c))
-Base.length(c::Cif{V} where V) = length(keys(c))
-Base.iterate(c::Cif{V} where V) = iterate(get_contents(c))
-Base.iterate(c::Cif{V} where V,i::Integer) = iterate(get_contents(c),i)
-Base.show(io::IO,c::Cif{V} where V) = begin
-    for k in keys(c)
-        write(io,"save_$k\n")
-        show(io,c[k])
-    end
-end
-
-struct NativeCif <: Cif{cif_container{String}}
-    contents::Dict{String,cif_container}
-    original_file::String
-end
-
-get_contents(c::NativeCif) = c.contents
-
-# Operations on Cifs
-Base.getindex(c::NativeCif,s) = begin
-    c.contents[s]
-end
-
-Base.setindex!(c::NativeCif,v,s) = begin
-    c.contents[s]=v
-end
-
-Base.first(c::NativeCif) = first(c.contents)
-Base.keys(c::NativeCif) = keys(c.contents)
-Base.haskey(c::NativeCif,s::String) = haskey(c.contents,s)
-Base.show(io::IO,c::NativeCif) = begin
-    for k in keys(c)
-        write(io,"data_$k\n")
-        show(io,c[k])
-    end
-end
-
-"""
-We define both `NativeBlock`, which has no save frames, and
-`FullBlock` which also has save frames
-"""
-mutable struct NativeBlock <: cif_container{Any}
-    loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{Any}}
-    original_file::String
-end
-
-NativeBlock() = begin
-    NativeBlock([],Dict(),"")
-end
-
-mutable struct FullBlock <: nested_cif_container{Any}
-    save_frames::Dict{String,cif_container{Any}}
-    loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{Any}}
-    original_file::String
-end
-
-NativeBlock(f::FullBlock) = NativeBlock(f.loop_names,f.data_values,f.original_file)
-FullBlock(n::NativeBlock) = FullBlock(Dict(),get_loop_names(n),get_data_values(n),n.original_file)
-FullBlock(f::FullBlock) = f
-
-# And a simple access API
-get_data_values(b::NativeBlock) = b.data_values
-get_data_values(b::FullBlock) = b.data_values
-set_data_values(b::NativeBlock,v) = begin b.data_values = v end
-set_data_values(b::FullBlock,v) = begin b.data_values = v end
-
-get_loop_names(b::NativeBlock) = b.loop_names
-get_loop_names(b::FullBlock) = b.loop_names
-set_loop_names(b::NativeBlock,n) = begin b.loop_names = n end
-set_loop_names(b::FullBlock,n) = begin b.loop_names = n end
-
 Base.keys(b::cif_container) = keys(get_data_values(b))
 Base.haskey(b::cif_container,s::String) = haskey(get_data_values(b),lowercase(s))
 Base.iterate(b::cif_container) = iterate(get_data_values(b))
@@ -123,7 +36,7 @@ Base.iterate(b::cif_container,s) = iterate(get_data_values(b),s)
 Base.getindex(b::cif_container,s::String) = get_data_values(b)[lowercase(s)]
 Base.get(b::cif_container,s::String,a) = get(get_data_values(b),lowercase(s),a)
 get_datablock(b::cif_container) = b
-                   
+
 # We can specify a particular row in a loop by giving the
 # values of the datanames.
 Base.getindex(b::cif_container,s::Dict) = begin
@@ -146,6 +59,98 @@ Base.delete!(b::cif_container,s) = begin
     delete!(get_data_values(b),lowercase(s))
 end
 
+"""
+A container with nested blocks (save frames). These are returned by the
+method `get_frames`. In all other ways a nested cif container behaves
+as if the save frames are absent.
+"""
+abstract type nested_cif_container{V} <: cif_container{V} end
+
+get_frames(c::nested_cif_container) = error("get_frames not implemented for $(typeof(c))")
+
+
+"""
+A CIF file is a cif_collection. The important distinction is that indexing produces a
+cif_container, not an array of data values.  There are no values at the top level.
+"""
+abstract type CifCollection{V} <: AbstractDict{String,V} end
+
+get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
+    return V
+end
+
+Base.show(io::IO,c::CifCollection) = begin
+    for k in keys(c)
+        write(io,"save_$k\n")
+        show(io,c[k])
+    end
+end
+
+struct NativeCif{V} <: CifCollection{V}
+    contents::Dict{String,cif_container{V}}
+    original_file::String
+end
+
+Base.keys(n::NativeCif) = keys(n.contents)
+Base.first(n::NativeCif) = first(n.contents)
+Base.length(n::NativeCif) = length(n.contents)
+Base.haskey(n::NativeCif,s) = haskey(n.contents,s)
+Base.getindex(n::NativeCif,s) = n.contents[s]
+Base.setindex!(c::NativeCif,v,s) = begin
+    c.contents[s]=v
+end
+
+Base.show(io::IO,c::NativeCif) = begin
+    for k in keys(c)
+        write(io,"data_$k\n")
+        show(io,c[k])
+    end
+end
+
+get_source_file(n::NativeCif) = n.original_file
+
+"""
+We define both `NativeBlock`, which has no save frames, and
+`FullBlock` which has save frames
+"""
+mutable struct NativeBlock{V} <: cif_container{V}
+    loop_names::Vector{Vector{String}} #one loop is a list of datanames
+    data_values::Dict{String,Vector{V}}
+    original_file::String
+end
+
+NativeBlock{V}() where V = begin
+    NativeBlock(Vector{String}[],Dict{String,Vector{V}}(),"")
+end
+
+mutable struct FullBlock{V} <: nested_cif_container{V}
+    save_frames::Dict{String,cif_container{V}}
+    loop_names::Vector{Vector{String}} #one loop is a list of datanames
+    data_values::Dict{String,Vector{V}}
+    original_file::String
+end
+
+NativeBlock(f::FullBlock) = NativeBlock(get_loop_names(f),get_data_values(f),get_source_file(f))
+FullBlock(n::NativeBlock{V}) where V = FullBlock(Dict{String,cif_container{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
+FullBlock(f::FullBlock) = f
+
+# And a simple access API
+get_data_values(b::NativeBlock) = b.data_values
+get_data_values(b::FullBlock) = b.data_values
+set_data_values(b::NativeBlock,v) = begin b.data_values = v end
+set_data_values(b::FullBlock,v) = begin b.data_values = v end
+
+get_loop_names(b::NativeBlock) = b.loop_names
+get_loop_names(b::FullBlock) = b.loop_names
+set_loop_names(b::NativeBlock,n) = begin b.loop_names = n end
+set_loop_names(b::FullBlock,n) = begin b.loop_names = n end
+
+get_source_file(b::NativeBlock) = b.original_file
+get_source_file(f::FullBlock) = f.original_file
+
+# nested API
+get_frames(f::FullBlock{V}) where V = NativeCif{V}(f.save_frames,get_source_file(f))
+                  
 # Show does not produce a conformant CIF (yet) but a
 # quasi-CIF for informational purposes
 Base.show(io::IO,c::cif_container) = begin
@@ -172,13 +177,9 @@ Base.show(io::IO,c::cif_container) = begin
     end
 end
 
-Base.show(io::IO,b::FullBlock) = begin
+Base.show(io::IO,b::nested_cif_container) = begin
     # first output the save frames
-    for s in b.save_frames
-        write(io,"save_$(first(s))")
-        show(io,last(s))
-        write(io,"save_\n\n")
-    end
+    show(io,get_frames(b))
     show(io,NativeBlock(b))
 end
 
@@ -271,27 +272,23 @@ create_loop!(b::cif_container,names::Array{String,1}) = begin
 end
 
 mutable struct cif_builder_context
-    actual_cif::Dict{String,cif_container}
-    block_stack::Array{cif_container}
+    actual_cif::Dict{String,cif_container{CifValue}}
+    block_stack::Array{cif_container{CifValue}}
     filename::String
     verbose::Bool
 end
 
-get_all_frames(c::FullBlock) = begin
-    NativeCif(c.save_frames,c.original_file)
-end
-
 get_save_frame(c::FullBlock,s::String) = begin
-    c.save_frames[s]
+    get_frames(c)[s]
 end
 
 #== Merge the save frame lists of the second block files into the
 first block. This routine is used in order to merge
 dictionaries, for which the data block contents are less important ==#
 
-merge_saves(combiner::Function,c::FullBlock,d::FullBlock) = begin
-    merged_saves = merge(combiner,c.save_frames,d.save_frames)
-    FullBlock(merged_saves,c.loop_names,c.data_values,c.original_file)
+merge_saves(combiner::Function,c,d) = begin
+    merged_saves = merge(combiner,get_frames(c),get_frames(d))
+    FullBlock(merged_saves,get_loop_names(c),get_data_values(c),c.original_file)
 end
 
 """An opaque type representing the parse options object in libcif"""
@@ -344,7 +341,8 @@ handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("New blockname $(blockname)")
     end
-    newblock = NativeBlock(Vector(),Dict(),b.filename)
+    newblock = NativeBlock{CifValue}()
+    newblock.original_file = b.filename
     push!(b.block_stack,newblock)
     0
 end
@@ -372,7 +370,8 @@ handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("Frame started: $blockname")
     end
-    newblock = NativeBlock(Vector(),Dict(),b.filename)
+    newblock = NativeBlock{CifValue}()
+    newblock.original_file = b.filename
     b.block_stack[end] = FullBlock(b.block_stack[end])
     push!(b.block_stack,newblock)
     0
@@ -492,8 +491,8 @@ default_options(s::String;verbose=false) = begin
     return p_opts
 end
 
-NativeCif() = begin
-    return NativeCif(Dict{String,cif_container}(),"")
+NativeCif{V}() where V = begin
+    return NativeCif(Dict{String,cif_container{V}}(),"")
 end
 
 NativeCif(s::AbstractString;verbose=false) = begin

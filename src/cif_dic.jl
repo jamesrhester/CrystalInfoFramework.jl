@@ -55,7 +55,7 @@ struct Cifdic <: abstract_cif_dictionary
 end
 
 Cifdic(b,d,c,parents) = begin
-    all_names = collect(keys(get_all_frames(b)))
+    all_names = collect(keys(get_frames(b)))
     if !issubset(values(d),all_names)
         miss_vals = setdiff(values(d),all_names)
         error("""Cifdic: supplied definition lookup contains save frames that are
@@ -80,7 +80,7 @@ Cifdic(base_b::FullBlock) = begin
     # importation first as it changes the block contents
     b = resolve_imports!(base_b)
     # create the definition names
-    defs = get_all_frames(b)
+    defs = get_frames(b)
     bnames = collect(keys(defs))
     match_dict = Dict()
     # create lookup tables for cat,obj if not a template dictionary
@@ -354,7 +354,7 @@ end
 templated imports operate directly on the internal Dict entries,
 it appears that the full imports create a copy ==#
 resolve_imports!(b::nested_cif_container) = begin
-    c = get_all_frames(b) #dont care about actual non-save data
+    c = get_frames(b) #dont care about actual non-save data
     imports = [c[a] for a in keys(c) if haskey(c[a],"_import.get")]
     if length(imports) == 0
         return b
@@ -365,11 +365,11 @@ resolve_imports!(b::nested_cif_container) = begin
     for i in imports
         delete!(i,"_import.get")
     end
-    return FullBlock(new_c.contents,b.loop_names,b.data_values,b.original_file)
+    return FullBlock(new_c.contents,get_loop_names(b),get_data_values(b),get_source_file(b))
 end
 
 get_import_info(original_dir,import_entry) = begin
-    # println("Now processing $one_entry")
+    #println("Now processing $import_entry")
     fixed = fix_url(import_entry["file"],original_dir)
     url = URI(fixed)
     #println("URI is $(url.scheme), $(url.path)")
@@ -513,8 +513,8 @@ get_datablock(c::cif_container_with_dict) = begin
     error("get_datablock not defined for concrete class!")
 end
 
-struct cif_block_with_dict <: cif_container_with_dict
-    data::cif_container
+struct cif_block_with_dict{V <: cif_container} <: cif_container_with_dict
+    data::V
     dictionary::Cifdic
 end
 
