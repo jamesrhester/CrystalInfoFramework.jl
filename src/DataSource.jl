@@ -140,10 +140,10 @@ Base.getindex(ds::MultiDataSource,n) = begin
     returnvals = []
     println("Looking for $n")
     for d in ds
-        # println("Looking for $n in $(typeof(d))")
+        #println("Looking for $n in $(typeof(d))")
         append!(returnvals,get(d,n,[]))
     end
-    #println("Found $returnvals")
+    println("Found $(length(returnvals)) values")
     if length(returnvals) == 0 throw(KeyError) end
     return returnvals
 end
@@ -159,24 +159,38 @@ Base.length(x::MultiDataSource,name) = begin
     return cnt
 end
 
+Base.keys(x::MultiDataSource) = begin
+    all_keys = Set([])
+    for d in x
+        union!(all_keys,keys(d))
+    end
+    return all_keys
+end
+
+Base.haskey(x::MultiDataSource,k) = begin
+    for d in x
+        if haskey(d,k) return true end
+    end
+    return false
+end
+
+        
 get_assoc_value(x::MultiDataSource,name,index,other_name) = begin
     if length(x[other_name]) == 1
         return x[other_name][1]
     end
     cnt = 0
     for d in x
-        println("Looking for assoc value in $(typeof(d))")
-        println("Which is what iterating over $(typeof(x)) gives us")
+        #println("Looking for assoc value in $(typeof(d))")
+        #println("Which is what iterating over $(typeof(x)) gives us")
+        if !haskey(d,name) || !haskey(d,other_name) continue end
         new_len = length(d[name])
-        if cnt+new_len >= index
-            if length(d[name]) == length(d[other_name])
-                return d[other_name][index-cnt]
-            end
-            if length(d[other_name]) == 1
-                return d[other_name][1]
-            end
+        if cnt+new_len < index
+            cnt+= new_len
+            continue
         end
-        cnt += new_len
+        nested_assoc = get_assoc_value(d,name,index-cnt,other_name)
+        return nested_assoc
     end
     return missing
 end
@@ -208,6 +222,9 @@ A Cif NativeBlock is a data source. It implements the dictionary interface.
 DataSource(::NativeBlock) = IsDataSource()
 
 get_assoc_value(x::NativeBlock,name,index,other) = begin
+    if !haskey(x,name) return missing end
+    if !haskey(x,other) return missing end
+    println("Looking for entry $index of $name which has length $(length(x[name]))")
     if index > length(x[name]) throw(BoundsError) end
     if length(x[other]) == 1 return x[other][1] end
     if length(x[name]) == length(x[other]) return x[other][index] end 
@@ -219,11 +236,11 @@ MultiDataSources, which means implementing the iterate_blocks method.
 The blocks in a cif_container are all of the save frames, and the
 enclosing block taken as a separate block.  In this view it is
 possible to associate items in separate save frames. However, these
-potential associations are overruled by dictionaries. 
+potential associations are excluded if necessary by dictionaries. 
 """
 iterate_blocks(c::nested_cif_container) = begin
     # main block then saves
-    saves = collect(keys(c.save_frames))
+    saves = collect(keys(get_frames(c)))
     #println("Returning iterator over $(typeof(c)), length $(length(saves))")
     return NativeBlock(c),saves
 end
@@ -236,7 +253,7 @@ iterate_blocks(c::nested_cif_container,s) = begin
     end
     next_frame = popfirst!(s)
     #println("Now looking at frame $next_frame")
-    return c.save_frames[next_frame],s
+    return get_frames(c)[next_frame],s
 end
 
 """
