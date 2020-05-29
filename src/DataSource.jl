@@ -224,7 +224,7 @@ DataSource(::NativeBlock) = IsDataSource()
 get_assoc_value(x::NativeBlock,name,index,other) = begin
     if !haskey(x,name) return missing end
     if !haskey(x,other) return missing end
-    println("Looking for entry $index of $name which has length $(length(x[name]))")
+    #println("Looking for entry $index of $name which has length $(length(x[name]))")
     if index > length(x[name]) throw(BoundsError) end
     if length(x[other]) == 1 return x[other][1] end
     if length(x[name]) == length(x[other]) return x[other][index] end 

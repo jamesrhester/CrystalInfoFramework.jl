@@ -1,6 +1,6 @@
 export generate_index,generate_keys
-export DDLmCategory
-export get_key_datanames,get_value_for_id,get_value_for_key
+export DDLmCategory, CatPacket
+export get_key_datanames,get_value
 
 # Relations
 
@@ -9,18 +9,19 @@ corresponds to an object in a mathematical category, or a relation in
 the relational model. Objects must have an identifier function that
 provides an opaque label for an object. We also want to be able to
 iterate over all values of this identifier, and other relations will
-pass us values of this identifier.  """
+pass us values of this identifier. Iteration produces a Row object. """
 
 abstract type Relation end
+abstract type Row end
 
 get_name(r::Relation) = throw(error("Not implemented"))
 
 """
 Iterate over the identifier for the relation
 """
-Base.iterate(r::Relation) = throw(error("Not implemented"))
+Base.iterate(r::Relation)::Row = throw(error("Not implemented"))
 
-Base.iterate(r::Relation,s) = throw(error("Not implemented"))
+Base.iterate(r::Relation,s)::Row = throw(error("Not implemented"))
 
 """
 Return all known mappings from a Relation
@@ -29,12 +30,23 @@ get_mappings(r::Relation) = begin
     throw(error("Not implemented"))
 end
 
+get_key_datanames(r::Relation) = begin
+    throw(error("Not implemented"))
+end
+
+get_category(r::Row) = throw(error("Not implemented"))
+
 """
-Given an opaque identifier returned by iterator,
+Given an opaque row returned by iterator,
 provide the value that it maps to for mapname
 """
-get_value_for_id(r::Relation,id,mapname) = begin
+get_value(row::Row,mapname) = begin
     throw(error("Not implemented"))
+end
+
+get_key(row::Row) = begin
+    kd = get_key_datanames(get_category(row))
+    [get_value(row,k) for k in kd]
 end
 
 """
@@ -42,20 +54,26 @@ Given a Julia dictionary `k` containing values of
 the keys, provide the corresponding value
 of dataname `name`.
 """
-get_value_for_key(r::Relation,k,name) = begin
+get_value(r::Relation,k::Dict,name) = begin
     if Set(keys(k)) != Set(get_key_datanames(r))
         throw(error("Incorrect key column names supplied: $(keys(k)) != $(get_key_datanames(r))"))
     end
     test_keys = keys(k)
     test_vals = values(k)
     for row in r
-        test = get_key_for_id(r,row)
+        test = get_key(row)
         if all(x->x[1]==x[2],zip(test, test_vals))
-            return get_value_for_id(r,row,name)
+            return get_value(row,name)
         end
     end
     return missing
 end
+
+Base.propertynames(c::Row,private::Bool=false) = begin
+    get_object_names(get_category(c))
+end
+
+Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 
 """
 A RelationalContainer models a system of interconnected tables conforming
@@ -91,27 +109,6 @@ abstract type CifCategory <: Relation end
 
 # implement the Relation interface
 
-""" 
-We make use of the fact that columns are ordered
-"""
-Base.iterate(c::CifCategory) = begin
-    k = get_key_datanames(c)[1]
-    keylength = length(c[k])
-    if keylength == 0
-        return nothing
-    end
-    r,s = iterate(1:keylength)
-    return r,(1:keylength,s)
-end
-
-Base.iterate(c::CifCategory,state) = begin
-    keyrange,index = state
-    r = iterate(keyrange,index)
-    if r == nothing return nothing end
-    t,s = r
-    return t,(keyrange,s)
-end
-
 """
 A mapping is a (src,tgt,name) tuple, but
 the source is always this category
@@ -126,7 +123,87 @@ get_mappings(c::CifCategory) = begin
     return local_maps
 end
 
-get_value_for_id(c::CifCategory,id,mapname) = c[mapname][id]
+# Useful for Set categories
+first_packet(c::CifCategory) = iterate(c)[1]
+
+#=========
+
+CatPackets
+
+=========#
+
+#==
+A `CatPacket` is a row in the category. We allow access to separate elements of
+the packet using the property notation.
+==#
+
+struct CatPacket <: Row
+    id::Int
+    source_cat::CifCategory
+end
+
+# Create a packet given the key values
+
+CatPacket(c::CifCategory,keydict) = get_row(c,keydict)
+get_category(c::CatPacket) = getfield(c,:source_cat)
+
+CrystalInfoFramework.get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
+
+
+get_row(r::Relation,keydict) = begin
+    if Set(keydict(k)) != Set(get_key_datanames(r))
+        throw(error("Incorrect key column names supplied: $(keys(k)) != $(get_key_datanames(r))"))
+    end
+    test_keys = keys(k)
+    test_vals = values(k)
+    for row in r
+        test = get_key(row)
+        if all(x->x[1]==x[2],zip(test, test_vals))
+            return row
+        end
+    end
+    return missing
+end
+
+Base.iterate(c::CifCategory) = begin
+    k = get_key_datanames(c)[1]
+    keylength = length(c[k])
+    if keylength == 0
+        return nothing
+    end
+    r,s = iterate(1:keylength)
+    return CatPacket(r,c),(1:keylength,s)
+end
+
+# Cache the final value at the end of the iteration,
+# as our packets may have updated the data frame.
+Base.iterate(c::CifCategory,ci) = begin
+    er,s = ci
+    next = iterate(er,s)
+    if next == nothing
+        # find new cache entries
+        # update_cache(c)
+        return next
+    end
+    r,s = next
+    return CatPacket(r,c),(er,s)
+end
+
+
+# Support dREL legacy. Current row in dREL actually
+# numbers from zero
+current_row(c::CatPacket) = begin
+    return getfield(c,:id)-1
+end
+
+"""
+
+"""
+get_value(row::CatPacket,name) = begin
+    rownum = getfield(row,:id)
+    c = get_category(row)
+    c[name][rownum]
+end
 
 """
 get_data returns a value for a given category. Note that if the value
@@ -146,6 +223,7 @@ struct DDLmCategory <: CifCategory
     data_ptr::DataFrame
     name_to_object::Dict{String,String}
     object_to_name::Dict{String,String}
+    dictionary::Cifdic
 end
 
 Base.show(io::IO,d::DDLmCategory) = begin
@@ -198,7 +276,7 @@ DDLmCategory(catname::String,data,cifdic::Cifdic) = begin
     linked_names = [(lowercase(cifdic[n]["_name.category_id"][1]),d) for (d,n) in linked_names]
 
     DDLmCategory(catname,internal_object_names,key_names,linked_names,data,data_ptr,
-                            name_to_object,object_to_name)
+                            name_to_object,object_to_name,cifdic)
 
 end
 
@@ -263,10 +341,12 @@ Base.getindex(d::DDLmCategory,name) = begin
     throw(KeyError)
 end
 
-# Relation interface; `id` is the row number
-get_value_for_id(d::DDLmCategory,id,name) = begin
+# Relation interface.
+get_value(row::CatPacket,name::String) = begin
+    rownum = getfield(row,:id)
+    d = get_category(row)
     colname = d.name_to_object[name]
-    lookup = d.data_ptr[id,Symbol(colname)]
+    lookup = d.data_ptr[rownum,Symbol(colname)]
     # println("Got $lookup for pos $id of $colname")
     # The table holds the actual key value for key columns only
     if name in get_key_datanames(d)
@@ -275,14 +355,27 @@ get_value_for_id(d::DDLmCategory,id,name) = begin
     return d.rawdata[name][lookup]
 end
 
-"""
-Return a proper key tuple
-"""
-get_key_for_id(d::DDLmCategory,id) = begin
-    colnames = [d.name_to_object[n] for n in get_key_datanames(d)]
-    return [d.data_ptr[id,Symbol(c)] for c in colnames]
+get_value(row::CatPacket,name::Symbol) = begin
+    d = get_category(row)
+    rownum = getfield(row,:id)
+    as_string = d.object_to_name[String(name)]
+    lookup = d.data_ptr[rownum,name]
+    if as_string in get_key_datanames(d)
+        return lookup
+    end
+    return d.rawdata[as_string][lookup]
 end
 
-get_column_names(d::DDLmCategory) = d.column_names
+"""
+Return a list of key dataname values
+"""
+get_key(row::CatPacket) = begin
+    d = get_category(row)
+    colnames = [d.name_to_object[n] for n in get_key_datanames(d)]
+    rownum = getfield(row,:id)
+    return [d.data_ptr[rownum,Symbol(c)] for c in colnames]
+end
+
+get_object_names(d::DDLmCategory) = d.data_ptr.names
 get_key_datanames(d::DDLmCategory) = d.keys
 get_link_names(d::DDLmCategory) = d.linked_names
