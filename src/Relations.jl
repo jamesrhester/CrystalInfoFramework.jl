@@ -1,5 +1,5 @@
 export generate_index,generate_keys
-export DDLmCategory, CatPacket
+export RelationalContainer,DDLmCategory, CatPacket
 export get_key_datanames,get_value
 
 # Relations
@@ -78,7 +78,10 @@ Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 """
 A RelationalContainer models a system of interconnected tables conforming
 the relational model, with an eye on the functional representation and
-category theory.
+category theory.  The dictionary is used to establish inter-category links
+and category keys. Any alias and type information is ignored. If this
+information is relevant, the data source must handle it (e.g. by using
+a TypedDataSource).
 
 """
 abstract type AbstractRelationalContainer <: AbstractDict{String,Relation} end
@@ -86,6 +89,7 @@ abstract type AbstractRelationalContainer <: AbstractDict{String,Relation} end
 struct RelationalContainer <: AbstractRelationalContainer
     relations::Dict{String,Relation}
     mappings::Array{Tuple{String,String,String}} #source,target,name
+    RelationalContainer(d::Dict,m::Array) = new(d,m)
 end
 
 RelationalContainer(a::Array{Relation,1}) = begin
@@ -98,12 +102,43 @@ RelationalContainer(a::Array{Relation,1}) = begin
     RelationalContainer(lookup,mappings)
 end
 
+RelationalContainer(d,dict::abstract_cif_dictionary) = RelationalContainer(DataSource(d),d,dict)
+
+RelationalContainer(d::DataSource, dict::abstract_cif_dictionary) = RelationalContainer(IsDataSource(),d,dict)
+
+RelationalContainer(::IsDataSource,d,dict::abstract_cif_dictionary) = begin
+    all_maps = Array[]
+    # Construct relations
+    relation_dict = Dict{String,Relation}()
+    all_dnames = Set(keys(d))
+    for one_cat in get_categories(dict)
+        println("Processing $one_cat")
+        cat_type = get(dict[one_cat],"_definition.class",["Datum"])[]
+        if cat_type == "Set"
+            all_names = get_names_in_cat(dict,one_cat)
+            if any(n -> n in all_names, all_dnames)
+                relation_dict[one_cat] = DDLmCategory(one_cat,d,dict)
+            end
+        elseif cat_type == "Loop"
+            all_names = get_keys_for_cat(dict,one_cat)
+            if all(k -> k in all_dnames,all_names)
+                println("* Adding $one_cat to relational container")
+                relation_dict[one_cat] = DDLmCategory(one_cat,d,dict)
+            end
+        end
+        # Construct mappings
+        all_maps = get_mappings(dict,one_cat)
+    end
+    RelationalContainer(relation_dict,all_maps)
+end
+
 Base.keys(r::RelationalContainer) = keys(r.relations)
 Base.haskey(r::RelationalContainer,k) = haskey(r.relations,k)
-
+Base.getindex(r::RelationalContainer,s) = r.relations[s]
+Base.setindex!(r::RelationalContainer,s,new) = r.relations[s]=new
 
 """
-A CifCategory describes a relation
+A CifCategory describes a relation using a dictionary
 """
 abstract type CifCategory <: Relation end
 
@@ -113,18 +148,22 @@ abstract type CifCategory <: Relation end
 A mapping is a (src,tgt,name) tuple, but
 the source is always this category
 """
-get_mappings(c::CifCategory) = begin
-    myname = get_name(c)
-    objs = get_object_names(c)
-    links = get_link_names(c)
-    linknames = [l[2] for l in links]
-    local_maps = [(myname,n) for n in objs if !(n in linknames)]
-    append!(local_maps,linknames)
+get_mappings(d::abstract_cif_dictionary,cat::String) = begin
+    objs = get_objs_in_cat(d,cat)
+    links = get_linked_names_in_cat(d,cat)
+    link_objs = [d[l]["_name.object_id"] for l in links]
+    dests = [get_ultimate_link(d,l) for l in links]
+    dest_cats = [find_category(d,dn) for dn in dests]
+    local_maps = [(cat,cat,n) for n in objs if !(n in link_objs)]
+    append!(local_maps,[(cat,d,n) for (d,n) in zip(dest_cats,dests)])
     return local_maps
 end
 
 # Useful for Set categories
 first_packet(c::CifCategory) = iterate(c)[1]
+
+# And a CifCategory has a dictionary!
+CrystalInfoFramework.get_dictionary(c::CifCategory) = throw(error("Implement get_dictionary for $(typeof(c))"))
 
 #=========
 
@@ -150,8 +189,8 @@ get_category(c::CatPacket) = getfield(c,:source_cat)
 CrystalInfoFramework.get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
 
 
-get_row(r::Relation,keydict) = begin
-    if Set(keydict(k)) != Set(get_key_datanames(r))
+get_row(r::Relation,k::Dict) = begin
+    if Set(keys(k)) != Set(get_key_datanames(r))
         throw(error("Incorrect key column names supplied: $(keys(k)) != $(get_key_datanames(r))"))
     end
     test_keys = keys(k)
@@ -218,7 +257,6 @@ struct DDLmCategory <: CifCategory
     name::String
     column_names::Array{String,1}
     keys::Array{String,1}
-    linked_names::Array{Tuple{String,String},1} #cat,dataname
     rawdata
     data_ptr::DataFrame
     name_to_object::Dict{String,String}
@@ -235,57 +273,66 @@ end
 DataSource(DDLmCategory) = IsDataSource()
 
 """
-Construct a category from a data source and a dictionary.
+Construct a category from a data source and a dictionary. Type and alias information
+should be handled by the datasource.
 """
 DDLmCategory(catname::String,data,cifdic::Cifdic) = begin
-    # Create tables to translate between data names and object names
+    #
+    # Absorb dictionary information
+    # 
     object_names = [lowercase(a) for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
     data_names = lowercase.([cifdic[a]["_definition.id"][1] for a in object_names])
     internal_object_names = lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names])
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(zip(internal_object_names,data_names))
-    # Do we expect more than one packet?
-    is_looped = get(cifdic[catname],"_definition.class",["Set"])[1] == "Loop"
-    key_names = []
-    if is_looped
-        key_names = cifdic[catname]["_category_key.name"]
-    end
-
+    key_names = get_keys_for_cat(cifdic,catname)
+    
     # The leaf values that will go into the data frame
-    have_vals = [k for k in data_names if k in lowercase.(keys(data)) && !(k in key_names)]
+    # Use unique as aliases might have produced multiple occurrences
+    
+    have_vals = unique(filter(k-> haskey(data,k) && !(k in key_names),data_names))
 
     # Make the data frame
-    data_ptr = DataFrame() 
-    key_tuples = generate_keys(data,cifdic,key_names,have_vals)
-    key_cols = zip(key_tuples...)
-    for (n,c) in zip(key_names,key_cols)
-        println("Setting $n to $c")
-        data_ptr[!,Symbol(name_to_object[n])] = [c...]
+    data_ptr = DataFrame()
+    println("For $catname datasource has names $have_vals")
+    key_list = generate_keys(data,cifdic,key_names,have_vals)
+    if !isempty(key_list)
+        key_cols = zip(key_list...)
+        for (n,c) in zip(key_names,key_cols)
+            println("Setting $n to $c")
+            data_ptr[!,Symbol(name_to_object[n])] = [c...]
+        end
     end
 
     for n in have_vals
         println("Setting $n")
-        data_ptr[!,Symbol(name_to_object[n])] = [generate_index(data,cifdic,key_tuples,key_names,n)...]
+        data_ptr[!,Symbol(name_to_object[n])] = [generate_index(data,cifdic,key_list,key_names,n)...]
     end
     #
 
-    # Store any linked data names
-
-    linked_names = [(a,cifdic[a]["_name.linked_item_id"][1]) for a in data_names if
-                    haskey(cifdic[a],"_name.linked_item_id") && cifdic[a]["_type.purpose"][1] != "SU"]
-    linked_names = [(lowercase(cifdic[n]["_name.category_id"][1]),d) for (d,n) in linked_names]
-
-    DDLmCategory(catname,internal_object_names,key_names,linked_names,data,data_ptr,
+    DDLmCategory(catname,internal_object_names,key_names,data,data_ptr,
                             name_to_object,object_to_name,cifdic)
 
 end
 
 DDLmCategory(catname,c::cif_container_with_dict) = DDLmCategory(catname,get_datablock(c),get_dictionary(c))
 
+# Minimal initialiser
+DDLmCategory(catname::String,cifdic::cif_container_with_dict) = DDLmCategory(catname,Dict{String,Any}(),cifdic)
+ 
+DDLmCategory(catname::String,t::TypedDataSource) = DDLmCategory(catname,get_datasource(t),get_dictionary(t))
+
 """
-Generate all known key values for a category
+Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
+to the end arbitrarily
 """
+
+Base.isless(x::Nothing,y) = false
+Base.isless(x,y::Nothing) = true
+Base.isless(x::Nothing,y::Nothing) = false
+
 generate_keys(data,c::Cifdic,key_names,non_key_names) = begin
+    if isempty(key_names) return [] end
     val_list = []
     for nk in non_key_names
         append!(val_list,zip([get_assoc_with_key_aliases(data,c,nk,k) for k in key_names]...))
@@ -300,6 +347,7 @@ Given a list of keys, find which position in the `non_key_name` list corresponds
 each key.
 """
 generate_index(data, c::Cifdic,key_vals,key_names, non_key_name) = begin
+    if isempty(key_names) return [1] end
     map_list = collect(zip((get_assoc_with_key_aliases(data,c,non_key_name,k) for k in key_names)...))
     # Map_list is a list of non-key positions -> key position. We want the opposite.
     # println("List of associations is $map_list")
@@ -311,15 +359,17 @@ end
 
 """
 This allows seamless presentation of parent-child categories as a single
-category if necessary.
+category if necessary. Make sure empty category is handled.
 """
 get_assoc_with_key_aliases(data,c::Cifdic,name,key_name) = begin
     while !haskey(data,key_name) && key_name != nothing
         println("Looking for $key_name")
-        key_name = get(c[key_name],"_name.linked_item_id",[nothing])[1]
-        println("Next up is $key_name")
+        key_name = get(c[key_name],"_name.linked_item_id",[nothing])[]
     end
-    if isnothing(key_name) return missing end
+    if isnothing(key_name)
+        if haskey(data,name) return missing end
+        return []    #the data name is missing
+    end
     return get_all_associated_values(data,name,key_name)
 end
 
@@ -333,12 +383,34 @@ dataframe because we need to take into account both aliases and linked
 data names.
 
 """
-Base.getindex(d::DDLmCategory,name) = begin
+Base.getindex(d::DDLmCategory,name::String) = begin
     colname = Symbol(d.name_to_object[name])
-    if colname in names(d.data_ptr)
+    if !(colname in names(d.data_ptr)) throw(KeyError()) end
+    if name in get_key_datanames(d) 
         return d.data_ptr[!,Symbol(colname)]
     end
-    throw(KeyError)
+    return map(x-> d.rawdata[name][x],d.data_ptr[!,Symbol(colname)])
+end
+
+Base.getindex(d::DDLmCategory,name::Symbol) = begin
+    if !(name in names(d.data_ptr)) throw(KeyError()) end
+    aka = d.object_to_name[String(name)]
+    if aka in get_key_datanames(d)
+        return d.data_ptr[!,name]
+    end
+    return map(x->d.rawdata[aka][x],d.data_ptr[!,name])
+end
+
+# If a single value is provided we turn it into a keyed access as long as
+# we have a single value for the key
+
+get_by_key_val(d::DDLmCategory,x::Union{SubString,String,Array{Any},Number}) = begin
+    knames = get_key_datanames(d)
+    if length(knames) == 1
+        rownum = indexin([x],d[knames[1]])[1]
+        return CatPacket(rownum,d)
+    end
+    throw(KeyError(x))
 end
 
 # Relation interface.
@@ -379,3 +451,4 @@ end
 get_object_names(d::DDLmCategory) = d.data_ptr.names
 get_key_datanames(d::DDLmCategory) = d.keys
 get_link_names(d::DDLmCategory) = d.linked_names
+CrystalInfoFramework.get_dictionary(d::DDLmCategory) = d.dictionary

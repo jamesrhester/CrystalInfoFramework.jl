@@ -103,7 +103,21 @@ end
     println("c3_index is $c3_index")
     @test all_fracts[i[c3_index]] == ".2789(8)"
 end
-==#
+
+@testset "Test TypedDataSources" begin
+    cdic,data = prepare_sources()
+    t = TypedDataSource(data,cdic)
+    @test t["_cell.volume"][] == 635.3
+    @test t["_cell_volume"][] == 635.3
+    @test haskey(t,"_atom_type.symbol")
+    @test haskey(t,"_atom_type_symbol")
+    @test !haskey(t,"this_key_does_not_exist")
+    q = get_assoc_value(t,"_atom_type.atomic_mass",2,"_atom_type.symbol")
+    @test q == "C"
+    q = get_assoc_value(t,"_atom_type.atomic_mass",2,"_cell_volume")
+    @test q == 635.3
+end
+
 @testset "Test construction of a CifCategory" begin
     cdic,data = prepare_sources()
     atom_cat = DDLmCategory("atom_site",data,cdic)
@@ -111,12 +125,13 @@ end
     # Test getting a particular value
     mypacket = CatPacket(3,atom_cat)
     @test get_value(mypacket,"_atom_site.fract_x") == ".2789(8)"
-    # Test iteration
-    #for r in atom_cat
-    #    println("Line $(getfield(r,:id)): atom_site.fract_y is $(r.fract_y)")
-    #end
     # Test relation interface
     @test get_value(atom_cat,Dict("_atom_site.label"=>"o2"),"_atom_site.fract_z") == ".2290(11)"
+    # Test missing data
+    empty_cat = DDLmCategory("diffrn_orient_refln",data,cdic)
+    # Test set category
+    set_cat = DDLmCategory("cell",data,cdic)
+    @test set_cat["_cell.volume"][] == "635.3(11)"
 end
 
 @testset "Test behaviour of plain CatPackets" begin
@@ -128,4 +143,14 @@ end
             @test one_pack.fract_z == ".2290(11)"
         end
     end
+end
+==#
+@testset "Test construction of RelationalContainers from Datasources and dictionaries" begin
+    cdic,data = prepare_sources()
+    ddata = TypedDataSource(data,cdic)
+    my_rc = RelationalContainer(ddata,cdic)
+    # loops
+    @test length(my_rc["atom_type"][:atomic_mass]) == 3
+    # sets
+    @test my_rc["cell"]["_cell.volume"][] == 635.3
 end

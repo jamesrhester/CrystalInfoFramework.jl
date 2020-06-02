@@ -12,7 +12,8 @@ from single arrays to multiple arrays.
 """
 
 export get_assoc_value, get_all_associated_values
-export DataSource,MultiDataSource
+export DataSource,MultiDataSource, TypedDataSource
+export IsDataSource
 
 """
 ## Data Source
@@ -280,5 +281,268 @@ iterate_blocks(c::NativeCif,s) = begin
     return make_data_source(get_contents(c)[nxt]),(blocks,new_s)
 end
 
-#== End of Data Sources ==#
+#==
+
+A data source with an associated dictionary processes types and aliases.
+
 ==#
+
+struct TypedDataSource <: DataSource
+    data
+    dict::abstract_cif_dictionary
+end
+
+get_dictionary(t::TypedDataSource) = t.dict
+get_datasource(t::TypedDataSource) = t.data
+
+"""
+getindex(t::TypedDataSource,s::String)
+
+The correctly-typed value for dataname `s` in `t` is returned, including
+searching for dataname aliases and providing a default value if defined.
+"""
+Base.getindex(t::TypedDataSource,s::String) = begin
+    # go through all aliases
+    refdict = get_dictionary(t)
+    ds = get_datasource(t)
+    root_def = refdict[s]  #will find definition
+    true_name = root_def["_definition.id"][1]
+    raw_val = missing
+    try
+        raw_val = ds[true_name]
+    catch KeyError
+        println("Couldn't find $true_name")
+        aliases = list_aliases(refdict,s)
+        for a in get(root_def,"_alias.definition_id",[true_name])
+            try
+                raw_val = ds[a]
+                break
+            catch KeyError
+                println("And couldn't find $a")
+            end
+        end
+        if ismissing(raw_val)   #no joy
+            backup = get_default(refdict,s)
+            if !ismissing(backup)
+                raw_val = backup
+            else
+                println("Can't find $s")
+                throw(Base.KeyError(s))
+            end
+        end
+    end
+    actual_type = convert_to_julia(refdict,s,raw_val)
+end
+
+Base.get(t::TypedDataSource,s::String,default) = begin
+    try
+        t[s]
+    catch KeyError
+        return default
+    end
+end
+
+
+Base.iterate(t::TypedDataSource) = iterate(get_datasource(t))
+Base.iterate(t::TypedDataSource,s) = iterate(get_datasource(t),s)
+
+Base.haskey(t::TypedDataSource,s::String) = begin
+    actual_data = get_datasource(t)
+    # go through all aliases
+    ref_dic = get_dictionary(t)
+    if !(haskey(ref_dic,s)) #no alias information
+        return haskey(actual_data,s)
+    end
+    return any(n->haskey(actual_data,n), list_aliases(ref_dic,s,include_self=true))
+end
+
+# Anything not defined in the dictionary is invisible
+# Convert all non-standard data names.
+
+Base.keys(t::TypedDataSource) = begin
+    true_keys = lowercase.(collect(keys(get_datasource(t))))
+    dict = get_dictionary(t)
+    dnames = [d for d in keys(dict) if lowercase(d) in true_keys]
+    return unique!([translate_alias(dict,n) for n in dnames])
+end
+
+get_assoc_value(t::TypedDataSource,name,index,other_name) = begin
+    # find the right names
+    ds = get_datasource(t)
+    dict = get_dictionary(t)
+    raw_name = filter(x->haskey(ds,x),list_aliases(dict,name,include_self=true))
+    raw_other = filter(x->haskey(ds,x),list_aliases(dict,other_name,include_self=true))
+    if length(raw_name) == 0 || length(raw_other)==0 return missing end
+    if length(raw_name) > 1 || length(raw_other) > 1
+        throw(error("More than one value for $name, $other_name: $raw_name, $raw_other"))
+    end
+    raw = get_assoc_value(ds,raw_name[1],index,raw_other[1])
+    if ismissing(raw) return missing end
+    return convert_to_julia(get_dictionary(t),other_name,[raw])[]
+end
+
+get_all_associated_values(t::TypedDataSource,name,other_name) = begin
+    # find the right names
+    ds = get_datasource(t)
+    dict = get_dictionary(t)
+    raw_name = filter(x->haskey(ds,x),list_aliases(dict,name,include_self=true))
+    raw_other = filter(x->haskey(ds,x),list_aliases(dict,other_name,include_self=true))
+    if length(raw_name) == 0 || length(raw_other)==0 return missing end
+    if length(raw_name) > 1 || length(raw_other) > 1
+        throw(error("More than one value for $name, $other_name: $raw_name, $raw_other"))
+    end
+    println("Getting all linked values for $(raw_name[]) -> $(raw_other[]))")
+    return get_all_associated_values(ds,raw_name[],raw_other[])
+end
+
+#==
+The dREL type machinery. Defined that take a string
+as input and return an object of the appropriate type
+==#
+
+#== Type annotation ==#
+const type_mapping = Dict( "Text" => String,        
+                           "Code" => Symbol("CaselessString"),                                                
+                           "Name" => String,        
+                           "Tag"  => String,         
+                           "Uri"  => String,         
+                           "Date" => String,  #change later        
+                           "DateTime" => String,     
+                           "Version" => String,     
+                           "Dimension" => Integer,   
+                           "Range"  => String, #TODO       
+                           "Count"  => Integer,    
+                           "Index"  => Integer,       
+                           "Integer" => Integer,     
+                           "Real" =>    Float64,        
+                           "Imag" =>    Complex,  #really?        
+                           "Complex" => Complex,     
+                           # Symop       
+                           # Implied     
+                           # ByReference
+                           "Array" => Array,
+                           "Matrix" => Array,
+                           "List" => Array{Any}
+                           )
+
+get_julia_type_name(cdic,cat::String,obj::String) = begin
+    definition = get_by_cat_obj(cdic,(cat,obj))
+    base_type = definition["_type.contents"][1]
+    cont_type = get(definition,"_type.container",["Single"])[1]
+    julia_base_type = type_mapping[base_type]
+    return julia_base_type,cont_type
+end
+
+"""Convert to the julia type for a given category, object and String value.
+This is clearly insufficient as it only handles one level of arrays.
+
+The value is assumed to be an array containing string values of the particular 
+dataname, which is as usually returned by the CIF readers, even for single values.
+"""
+convert_to_julia(cdic,cat,obj,value::Array) = begin
+    julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
+    if typeof(value) == Array{julia_base_type,1} return value end
+    change_func = (x->x)
+    # println("Julia type for $base_type is $julia_base_type, converting $value")
+    if julia_base_type == Integer
+        change_func = (x -> map(y->parse(Int,y),x))
+    elseif julia_base_type == Float64
+        change_func = (x -> map(y->real_from_meas(y),x))
+    elseif julia_base_type == Complex
+        change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
+    elseif julia_base_type == String
+        change_func = (x -> map(y->String(y),x))
+    elseif julia_base_type == Symbol("CaselessString")
+        change_func = (x -> map(y->CaselessString(y),x))
+    end
+    if cont_type == "Single"
+        return change_func(value)
+    elseif cont_type in ["Array","Matrix"]
+        return map(change_func,value)
+    else error("Unsupported container type $cont_type")   #we can do nothing
+    end
+end
+
+convert_to_julia(cdic,dataname::String,value) = begin
+    definition = cdic[dataname]
+    return convert_to_julia(cdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
+end
+
+# return dimensions as an Array. Note that we do not handle
+# asterisks, I think they are no longer allowed?
+# The first dimension in Julia is number of rows, then number
+# of columns. This is the opposite to dREL
+
+get_dimensions(cdic,cat,obj) = begin
+    definition = get_by_cat_obj(cdic,(cat,obj))
+    dims = get(definition,"_type.dimension",["[]"])[1]
+    final = eval(Meta.parse(dims))
+    if length(final) > 1
+        t = final[1]
+        final[1] = final[2]
+        final[2] = t
+    end
+    return final
+end
+    
+real_from_meas(value::String) = begin
+    #println("Getting real value from $value")
+    if '(' in value
+        #println("NB $(value[1:findfirst(isequal('('),value)])")
+        return parse(Float64,value[1:findfirst(isequal('('),value)-1])
+    end
+    return parse(Float64,value)
+end
+
+Range(v::String) = begin
+    lower,upper = split(v,":")
+    parse(Number,lower),parse(Number,upper)
+end
+
+#== This type of string compares as a caseless string
+Most other operations are left undefined for now ==#
+
+struct CaselessString <: AbstractString
+    actual_string::String
+end
+
+Base.:(==)(a::CaselessString,b::AbstractString) = begin
+    lowercase(a.actual_string) == lowercase(b)
+end
+
+Base.:(==)(a::AbstractString,b::CaselessString) = begin
+    lowercase(a) == lowercase(b.actual_string)
+end
+
+Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
+
+#== the following don't work, for now we have explicit types 
+Base.:(==)(a::AbstractString,b::SubString{T} where {T}) = a == T(b)
+
+Base.:(==)(a::SubString{T} where {T},b::AbstractString) = T(a) == b
+==#
+
+Base.:(==)(a::SubString{CaselessString},b::AbstractString) = CaselessString(a) == b
+Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = CaselessString(b) == a
+Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = a == CaselessString(b)
+
+Base.iterate(c::CaselessString) = iterate(c.actual_string)
+Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
+Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
+Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
+Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
+
+#== A caseless string should match both upper and lower case
+==#
+Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
+    for (k,v) in d
+        if lowercase(k) == lowercase(key)
+            return v
+        end
+    end
+    KeyError("$key not found")
+end
+
+#
+#== End of Data Sources ==#
+
