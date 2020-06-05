@@ -1,15 +1,17 @@
 export generate_index,generate_keys
-export RelationalContainer,DDLmCategory, CatPacket
-export get_key_datanames,get_value
+export AbstractRelationalContainer,RelationalContainer,DDLmCategory, CatPacket
+export get_key_datanames,get_value, get_all_datanames
 
 # Relations
 
-""" A Relation is an object in a RelationalContainer (see below). It
+""" 
+A Relation is an object in a RelationalContainer (see below). It
 corresponds to an object in a mathematical category, or a relation in
 the relational model. Objects must have an identifier function that
 provides an opaque label for an object. We also want to be able to
 iterate over all values of this identifier, and other relations will
-pass us values of this identifier. Iteration produces a Row object. """
+pass us values of this identifier. Iteration produces a Row object.
+ """
 
 abstract type Relation end
 abstract type Row end
@@ -30,6 +32,11 @@ get_mappings(r::Relation) = begin
     throw(error("Not implemented"))
 end
 
+"""
+get_key_datanames returns a list of columns for the relation that, combined,
+form the key. Column names must be symbols to allow rows to be selected using
+other value types.
+"""
 get_key_datanames(r::Relation) = begin
     throw(error("Not implemented"))
 end
@@ -92,16 +99,6 @@ struct RelationalContainer <: AbstractRelationalContainer
     RelationalContainer(d::Dict,m::Array) = new(d,m)
 end
 
-RelationalContainer(a::Array{Relation,1}) = begin
-    lookup = Dict([(get_name(b)=>b) for b in a])
-    mappings = []
-    for r in a
-        tgt,name = get_mappings(r)
-        push!(mappings,(get_name(r),tgt,name))
-    end
-    RelationalContainer(lookup,mappings)
-end
-
 RelationalContainer(d,dict::abstract_cif_dictionary) = RelationalContainer(DataSource(d),d,dict)
 
 RelationalContainer(d::DataSource, dict::abstract_cif_dictionary) = RelationalContainer(IsDataSource(),d,dict)
@@ -136,6 +133,20 @@ Base.keys(r::RelationalContainer) = keys(r.relations)
 Base.haskey(r::RelationalContainer,k) = haskey(r.relations,k)
 Base.getindex(r::RelationalContainer,s) = r.relations[s]
 Base.setindex!(r::RelationalContainer,s,new) = r.relations[s]=new
+
+get_all_datanames(r::RelationalContainer) = begin
+    namelist = []
+    for one_r in values(r.relations)
+        append!(namelist,keys(one_r))
+    end
+    return namelist
+end
+
+
+Base.show(io::IO,r::RelationalContainer) = begin
+    show(io,r.relations)
+    show(io,r.mappings)
+end
 
 """
 A CifCategory describes a relation using a dictionary
@@ -228,6 +239,7 @@ Base.iterate(c::CifCategory,ci) = begin
     return CatPacket(r,c),(er,s)
 end
 
+Base.length(c::CifCategory) = size(c.data_ptr,1)
 
 # Support dREL legacy. Current row in dREL actually
 # numbers from zero
@@ -255,12 +267,12 @@ get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
 struct DDLmCategory <: CifCategory
     name::String
-    column_names::Array{String,1}
-    keys::Array{String,1}
+    column_names::Array{Symbol,1}
+    keys::Array{Symbol,1}
     rawdata
     data_ptr::DataFrame
-    name_to_object::Dict{String,String}
-    object_to_name::Dict{String,String}
+    name_to_object::Dict{String,Symbol}
+    object_to_name::Dict{Symbol,String}
     dictionary::Cifdic
 end
 
@@ -282,7 +294,7 @@ DDLmCategory(catname::String,data,cifdic::Cifdic) = begin
     # 
     object_names = [lowercase(a) for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
     data_names = lowercase.([cifdic[a]["_definition.id"][1] for a in object_names])
-    internal_object_names = lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names])
+    internal_object_names = Symbol.(lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names]))
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(zip(internal_object_names,data_names))
     key_names = get_keys_for_cat(cifdic,catname)
@@ -300,16 +312,18 @@ DDLmCategory(catname::String,data,cifdic::Cifdic) = begin
         key_cols = zip(key_list...)
         for (n,c) in zip(key_names,key_cols)
             println("Setting $n to $c")
-            data_ptr[!,Symbol(name_to_object[n])] = [c...]
+            data_ptr[!,name_to_object[n]] = [c...]
         end
     end
 
     for n in have_vals
         println("Setting $n")
-        data_ptr[!,Symbol(name_to_object[n])] = [generate_index(data,cifdic,key_list,key_names,n)...]
+        data_ptr[!,name_to_object[n]] = [generate_index(data,cifdic,key_list,key_names,n)...]
     end
     #
-
+    # Keys are provided as symbols referring to column names
+    #
+    key_names = [name_to_object[k] for k in key_names]
     DDLmCategory(catname,internal_object_names,key_names,data,data_ptr,
                             name_to_object,object_to_name,cifdic)
 
@@ -379,25 +393,30 @@ get_name(d::DDLmCategory) = d.name
 
 """
 get_data(d::DDLmCategory,colname) differs from getting the data out of the
-dataframe because we need to take into account both aliases and linked
-data names.
+dataframe because of linked data names (note yet implemented).
 
 """
-Base.getindex(d::DDLmCategory,name::String) = begin
-    colname = Symbol(d.name_to_object[name])
-    if !(colname in names(d.data_ptr)) throw(KeyError()) end
-    if name in get_key_datanames(d) 
-        return d.data_ptr[!,Symbol(colname)]
+Base.getindex(d::DDLmCategory,keyval) = begin
+    a = get_key_datanames(d)
+    if length(a) != 1
+        throw(error("Category $(d.name) accessed with value $keyval but has $(length(a)) key datanames"))
     end
-    return map(x-> d.rawdata[name][x],d.data_ptr[!,Symbol(colname)])
+    return d[Dict{Symbol,Any}(a[1]=>keyval)]
 end
+
+Base.getindex(d::DDLmCategory,dict::Dict{Symbol,Any}) = begin
+    get_row(d,dict)
+end
+
+# Getindex by symbol is the only way to get at a column. We reserve
+# other values for row and key based indexing.
 
 Base.getindex(d::DDLmCategory,name::Symbol) = begin
     if !(name in names(d.data_ptr)) throw(KeyError()) end
-    aka = d.object_to_name[String(name)]
-    if aka in get_key_datanames(d)
+    if name in get_key_datanames(d)
         return d.data_ptr[!,name]
     end
+    aka = d.object_to_name[name]
     return map(x->d.rawdata[aka][x],d.data_ptr[!,name])
 end
 
@@ -421,7 +440,7 @@ get_value(row::CatPacket,name::String) = begin
     lookup = d.data_ptr[rownum,Symbol(colname)]
     # println("Got $lookup for pos $id of $colname")
     # The table holds the actual key value for key columns only
-    if name in get_key_datanames(d)
+    if colname in get_key_datanames(d)
         return lookup
     end
     return d.rawdata[name][lookup]
@@ -430,11 +449,11 @@ end
 get_value(row::CatPacket,name::Symbol) = begin
     d = get_category(row)
     rownum = getfield(row,:id)
-    as_string = d.object_to_name[String(name)]
     lookup = d.data_ptr[rownum,name]
-    if as_string in get_key_datanames(d)
+    if name in get_key_datanames(d)
         return lookup
     end
+    as_string = d.object_to_name[name]
     return d.rawdata[as_string][lookup]
 end
 
@@ -443,12 +462,14 @@ Return a list of key dataname values
 """
 get_key(row::CatPacket) = begin
     d = get_category(row)
-    colnames = [d.name_to_object[n] for n in get_key_datanames(d)]
+    colnames = get_key_datanames(d)
     rownum = getfield(row,:id)
-    return [d.data_ptr[rownum,Symbol(c)] for c in colnames]
+    return [d.data_ptr[rownum,c] for c in colnames]
 end
 
 get_object_names(d::DDLmCategory) = d.data_ptr.names
 get_key_datanames(d::DDLmCategory) = d.keys
 get_link_names(d::DDLmCategory) = d.linked_names
-CrystalInfoFramework.get_dictionary(d::DDLmCategory) = d.dictionary
+get_dictionary(d::DDLmCategory) = d.dictionary
+
+Base.keys(d::DDLmCategory) = names(d.data_ptr)

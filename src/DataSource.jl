@@ -14,6 +14,7 @@ from single arrays to multiple arrays.
 export get_assoc_value, get_all_associated_values
 export DataSource,MultiDataSource, TypedDataSource
 export IsDataSource
+export get_julia_type_name,convert_to_julia,get_dimensions
 
 """
 ## Data Source

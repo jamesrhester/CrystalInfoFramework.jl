@@ -117,21 +117,23 @@ end
     q = get_assoc_value(t,"_atom_type.atomic_mass",2,"_cell_volume")
     @test q == 635.3
 end
-
+==#
 @testset "Test construction of a CifCategory" begin
     cdic,data = prepare_sources()
     atom_cat = DDLmCategory("atom_site",data,cdic)
-    @test get_key_datanames(atom_cat) == ["_atom_site.label"]
+    @test get_key_datanames(atom_cat) == [:label]
     # Test getting a particular value
     mypacket = CatPacket(3,atom_cat)
     @test get_value(mypacket,"_atom_site.fract_x") == ".2789(8)"
     # Test relation interface
-    @test get_value(atom_cat,Dict("_atom_site.label"=>"o2"),"_atom_site.fract_z") == ".2290(11)"
+    @test get_value(atom_cat,Dict(:label=>"o2"),"_atom_site.fract_z") == ".2290(11)"
     # Test missing data
     empty_cat = DDLmCategory("diffrn_orient_refln",data,cdic)
     # Test set category
     set_cat = DDLmCategory("cell",data,cdic)
-    @test set_cat["_cell.volume"][] == "635.3(11)"
+    @test set_cat[:volume][] == "635.3(11)"
+    # Test getting a key value
+    @test atom_cat["o2"].fract_z == ".2290(11)"
 end
 
 @testset "Test behaviour of plain CatPackets" begin
@@ -144,7 +146,7 @@ end
         end
     end
 end
-==#
+
 @testset "Test construction of RelationalContainers from Datasources and dictionaries" begin
     cdic,data = prepare_sources()
     ddata = TypedDataSource(data,cdic)
@@ -152,5 +154,5 @@ end
     # loops
     @test length(my_rc["atom_type"][:atomic_mass]) == 3
     # sets
-    @test my_rc["cell"]["_cell.volume"][] == 635.3
+    @test my_rc["cell"][:volume][] == 635.3
 end
