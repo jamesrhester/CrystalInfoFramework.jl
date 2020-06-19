@@ -15,6 +15,7 @@ export get_assoc_value, get_all_associated_values
 export DataSource,MultiDataSource, TypedDataSource
 export IsDataSource
 export get_julia_type_name,convert_to_julia,get_dimensions
+export CaselessString
 
 """
 ## Data Source
@@ -379,7 +380,7 @@ get_assoc_value(t::TypedDataSource,name,index,other_name) = begin
     end
     raw = get_assoc_value(ds,raw_name[1],index,raw_other[1])
     if ismissing(raw) return missing end
-    return convert_to_julia(get_dictionary(t),other_name,[raw])[]
+    return convert_to_julia(dict,other_name,[raw])[]
 end
 
 get_all_associated_values(t::TypedDataSource,name,other_name) = begin
@@ -393,7 +394,8 @@ get_all_associated_values(t::TypedDataSource,name,other_name) = begin
         throw(error("More than one value for $name, $other_name: $raw_name, $raw_other"))
     end
     println("Getting all linked values for $(raw_name[]) -> $(raw_other[]))")
-    return get_all_associated_values(ds,raw_name[],raw_other[])
+    untyped = get_all_associated_values(ds,raw_name[],raw_other[])
+    return convert_to_julia(dict,other_name,untyped)
 end
 
 #==
@@ -418,7 +420,7 @@ const type_mapping = Dict( "Text" => String,
                            "Real" =>    Float64,        
                            "Imag" =>    Complex,  #really?        
                            "Complex" => Complex,     
-                           # Symop       
+                           "Symop" => String,       
                            # Implied     
                            # ByReference
                            "Array" => Array,
@@ -452,7 +454,7 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     elseif julia_base_type == Complex
         change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
     elseif julia_base_type == String
-        change_func = (x -> map(y->String(y),x))
+        change_func = (x -> map(y-> if isnothing(y) "." else String(y) end,x))
     elseif julia_base_type == Symbol("CaselessString")
         change_func = (x -> map(y->CaselessString(y),x))
     end
