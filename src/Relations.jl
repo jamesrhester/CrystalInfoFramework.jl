@@ -1,57 +1,6 @@
 export generate_index,generate_keys
-export AbstractRelationalContainer,RelationalContainer,DDLmCategory, CatPacket
-export CifCategory, LegacyCategory
 export get_key_datanames,get_value, get_all_datanames, get_name, current_row
 export get_category,has_category,first_packet
-
-# Relations
-
-""" 
-A Relation is an object in a RelationalContainer (see below). It
-corresponds to an object in a mathematical category, or a relation in
-the relational model. Objects must have an identifier function that
-provides an opaque label for an object. We also want to be able to
-iterate over all values of this identifier, and other relations will
-pass us values of this identifier. Iteration produces a Row object.
- """
-
-abstract type Relation end
-abstract type Row end
-
-get_name(r::Relation) = throw(error("Not implemented"))
-
-"""
-Iterate over the identifier for the relation
-"""
-Base.iterate(r::Relation)::Row = throw(error("Not implemented"))
-
-Base.iterate(r::Relation,s)::Row = throw(error("Not implemented"))
-
-"""
-Return all known mappings from a Relation
-"""
-get_mappings(r::Relation) = begin
-    throw(error("Not implemented"))
-end
-
-"""
-get_key_datanames returns a list of columns for the relation that, combined,
-form the key. Column names must be symbols to allow rows to be selected using
-other value types.
-"""
-get_key_datanames(r::Relation) = begin
-    throw(error("Not implemented"))
-end
-
-get_category(r::Row) = throw(error("Not implemented"))
-
-"""
-Given an opaque row returned by iterator,
-provide the value that it maps to for mapname
-"""
-get_value(row::Row,mapname) = begin
-    throw(error("Not implemented"))
-end
 
 get_key(row::Row) = begin
     kd = get_key_datanames(get_category(row))
@@ -78,31 +27,30 @@ get_value(r::Relation,k::Dict,name) = begin
     return missing
 end
 
+get_row(r::Relation,k::Dict) = begin
+    key_order = get_key_datanames(r)
+    numkeys = length(key_order)
+    if Set(keys(k)) != Set(key_order)
+        throw(error("Incorrect key column names supplied: $(keys(k)) != $key_order"))
+    end
+    test_keys = keys(k)
+    test_vals = values(k)
+    for row in r
+        test = get_key(row)
+        if all(x->test[x]==k[key_order[x]],1:numkeys)
+            return row
+        end
+    end
+    return missing
+end
+
 Base.propertynames(c::Row,private::Bool=false) = begin
     get_object_names(get_category(c))
 end
 
 Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 
-"""
-A RelationalContainer models a system of interconnected tables conforming
-the relational model, with an eye on the functional representation and
-category theory.  The dictionary is used to establish inter-category links
-and category keys. Any alias and type information is ignored. If this
-information is relevant, the data source must handle it (e.g. by using
-a TypedDataSource).
-
-Keys and values still refer to the items stored in the container itself.
-
-"""
-abstract type AbstractRelationalContainer <: DataSource end
-
-struct RelationalContainer <: AbstractRelationalContainer
-    relations::Dict{String,Relation}
-    mappings::Array{Tuple{String,String,String}} #source,target,name
-    dataname_to_cat::Dict{String,String} #for convenience
-    RelationalContainer(d::Dict,m::Array,di::Dict) = new(d,m,di)
-end
+# == Relational Containers == #
 
 RelationalContainer(d,dict::abstract_cif_dictionary) = RelationalContainer(DataSource(d),d,dict)
 
@@ -119,15 +67,17 @@ RelationalContainer(::IsDataSource,d,dict::abstract_cif_dictionary) = begin
         if cat_type == "Set"
             all_names = lowercase.(get_names_in_cat(dict,one_cat))
             if any(n -> n in all_names, all_dnames)
-                relation_dict[one_cat] = DDLmCategory(one_cat,d,dict)
+                println("* Adding Set category $one_cat to container")
+                relation_dict[one_cat] = SetCategory(one_cat,d,dict)
             end
         elseif cat_type == "Loop"
             all_names = get_keys_for_cat(dict,one_cat)
             if all(k -> k in all_dnames,all_names)
                 println("* Adding $one_cat to relational container")
-                relation_dict[one_cat] = DDLmCategory(one_cat,d,dict)
+                relation_dict[one_cat] = LoopCategory(one_cat,d,dict)
             elseif any(n->n in all_dnames,get_names_in_cat(dict,one_cat))
                 # A legacy loop category which is missing keys
+                println("* Adding legacy category $one_cat to container")
                 relation_dict[one_cat] = LegacyCategory(one_cat,d,dict)
             end
         end
@@ -160,10 +110,13 @@ Base.show(io::IO,r::RelationalContainer) = begin
     show(io,r.mappings)
 end
 
-"""
-A CifCategory describes a relation using a dictionary
-"""
-abstract type CifCategory <: Relation end
+# == CifCategory == #
+
+#== 
+
+CifCategories use a CIF dictionary to describe relations
+
+==#
 
 # implement the Relation interface
 
@@ -185,49 +138,14 @@ end
 # Useful for Set categories
 first_packet(c::CifCategory) = iterate(c)[1]
 
-# And a CifCategory has a dictionary!
-get_dictionary(c::CifCategory) = throw(error("Implement get_dictionary for $(typeof(c))"))
-
-#=========
-
-CatPackets
-
-=========#
-
-#==
-A `CatPacket` is a row in the category. We allow access to separate elements of
-the packet using the property notation.
-==#
-
-struct CatPacket <: Row
-    id::Int
-    source_cat::CifCategory
-end
+# == CatPacket == #
 
 # Create a packet given the key values
 
 CatPacket(c::CifCategory,keydict) = get_row(c,keydict)
+
 get_category(c::CatPacket) = getfield(c,:source_cat)
-
 get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
-
-
-get_row(r::Relation,k::Dict) = begin
-    key_order = get_key_datanames(r)
-    numkeys = length(key_order)
-    if Set(keys(k)) != Set(key_order)
-        throw(error("Incorrect key column names supplied: $(keys(k)) != $key_order"))
-    end
-    test_keys = keys(k)
-    test_vals = values(k)
-    for row in r
-        test = get_key(row)
-        if all(x->test[x]==k[key_order[x]],1:numkeys)
-            return row
-        end
-    end
-    return missing
-end
 
 Base.iterate(c::CifCategory) = begin
     r,s = iterate(1:length(c))
@@ -263,13 +181,23 @@ current_row(c::CatPacket) = begin
     return getfield(c,:id)-1
 end
 
-"""
-
-"""
 get_value(row::CatPacket,name) = begin
     rownum = getfield(row,:id)
     c = get_category(row)
     c[name][rownum]
+end
+
+# Relation interface.
+get_value(row::CatPacket,name::String) = begin
+    rownum = getfield(row,:id)
+    d = get_category(row)
+    lookup = get_value(d,rownum,name)
+    # println("Got $lookup for pos $id of $name")
+    # The table holds the actual key value for key columns only
+    if name in get_key_datanames(d)
+        return lookup
+    end
+    return get_raw_value(d,name,lookup)
 end
 
 """
@@ -281,64 +209,11 @@ data name column.
 get_data(c::CifCategory,mapname) = throw(error("Not implemented"))
 get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
-"""
-A LegacyCategory is missing keys, so very little can be done
-for it until the keys are generated somehow. We store the
-data names that are available.
-"""
-struct LegacyCategory <: CifCategory
-    name::String
-    column_names::Array{Symbol,1}
-    rawdata
-    data_ptr::DataFrame
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
-end
-
-"""
-DDLm classifies relations into Set categories,
-and Loop categories.
-"""
-abstract type DDLmCategory <: CifCategory end
-    
-"""
-A SetCategory has a single row and no keys, which means
-that access via key values is impossible, but unambiguous
-values are available
-"""
-struct SetCategory <: DDLmCategory
-    name::String
-    column_names::Array{Symbol,1}
-    rawdata
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
-end
-
-DataSource(SetCategory) = IsDataSource()
-
-"""
-A LoopCategory is a DDLmCategory with keys
-"""
-struct LoopCategory <: CifCategory
-    name::String
-    column_names::Array{Symbol,1}
-    keys::Array{Symbol,1}
-    rawdata
-    data_ptr::DataFrame
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
-end
-
 Base.show(io::IO,d::LoopCategory) = begin
     show(io,"LoopCategory $(d.name) ")
     show(io,d.data_ptr)
 end
 
-    
-DataSource(LoopCategory) = IsDataSource()
 
 """
 Construct a category from a data source and a dictionary. Type and alias information
@@ -524,18 +399,6 @@ get_value(d::LoopCategory,colname::String) = begin
     return [get_value(d,n,colname) for n in 1:length(d)]
 end
                
-# Relation interface.
-get_value(row::CatPacket,name::String) = begin
-    rownum = getfield(row,:id)
-    d = get_category(row)
-    lookup = get_value(d,rownum,name)
-    # println("Got $lookup for pos $id of $name")
-    # The table holds the actual key value for key columns only
-    if name in get_key_datanames(d)
-        return lookup
-    end
-    return get_raw_value(d,name,lookup)
-end
 
 get_raw_value(c::LoopCategory,obj::Symbol,lookup::Int) = begin
     name = c.object_to_name[obj]
@@ -568,6 +431,43 @@ get_link_names(d::LoopCategory) = d.linked_names
 get_dictionary(d::LoopCategory) = d.dictionary
 
 Base.keys(d::LoopCategory) = names(d.data_ptr)
+
+SetCategory(catname::String,data,cifdic::Cifdic) = begin
+    #
+    # Absorb dictionary information
+    # 
+    object_names = [lowercase(a) for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
+    data_names = lowercase.([cifdic[a]["_definition.id"][1] for a in object_names])
+    internal_object_names = Symbol.(lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names]))
+    name_to_object = Dict(zip(data_names,internal_object_names))
+    object_to_name = Dict(zip(internal_object_names,data_names))
+
+    # Use unique as aliases might have produced multiple occurrences
+    
+    present = unique(filter(k-> haskey(data,k),data_names))
+    present = map(x->name_to_object[x],present)
+    SetCategory(catname,internal_object_names,data,present,
+                            name_to_object,object_to_name,cifdic)
+end
+
+get_dictionary(s::SetCategory) = s.dictionary
+get_name(s::SetCategory) = s.name
+get_object_names(s::SetCategory) = s.present
+Base.keys(s::SetCategory) = s.present
+
+get_value(s::SetCategory,i::Int,name::Symbol) = begin
+    if i != 1
+        throw(error("Attempt to access row $i of a 1-row Set Category"))
+    end
+    access_name = s.object_to_name[name]
+    return s.rawdata[access_name]
+end
+
+Base.getindex(s::SetCategory,name::Symbol) = begin
+    return s.rawdata[s.object_to_name[name]]
+end
+
+Base.length(s::SetCategory) = 1
 
 LegacyCategory(catname::String,data,cifdic::Cifdic) = begin
     #

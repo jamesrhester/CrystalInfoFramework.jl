@@ -120,17 +120,17 @@ end
 ==#
 @testset "Test construction of a CifCategory" begin
     cdic,data = prepare_sources()
-    atom_cat = DDLmCategory("atom_site",data,cdic)
+    atom_cat = LoopCategory("atom_site",data,cdic)
     @test get_key_datanames(atom_cat) == [:label]
     # Test getting a particular value
     mypacket = CatPacket(3,atom_cat)
-    @test get_value(mypacket,"_atom_site.fract_x") == ".2789(8)"
+    @test get_value(mypacket,:fract_x) == ".2789(8)"
     # Test relation interface
-    @test get_value(atom_cat,Dict(:label=>"o2"),"_atom_site.fract_z") == ".2290(11)"
+    @test get_value(atom_cat,Dict(:label=>"o2"),:fract_z) == ".2290(11)"
     # Test missing data
-    empty_cat = DDLmCategory("diffrn_orient_refln",data,cdic)
+    empty_cat = LoopCategory("diffrn_orient_refln",data,cdic)
     # Test set category
-    set_cat = DDLmCategory("cell",data,cdic)
+    set_cat = SetCategory("cell",data,cdic)
     @test set_cat[:volume][] == "635.3(11)"
     # Test getting a key value
     @test atom_cat["o2"].fract_z == ".2290(11)"
@@ -138,7 +138,7 @@ end
 
 @testset "Test behaviour of plain CatPackets" begin
     cdic,data  = prepare_sources()
-    atom_cat = DDLmCategory("atom_site",data,cdic)
+    atom_cat = LoopCategory("atom_site",data,cdic)
     for one_pack in atom_cat
         @test !ismissing(one_pack.fract_x)
         if one_pack.label == "o2"
@@ -152,7 +152,7 @@ end
     ddata = TypedDataSource(data,cdic)
     my_rc = RelationalContainer(ddata,cdic)
     # loops
-    @test length(my_rc["atom_type"][:atomic_mass]) == 3
+    @test length(get_category(my_rc,"atom_type")[:atomic_mass]) == 3
     # sets
-    @test my_rc["cell"][:volume][] == 635.3
+    @test get_category(my_rc,"cell")[:volume][] == 635.3
 end

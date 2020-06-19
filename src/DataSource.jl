@@ -12,35 +12,7 @@ from single arrays to multiple arrays.
 """
 
 export get_assoc_value, get_all_associated_values
-export DataSource,MultiDataSource, TypedDataSource
-export IsDataSource
 export get_julia_type_name,convert_to_julia,get_dimensions
-export CaselessString
-
-"""
-## Data Source
-
-Ultimately a DataSource holds values that are associated
-with other values. This association is by location, not
-intrinsic to the value itself.
-
-A DataSource returns ordered arrays of information when
-supplied with a data name. It additionally returns the
-corresponding values of other data names when supplied
-with an index.  This correspondence is opportunistic,
-and does not need to be meaningful.
-
-A DataSource may contain encapsulated DataSources.
-
-We implement DataSources as traits to allow them to be
-grafted onto other file formats.
-
-"""
-abstract type DataSource end
-struct IsDataSource <: DataSource end
-struct IsNotDataSource <: DataSource end
-
-DataSource(::Type) = IsNotDataSource()
 
 """
 Return the value of `other_name` for position `index` of the array returned
@@ -82,32 +54,7 @@ get_all_associated_values(::IsDataSource,ds,name::String,other_name::String) = b
     return [get_assoc_value(ds,name,i,other_name) for i in 1:total]
 end
 
-"""
-Multiple data sources are also data sources. This trait can be applied to preexisting
-data storage formats, and then logic here will be used to handle creation of
-associations between data names in component data sources.
-
-The multi-data-source is conceived as a container holding data sources.
-
-Value associations within siblings are preserved. Therefore it is not
-possible in general to match indices in arrays in order to obtain
-corresponding values, as some siblings may have no values for a data
-name that has them in another sibling.
-
-Scenarios:
-1. 3 siblings, empty parent, one sibling contains many singleton values
--> all singleton values are associated with values in the remaining blocks
-1. As above, siblings contain differing singleton values for a data name
--> association will be with anything having the same number of values, and
-with values within each sibling block
-1. As above, one sibling contains an association between data names, another
-has only one of the data names and so no association
--> The parent retains the association in the sibling that has it
-1. Siblings and a contentful parent: parent is just another data block
-"""
-struct MultiDataSource{T} <: DataSource
-    wrapped::T
-end
+# == MultiDataSource methods == 
 
 make_data_source(x::MultiDataSource) = x
 
@@ -283,16 +230,7 @@ iterate_blocks(c::NativeCif,s) = begin
     return make_data_source(get_contents(c)[nxt]),(blocks,new_s)
 end
 
-#==
-
-A data source with an associated dictionary processes types and aliases.
-
-==#
-
-struct TypedDataSource <: DataSource
-    data
-    dict::abstract_cif_dictionary
-end
+# == TypedDataSource ==#
 
 get_dictionary(t::TypedDataSource) = t.dict
 get_datasource(t::TypedDataSource) = t.data
@@ -502,12 +440,7 @@ Range(v::String) = begin
     parse(Number,lower),parse(Number,upper)
 end
 
-#== This type of string compares as a caseless string
-Most other operations are left undefined for now ==#
-
-struct CaselessString <: AbstractString
-    actual_string::String
-end
+# == CaselessString == #
 
 Base.:(==)(a::CaselessString,b::AbstractString) = begin
     lowercase(a.actual_string) == lowercase(b)
