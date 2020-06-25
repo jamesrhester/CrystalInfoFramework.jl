@@ -175,8 +175,12 @@ order in which items appear is not guaranteed
 """
 get_value(c::CifCategory,n::Int,colname::Symbol) = error("Define get_value for $(typeof(c))")
 
-# Support dREL legacy. Current row in dREL actually
-# numbers from zero
+"""
+current_row(c::CatPacket)
+ 
+Support dREL legacy. Current row in dREL actually
+numbers from zero
+"""
 current_row(c::CatPacket) = begin
     return getfield(c,:id)-1
 end
@@ -191,13 +195,7 @@ end
 get_value(row::CatPacket,name::String) = begin
     rownum = getfield(row,:id)
     d = get_category(row)
-    lookup = get_value(d,rownum,name)
-    # println("Got $lookup for pos $id of $name")
-    # The table holds the actual key value for key columns only
-    if name in get_key_datanames(d)
-        return lookup
-    end
-    return get_raw_value(d,name,lookup)
+    return get_value(d,rownum,name)
 end
 
 """
@@ -210,8 +208,9 @@ get_data(c::CifCategory,mapname) = throw(error("Not implemented"))
 get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
 Base.show(io::IO,d::LoopCategory) = begin
-    show(io,"LoopCategory $(d.name) ")
-    show(io,d.data_ptr)
+    print(io,"LoopCategory $(d.name) ")
+    print(io,"Length $(length(d))")
+    print(io,"Columns $(d.column_names)")
 end
 
 
@@ -235,27 +234,29 @@ LoopCategory(catname::String,data,cifdic::Cifdic) = begin
     
     have_vals = unique(filter(k-> haskey(data,k) && !(k in key_names),data_names))
 
-    # Make the data frame
-    data_ptr = DataFrame()
     println("For $catname datasource has names $have_vals")
-    key_list = generate_keys(data,cifdic,key_names,have_vals)
-    if !isempty(key_list)
-        key_cols = zip(key_list...)
-        for (n,c) in zip(key_names,key_cols)
-            println("Setting $n to $c")
-            data_ptr[!,name_to_object[n]] = [c...]
-        end
-    end
-
-    for n in have_vals
-        println("Setting $n")
-        data_ptr[!,name_to_object[n]] = [generate_index(data,cifdic,key_list,key_names,n)...]
-    end
     #
     # Keys are provided as symbols referring to column names
     #
+    #
+    # Coherency check: all associated keys should have the same length
+    #
+    all_lengths = unique(length(data[k]) for k in have_vals)
+    if length(all_lengths)> 1
+        error("Inconsistent columns for $catname: $all_lengths")
+    end
+    if length(have_vals) > 0
+        keylengths = unique(length.(get_all_associated_indices(data,have_vals[1],k) for k in key_names))
+        if length(keylengths) > 1
+            error("Inconsistent key lengths for $catname: $keylengths")
+        end
+        if keylengths[] != all_lengths[]
+            error("For $catname key length $keylengths does not match value length: $all_lengths")
+        end
+    end
     key_names = [name_to_object[k] for k in key_names]
-    LoopCategory(catname,internal_object_names,key_names,data,data_ptr,
+
+    LoopCategory(catname,internal_object_names,key_names,data,
                             name_to_object,object_to_name,cifdic)
 
 end
@@ -275,18 +276,16 @@ LoopCategory(l::LegacyCategory,k) = begin
         throw(error("Can only convert LegacyCategory to LoopCategory if single key, given $keyname"))
     end
     keyname = l.name_to_object[keyname[1]]
-    l.data_ptr[!,keyname] = k
     LoopCategory(l.name,
                  l.column_names,
                  [keyname],
                  l.rawdata,
-                 l.data_ptr,
                  l.name_to_object,
                  l.object_to_name,
                  l.dictionary)
 end
 
-Base.length(d::LoopCategory) = size(d.data_ptr,1)
+Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]]])
 
 """
 Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
@@ -296,48 +295,6 @@ to the end arbitrarily
 Base.isless(x::Nothing,y) = false
 Base.isless(x,y::Nothing) = true
 Base.isless(x::Nothing,y::Nothing) = false
-
-generate_keys(data,c::Cifdic,key_names,non_key_names) = begin
-    if isempty(key_names) return [] end
-    val_list = []
-    for nk in non_key_names
-        append!(val_list,zip([get_assoc_with_key_aliases(data,c,nk,k) for k in key_names]...))
-        sort!(val_list)
-        unique!(val_list)
-    end
-    return val_list   #is sorted
-end
-
-"""
-Given a list of keys, find which position in the `non_key_name` list corresponds to
-each key.
-"""
-generate_index(data, c::Cifdic,key_vals,key_names, non_key_name) = begin
-    if isempty(key_names) return [1] end
-    map_list = collect(zip((get_assoc_with_key_aliases(data,c,non_key_name,k) for k in key_names)...))
-    # Map_list is a list of non-key positions -> key position. We want the opposite.
-    # println("List of associations is $map_list")
-    data_to_key = indexin(map_list,key_vals)
-    # println("Key positions for data items: $data_to_key")
-    key_to_data = indexin(collect(1:length(key_vals)),data_to_key)
-    return key_to_data
-end
-
-"""
-This allows seamless presentation of parent-child categories as a single
-category if necessary. Make sure empty category is handled.
-"""
-get_assoc_with_key_aliases(data,c::Cifdic,name,key_name) = begin
-    while !haskey(data,key_name) && key_name != nothing
-        println("Looking for $key_name")
-        key_name = get(c[key_name],"_name.linked_item_id",[nothing])[]
-    end
-    if isnothing(key_name)
-        if haskey(data,name) return missing end
-        return []    #the data name is missing
-    end
-    return get_all_associated_values(data,name,key_name)
-end
 
 # DataSource interface
 
@@ -364,12 +321,9 @@ end
 # other values for row and key based indexing.
 
 Base.getindex(d::LoopCategory,name::Symbol) = begin
-    if !(name in names(d.data_ptr)) throw(KeyError(name)) end
-    if name in get_key_datanames(d)
-        return d.data_ptr[!,name]
-    end
+    if !(name in d.column_names) throw(KeyError(name)) end
     aka = d.object_to_name[name]
-    return map(x->d.rawdata[aka][x],d.data_ptr[!,name])
+    return d.rawdata[aka]
 end
 
 # If a single value is provided we turn it into a keyed access as long as
@@ -385,12 +339,12 @@ get_by_key_val(d::LoopCategory,x::Union{SubString,String,Array{Any},Number}) = b
 end
 
 get_value(d::LoopCategory,n::Int,colname::Symbol) = begin
-    return d.data_ptr[n,colname]
+    aka = d.object_to_name[colname]
+    return get_value(d,n,aka)
 end
 
 get_value(d::LoopCategory,n::Int,colname::String) = begin
-    obj_col = Symbol(d.name_to_object[colname])
-    return get_value(d,n,obj_col)
+    return d.rawdata[colname][n]
 end
 
 # If we are given only a column name, we have to put all
@@ -399,20 +353,10 @@ get_value(d::LoopCategory,colname::String) = begin
     return [get_value(d,n,colname) for n in 1:length(d)]
 end
                
-
-get_raw_value(c::LoopCategory,obj::Symbol,lookup::Int) = begin
-    name = c.object_to_name[obj]
-    c.rawdata[name][lookup]
-end
-
 get_value(row::CatPacket,name::Symbol) = begin
     d = get_category(row)
     rownum = getfield(row,:id)
-    lookup = get_value(d,rownum,name)
-    if name in get_key_datanames(d)
-        return lookup
-    end
-    return get_raw_value(d,name,lookup)
+    return get_value(d,rownum,name)
 end
 
 """
@@ -425,12 +369,12 @@ get_key(row::CatPacket) = begin
     return [get_value(d,rownum,c) for c in colnames]
 end
 
-get_object_names(d::LoopCategory) = d.data_ptr.names
+get_object_names(d::LoopCategory) = d.column_names
 get_key_datanames(d::LoopCategory) = d.keys
 get_link_names(d::LoopCategory) = d.linked_names
 get_dictionary(d::LoopCategory) = d.dictionary
 
-Base.keys(d::LoopCategory) = names(d.data_ptr)
+Base.keys(d::LoopCategory) = get_object_names(d)
 
 SetCategory(catname::String,data,cifdic::Cifdic) = begin
     #
@@ -484,24 +428,16 @@ LegacyCategory(catname::String,data,cifdic::Cifdic) = begin
     
     have_vals = unique(filter(k-> haskey(data,k),data_names))
 
-    # Make the data frame
-    data_ptr = DataFrame()
     println("For $catname datasource has names $have_vals")
 
-    # The data_ptr column are ascending integers in all cases
-    dpvals = collect(1:length(data[have_vals[1]]))
-    for n in have_vals
-        data_ptr[!,name_to_object[n]] = dpvals
-    end
-
-    LegacyCategory(catname,internal_object_names,data,data_ptr,
+    LegacyCategory(catname,internal_object_names,data,
                             name_to_object,object_to_name,cifdic)
 end
 
-Base.length(l::LegacyCategory) = size(l.data_ptr,1)
+Base.length(l::LegacyCategory) = length(l[l.column_names[1]])
 
 get_dictionary(l::LegacyCategory) = l.dictionary
 
 get_name(l::LegacyCategory) = l.name
 
-Base.keys(l::LegacyCategory) = names(l.data_ptr)
+Base.keys(l::LegacyCategory) = l.column_names

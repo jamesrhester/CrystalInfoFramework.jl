@@ -25,7 +25,16 @@ prepare_sources() = begin
     return (cdic,data)
 end
 
-#==
+@testset "Test simple dict as DataSource" begin
+    testdic = Dict("a"=>[1,2,3],"b"=>[4,5,6],"c"=>[0],"d"=>[11,12])
+    @test get_assoc_index(testdic,"b",3,"a") == 3
+    @test get_all_associated_indices(testdic,"b","a") == [1,2,3]
+    @test get_all_associated_indices(testdic,"b","c") == [1,1,1]
+    @test get_assoc_value(testdic,"b",3,"a") == 3
+    @test collect(get_all_associated_values(testdic,"b","a")) == [1,2,3]
+    @test collect(get_all_associated_values(testdic,"b","c")) == [0,0,0]
+end
+
 @testset "Test CIF block as DataSource" begin
 
     # Within loop
@@ -45,7 +54,7 @@ end
     # Get all values
     @test begin
         b = prepare_files()
-        q = get_all_associated_values(b,"_atom_type.number_in_cell","_atom_type.symbol")
+        q = collect(get_all_associated_values(b,"_atom_type.number_in_cell","_atom_type.symbol"))
         println("Test 3: $q")
         q == ["O","C","H"]
     end
@@ -53,7 +62,7 @@ end
     # And if its a constant...
     @test begin
         b = prepare_files()
-        q = get_all_associated_values(b,"_atom_type_scat.source","_chemical_formula.sum")
+        q = collect(get_all_associated_values(b,"_atom_type_scat.source","_chemical_formula.sum"))
         q == fill("C7 H6 O3",3)
     end
     
@@ -77,19 +86,34 @@ end
         defblock["_item.mandatory_code"][1] == b["_item.mandatory_code"][6]
     end
 
+    @test begin
+        b = prepare_blocks()
+        ai = get_all_associated_indices(b,"_item.category_id","_item_type.code")
+        ac = b["_item.category_id"]
+        length(ai) == length(ac)
+    end
+    
     @test begin            #same save frame, no loop
         b = prepare_blocks()
-        r = get_assoc_value(b,"_item.category_id",4,"_item_type.code")
+        #r = get_assoc_value(b,"_item.category_id",4,"_item_type.code")
         # now we have to check!
         mb = first(b.wrapped).second
         s = get_assoc_value(b,"_item.category_id",4,"_item.name")
         println("Testing definition $s")
         defblock = mb.save_frames[s]
-        defblock["_item_type.code"][1] == r
+        ai = get_all_associated_indices(b,"_item.category_id","_item_type.code")
+        an = get_all_associated_indices(b,"_item.category_id","_item.name")
+        ac = b["_item.category_id"]
+        at = b["_item_type.code"]
+        names = b["_item.name"]
+        println("$(at[ai[4]])")
+        println("$(names[an[4]])")
+        println("$(defblock)")
+        at[ai[4]] == defblock["_item_type.code"][1] 
     end
 end
 
-
+#==
 @testset "Test auxiliary functions" begin
     cdic,data = prepare_sources()
     g = generate_keys(data,cdic,["_atom_site.label"],["_atom_site.fract_x"])
@@ -116,6 +140,10 @@ end
     @test q == "C"
     q = get_assoc_value(t,"_atom_type.atomic_mass",2,"_cell_volume")
     @test q == 635.3
+    q = get_all_associated_indices(t,"_atom_site.fract_x","_atom_site.label")
+    @test length(q) == length(t["_atom_site.fract_x"])
+    q = get_all_associated_indices(t,"_atom_site_fract_x","_atom_site_label")
+    @test length(q) == length(t["_atom_site_fract_x"]) #aliases
 end
 ==#
 @testset "Test construction of a CifCategory" begin
@@ -124,7 +152,7 @@ end
     @test get_key_datanames(atom_cat) == [:label]
     # Test getting a particular value
     mypacket = CatPacket(3,atom_cat)
-    @test get_value(mypacket,:fract_x) == ".2789(8)"
+    @test get_value(mypacket,:fract_x) == ".2501(5)"
     # Test relation interface
     @test get_value(atom_cat,Dict(:label=>"o2"),:fract_z) == ".2290(11)"
     # Test missing data
@@ -156,3 +184,4 @@ end
     # sets
     @test get_category(my_rc,"cell")[:volume][] == 635.3
 end
+==#

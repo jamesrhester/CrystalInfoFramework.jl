@@ -11,48 +11,59 @@ associations from multiple arrays to single arrays, and
 from single arrays to multiple arrays.
 """
 
+export get_assoc_index, get_all_associated_indices
 export get_assoc_value, get_all_associated_values
 export get_julia_type_name,convert_to_julia,get_dimensions
 
 """
-Return the value of `other_name` for position `index` of the array returned
+Return the index into `other_name` for position `index` of the array returned
 for `name`, which is mapped from `other_name`. If there is no such mapping, error.  
 """
-get_assoc_value(x,n,i,o) = get_assoc_value(DataSource(x),x,n,i,o)
-get_assoc_value(::IsNotDataSource,x,n,i,o) = error("$(typeof(x)) is not a DataSource")
+get_assoc_index(x,n,i,o) = get_assoc_index(DataSource(x),x,n,i,o)
+get_assoc_index(::IsNotDataSource,x,n,i,o) = error("$(typeof(x)) is not a DataSource")
+get_assoc_index(::IsDataSource,x,n,i,o) = begin
+    if !haskey(x,n) return missing end
+    name_len = length(x[n])
+    if !haskey(x,o) return missing end
+    other_len = length(x[o])
+    if name_len == other_len return i end
+    if other_len == 1 return 1 end
+    return missing
+end
 
+get_assoc_value(x,n,i,o) = get_assoc_value(DataSource(x),x,n,i,o)
+get_assoc_value(::IsDataSource,x,n,i,o) = x[o][get_assoc_index(IsDataSource(),x,n,i,o)]
 
 """
 Get all values of `o` associated with `n` such that the ith entry of `n`
 corresponds to the ith entry of `o`.
 """
-get_all_associated_values(x,n,o) = get_all_associated_values(DataSource(x),x,n,o)
+get_all_associated_indices(x,n,o) = get_all_associated_indices(DataSource(x),x,n,o)
 
 """
-For simplicity we do not try to overload Dict methods as some of the types
-that we are grafting onto may themselves use these methods to access data.
-The following are dictionary methods with `ds` prepended.
+Default method: return all associated values of `other_name` assuming that like
+indices match, or that a single value of `other_name` will be associated with 
+all values of `name`.
 """
-ds_get(x,n,default) = begin
-    try
-        return ds_getindex(x,n)
-    catch KeyError
-        return default
-    end
+get_all_associated_indices(::IsDataSource,ds,name::String,other_name::String) = begin
+    if !haskey(ds,name) return [] end
+    name_len = length(ds[name])
+    if !haskey(ds,other_name) return fill(missing,name_len) end
+    other_len = length(ds[other_name])
+    if name_len == other_len return 1:other_len end
+    if other_len == 1 return fill(1,name_len) end
+    return []
 end
 
-ds_getindex(x,n) = ds_getindex(DataSource(x),x,n)
+get_all_associated_values(x,n,o) =
+    (get_assoc_value(x,n,i,o) for i in get_all_associated_indices(x,n,o))
 
-ds_length(x,n) = ds_length(DataSource(x),x,n)
+# == Dict methods == #
 
 """
-Convenience function: return all associated values of `other_name`. Should
-be reimplemented for efficiency.
+A dictionary is a data source, assuming all elements are the same length
 """
-get_all_associated_values(::IsDataSource,ds,name::String,other_name::String) = begin
-    total = length(ds[name])
-    return [get_assoc_value(ds,name,i,other_name) for i in 1:total]
-end
+DataSource(::AbstractDict) = IsDataSource()
 
 # == MultiDataSource methods == 
 
@@ -125,41 +136,50 @@ Base.haskey(x::MultiDataSource,k) = begin
 end
 
         
-get_assoc_value(x::MultiDataSource,name,index,other_name) = begin
+get_assoc_index(x::MultiDataSource,name,index,other_name) = begin
     if length(x[other_name]) == 1
-        return x[other_name][1]
+        return 1
     end
-    cnt = 0
+    cnt = 0     #index in name
+    o_cnt = 0   #index in other one
     for d in x
         #println("Looking for assoc value in $(typeof(d))")
         #println("Which is what iterating over $(typeof(x)) gives us")
-        if !haskey(d,name) || !haskey(d,other_name) continue end
-        new_len = length(d[name])
-        if cnt+new_len < index
-            cnt+= new_len
-            continue
+        if !haskey(d,name) && !haskey(d,other_name) continue end
+        if haskey(d,name)
+            new_len = length(d[name])
+            if cnt+new_len < index
+                cnt+= new_len
+                if haskey(d,other_name)
+                    o_cnt += length(d[other_name])
+                end
+                continue
+            else
+                nested_assoc = get_assoc_index(d,name,index-cnt,other_name)
+                return o_cnt + nested_assoc
+            end
         end
-        nested_assoc = get_assoc_value(d,name,index-cnt,other_name)
-        return nested_assoc
+        if cnt > index # gone past
+            break
+        end
     end
     return missing
 end
 
-get_all_associated_values(x::MultiDataSource,name,other_name) = begin
-    ds = x.wrapped
+get_all_associated_indices(x::MultiDataSource,name,other_name) = begin
     if length(x[other_name]) == 1
-        return fill(x[other_name][1],length(x[name]))
+        return fill(1,length(x[name]))
     end
     ret_list = []
+    o_cnt = 0
     for d in x
-        new_len = length(d[name])
-        println("Length: $new_len")
-        if new_len == length(d[other_name])
-            println("Appending values for $other_name")
-            append!(ret_list, d[other_name])
-        elseif length(d[other_name]) == 1
-            append!(ret_list,fill(d[other_name][1],length(d[name])))
-        else
+        if !haskey(d,name) && !haskey(d,other_name) continue end
+        if haskey(d,name) && haskey(d,other_name)
+            append!(ret_list, o_cnt .+ get_all_associated_indices(d,name,other_name))
+            o_cnt += length(d[other_name])
+        elseif haskey(d,other_name)
+            o_cnt += length(d[other_name])
+        elseif haskey(d,name)
             append!(ret_list,fill(missing,length(d[name])))
         end
     end
@@ -170,15 +190,6 @@ end
 A Cif NativeBlock is a data source. It implements the dictionary interface.
 """
 DataSource(::NativeBlock) = IsDataSource()
-
-get_assoc_value(x::NativeBlock,name,index,other) = begin
-    if !haskey(x,name) return missing end
-    if !haskey(x,other) return missing end
-    #println("Looking for entry $index of $name which has length $(length(x[name]))")
-    if index > length(x[name]) throw(BoundsError) end
-    if length(x[other]) == 1 return x[other][1] end
-    if length(x[name]) == length(x[other]) return x[other][index] end 
-end
 
 """
 To use anything but NativeBlocks as DataSources we must make them into
@@ -306,22 +317,37 @@ Base.keys(t::TypedDataSource) = begin
     return unique!([translate_alias(dict,n) for n in dnames])
 end
 
-get_assoc_value(t::TypedDataSource,name,index,other_name) = begin
+"""
+get_assoc_index(t::TypedDataSource,name,index,other_name)
+
+Return the index of the value in `t[other_name]` corresponding to `name[i]`.
+If `other_name` has linked key values they will also be checked if `name` is missing.
+The intended use is for `other_name` to be a linked key data name.
+"""
+get_assoc_index(t::TypedDataSource,name,index,other_name) = begin
     # find the right names
     ds = get_datasource(t)
     dict = get_dictionary(t)
     raw_name = filter(x->haskey(ds,x),list_aliases(dict,name,include_self=true))
     raw_other = filter(x->haskey(ds,x),list_aliases(dict,other_name,include_self=true))
-    if length(raw_name) == 0 || length(raw_other)==0 return missing end
+    if length(raw_other) == 0
+        # try for linked names now
+        raw_other = nothing
+        while !haskey(ds,raw_other) && raw_other != nothing
+            raw_other = get(dict[raw_other],"_name.linked_item_id",[nothing])[]
+        end
+        if raw_other == nothing
+            return missing
+        end
+        raw_other = [raw_other]
+    end
     if length(raw_name) > 1 || length(raw_other) > 1
         throw(error("More than one value for $name, $other_name: $raw_name, $raw_other"))
     end
-    raw = get_assoc_value(ds,raw_name[1],index,raw_other[1])
-    if ismissing(raw) return missing end
-    return convert_to_julia(dict,other_name,[raw])[]
+    return get_assoc_index(ds,raw_name[1],index,raw_other[1])
 end
 
-get_all_associated_values(t::TypedDataSource,name,other_name) = begin
+get_all_associated_indices(t::TypedDataSource,name,other_name) = begin
     # find the right names
     ds = get_datasource(t)
     dict = get_dictionary(t)
@@ -332,8 +358,7 @@ get_all_associated_values(t::TypedDataSource,name,other_name) = begin
         throw(error("More than one value for $name, $other_name: $raw_name, $raw_other"))
     end
     println("Getting all linked values for $(raw_name[]) -> $(raw_other[]))")
-    untyped = get_all_associated_values(ds,raw_name[],raw_other[])
-    return convert_to_julia(dict,other_name,untyped)
+    return get_all_associated_indices(ds,raw_name[],raw_other[])
 end
 
 #==
@@ -479,6 +504,7 @@ Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
     KeyError("$key not found")
 end
 
+Base.haskey(d::Dict{CaselessString,Any},key) = haskey(d,lowercase(key)) 
 #
 #== End of Data Sources ==#
 
