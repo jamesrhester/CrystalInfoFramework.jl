@@ -25,6 +25,7 @@ prepare_sources() = begin
     return (cdic,data)
 end
 
+#==
 @testset "Test simple dict as DataSource" begin
     testdic = Dict("a"=>[1,2,3],"b"=>[4,5,6],"c"=>[0],"d"=>[11,12])
     @test get_assoc_index(testdic,"b",3,"a") == 3
@@ -113,7 +114,6 @@ end
     end
 end
 
-#==
 @testset "Test auxiliary functions" begin
     cdic,data = prepare_sources()
     g = generate_keys(data,cdic,["_atom_site.label"],["_atom_site.fract_x"])
@@ -184,4 +184,3 @@ end
     # sets
     @test get_category(my_rc,"cell")[:volume][] == 635.3
 end
-==#

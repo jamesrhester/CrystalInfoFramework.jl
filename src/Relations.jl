@@ -1,6 +1,6 @@
 export generate_index,generate_keys
 export get_key_datanames,get_value, get_all_datanames, get_name, current_row
-export get_category,has_category,first_packet
+export get_category,has_category,first_packet, construct_category, get_data
 
 get_key(row::Row) = begin
     kd = get_key_datanames(get_category(row))
@@ -50,65 +50,60 @@ end
 
 Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 
-# == Relational Containers == #
+# == General Relational Containers == #
 
-RelationalContainer(d,dict::abstract_cif_dictionary) = RelationalContainer(DataSource(d),d,dict)
+"""
+get_category(r::RelationalContainer,s::String)
 
-RelationalContainer(d::DataSource, dict::abstract_cif_dictionary) = RelationalContainer(IsDataSource(),d,dict)
+Return a DDLmCategory described by `s` constructed from the contents of `r`
+"""
+get_category(r::AbstractRelationalContainer,one_cat::String) = construct_category(r,one_cat)
 
-RelationalContainer(::IsDataSource,d,dict::abstract_cif_dictionary) = begin
-    all_maps = Array[]
-    # Construct relations
-    relation_dict = Dict{String,Relation}()
-    all_dnames = Set(lowercase.(keys(d)))
-    for one_cat in get_categories(dict)
-        println("Processing $one_cat")
-        cat_type = get(dict[one_cat],"_definition.class",["Datum"])[]
-        if cat_type == "Set"
-            all_names = lowercase.(get_names_in_cat(dict,one_cat))
-            if any(n -> n in all_names, all_dnames)
-                println("* Adding Set category $one_cat to container")
-                relation_dict[one_cat] = SetCategory(one_cat,d,dict)
-            end
-        elseif cat_type == "Loop"
-            all_names = get_keys_for_cat(dict,one_cat)
-            if all(k -> k in all_dnames,all_names)
-                println("* Adding $one_cat to relational container")
-                relation_dict[one_cat] = LoopCategory(one_cat,d,dict)
-            elseif any(n->n in all_dnames,get_names_in_cat(dict,one_cat))
-                # A legacy loop category which is missing keys
-                println("* Adding legacy category $one_cat to container")
-                relation_dict[one_cat] = LegacyCategory(one_cat,d,dict)
-            end
+has_category(r::AbstractRelationalContainer,one_cat::String) = begin
+    dict = get_dictionary(r)
+    if any(n-> haskey(get_data(r),n),get_names_in_cat(dict,one_cat))
+        return true
+    end
+    return false
+end
+
+construct_category(r::AbstractRelationalContainer,one_cat::String) = begin
+    dict = get_dictionary(r)
+    cat_type = get(dict[one_cat],"_definition.class",["Datum"])[]
+    if cat_type == "Set" return SetCategory(one_cat,r,dict) end
+    if cat_type == "Loop"
+        all_names = get_keys_for_cat(dict,one_cat)
+        if all(k -> haskey(get_data(r),k), all_names)
+            println("$one_cat is in relation")
+            return LoopCategory(one_cat,r,dict)
         end
-        # Construct mappings
-        all_maps = get_mappings(dict,one_cat)
     end
-    RelationalContainer(relation_dict,all_maps,get_all_datanames(relation_dict))
-end
-
-Base.keys(r::RelationalContainer) = keys(r.dataname_to_cat)
-Base.haskey(r::RelationalContainer,k) = k in keys(r)
-Base.getindex(r::RelationalContainer,s) = begin
-    cat = r.dataname_to_cat[s]
-    get_value(r.relations[cat],s)
-end
-
-get_all_datanames(r) = begin
-    namelist = Dict{String,String}()
-    for one_r in values(r)
-        merge!(namelist,Dict([(one_r.object_to_name[k]=>get_name(one_r)) for k in keys(one_r)]))
+    if any(n-> haskey(get_data(r),n),get_names_in_cat(dict,one_cat))
+        # A legacy loop category which is missing keys
+        println("Legacy category $one_cat is present in relation")
+        return LegacyCategory(one_cat,r,dict)
     end
-    return namelist
+    return missing
 end
 
-get_category(r::RelationalContainer,s::String) = r.relations[s]
-has_category(r::RelationalContainer,s::String) = haskey(r.relations,s)
+Base.keys(r::AbstractRelationalContainer) = keys(get_data(r))
+Base.haskey(r::AbstractRelationalContainer,k) = k in keys(r)
+Base.getindex(r::AbstractRelationalContainer,s) = begin
+    get_data(r)[s]
+end
+
+get_dictionary(r::RelationalContainer) = r.cifdic
+get_data(r::RelationalContainer) = r.rawdata
+
+get_all_datanames(r) = keys(r)
+
+
+#== Relational Containers ==#
 
 Base.show(io::IO,r::RelationalContainer) = begin
-    show(io,r.relations)
-    show(io,r.mappings)
+    println(io,"Relational container with data")
 end
+
 
 # == CifCategory == #
 
@@ -185,7 +180,7 @@ current_row(c::CatPacket) = begin
     return getfield(c,:id)-1
 end
 
-get_value(row::CatPacket,name) = begin
+get_value(row::CatPacket,name::Symbol) = begin
     rownum = getfield(row,:id)
     c = get_category(row)
     c[name][rownum]
@@ -207,10 +202,16 @@ data name column.
 get_data(c::CifCategory,mapname) = throw(error("Not implemented"))
 get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
-Base.show(io::IO,d::LoopCategory) = begin
-    print(io,"LoopCategory $(d.name) ")
+Base.show(io::IO,d::CifCategory) = begin
+    print(io,"Category $(get_name(d)) ")
     print(io,"Length $(length(d))")
-    print(io,"Columns $(d.column_names)")
+    df = DataFrame()
+    for n in keys(d)
+        if haskey(d,n)
+            df[!,n] = d[n]
+        end
+    end
+    show(io,df)
 end
 
 
@@ -229,7 +230,6 @@ LoopCategory(catname::String,data,cifdic::Cifdic) = begin
     object_to_name = Dict(zip(internal_object_names,data_names))
     key_names = get_keys_for_cat(cifdic,catname)
     
-    # The leaf values that will go into the data frame
     # Use unique as aliases might have produced multiple occurrences
     
     have_vals = unique(filter(k-> haskey(data,k) && !(k in key_names),data_names))
@@ -286,7 +286,8 @@ LoopCategory(l::LegacyCategory,k) = begin
 end
 
 Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]]])
-
+Base.haskey(d::LoopCategory,n::Symbol) = haskey(d.rawdata,d.object_to_name[n])
+Base.haskey(d::LoopCategory,n::String) = haskey(d.rawdata,n)
 """
 Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
 to the end arbitrarily
@@ -351,12 +352,6 @@ end
 # of the values in
 get_value(d::LoopCategory,colname::String) = begin
     return [get_value(d,n,colname) for n in 1:length(d)]
-end
-               
-get_value(row::CatPacket,name::Symbol) = begin
-    d = get_category(row)
-    rownum = getfield(row,:id)
-    return get_value(d,rownum,name)
 end
 
 """
@@ -432,6 +427,15 @@ LegacyCategory(catname::String,data,cifdic::Cifdic) = begin
 
     LegacyCategory(catname,internal_object_names,data,
                             name_to_object,object_to_name,cifdic)
+end
+
+# Getindex by symbol is the only way to get at a column. We reserve
+# other values for row and key based indexing.
+
+Base.getindex(l::LegacyCategory,name::Symbol) = begin
+    if !(name in l.column_names) throw(KeyError(name)) end
+    aka = l.object_to_name[name]
+    return l.rawdata[aka]
 end
 
 Base.length(l::LegacyCategory) = length(l[l.column_names[1]])
