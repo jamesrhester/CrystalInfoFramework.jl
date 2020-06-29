@@ -1,5 +1,6 @@
 # Enough support for DDL2 dictionaries to allow them to be used
 # for category construction
+export DDL2_Dictionary
 
 struct DDL2_Dictionary <: abstract_cif_dictionary
     block::FullBlock
@@ -15,12 +16,14 @@ DDL2_Dictionary(c::NativeCif) = begin
     return DDL2_Dictionary(first(c).second)
 end
 
+DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(NativeCif(a,verbose=verbose))
+
 """
 
 This DDL2 dictionary type does not handle multiple items defined
 in a single block
 """
-DDL2_Dictionary(base_b::FullBlock) = begin
+DDL2_Dictionary(b::FullBlock) = begin
     # create the definition names
     defs = get_frames(b)
     bnames = collect(keys(defs))
@@ -30,11 +33,13 @@ DDL2_Dictionary(base_b::FullBlock) = begin
     parent_dict = Dict()
     for k in bnames
         if haskey(defs[k],"_category.id")
-            match_dict[defs[k]["_category.id"]][] = k
+            match_dict[defs[k]["_category.id"][]] = k
         elseif haskey(defs[k],"_item.name")
-            match_dict[defs[k]["_item.name"]][] = k
+            for one_name in defs[k]["_item.name"]
+                match_dict[one_name] = k
+            end
         else
-            throw(error("Def with no name: $k"))
+            println("FYI, def with no name: $k")
         end
     end
 
@@ -43,10 +48,13 @@ DDL2_Dictionary(base_b::FullBlock) = begin
     merge!(match_dict,extra_aliases)
 
     # now the information for cat/obj lookup
+    # remembering the possibility of multiple defs in one
     for k in bnames
         if haskey(defs[k],"_item.category_id")
-            obj_id = lowercase(split(defs[k]["_item.name"][],".")[end])
-            cat_obj_dict[(defs[k]["_item.category_id"],obj_id)] = k
+            for (cat,name) in zip(defs[k]["_item.category_id"],defs[k]["_item.name"])
+                obj_id = lowercase(split(name,".")[end])
+                cat_obj_dict[(cat,obj_id)] = k
+            end
         end
     end
     return DDL2_Dictionary(b,match_dict,cat_obj_dict,Dict())
@@ -62,7 +70,9 @@ end
 
 find_category(d::DDL2_Dictionary,dataname) = begin
     block = d[dataname]
-    lowercase(get(block,"_item.category_id",[""])[])
+    pos = indexin([dataname],get(block,"_item.name",[]))[]
+    all_cats = get(block,"_item.category_id",[""])
+    if length(all_cats) >= pos all_cats[pos] else "" end
 end
 
 find_object(d::DDL2_Dictionary,dataname) = begin
