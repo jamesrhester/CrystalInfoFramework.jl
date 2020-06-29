@@ -5,15 +5,18 @@ export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias, is_alia
 export cif_block_with_dict, abstract_cif_dictionary,cif_container_with_dict
 export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
 export get_typed_datablock
+export translate_alias,list_aliases
+export find_object
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
+export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
 export get_func,set_func!,has_func
 export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
-export CaselessString
+export get_default
 
 abstract type abstract_cif_dictionary end
 
@@ -91,6 +94,7 @@ Cifdic(base_b::FullBlock) = begin
         # create all aliases
         extra_aliases = generate_aliases(defs)
         merge!(match_dict,extra_aliases)
+
         # now the information for cat/obj lookup
         defblocks = [(defs[k]["_name.category_id"][1],defs[k]["_name.object_id"][1],k) for k in bnames if "_name.category_id" in keys(defs[k]) && "_name.object_id" in keys(defs[k])]
         merge!(cat_obj_dict, Dict((lowercase.((s[1],s[2])),s[3]) for s in defblocks))
@@ -144,19 +148,26 @@ Base.iterate(c::Cifdic,s) = begin
 end
 
 # Create an alias dictionary: b is actually the save frame collection
-generate_aliases(b::NativeCif) = begin
+generate_aliases(b::NativeCif;alias_att = "_alias.definition_id") = begin
     start_dict = Dict()
     for def in keys(b)
-        if "_alias.definition_id" in keys(b[def])
-            alias_names = lowercase.(b[def]["_alias.definition_id"])
+        if alias_att in keys(b[def])
+            alias_names = lowercase.(b[def][alias_att])
             map(a->setindex!(start_dict,def,a),alias_names)
         end
     end
     return start_dict
 end
 
-list_aliases(b::Cifdic,n) = begin
-    return get(b[n],"_alias.definition_id",[])
+list_aliases(b::Cifdic,n;include_self=false) = begin
+    starter = []
+    if include_self push!(starter,b[n]["_definition.id"][]) end
+    return append!(starter, get(b[n],"_alias.definition_id",[]))
+end
+
+# Return the canonical name of `n`
+translate_alias(b::Cifdic,n) = begin
+    return b[n]["_definition.id"][]
 end
 
 """
@@ -182,22 +193,45 @@ end
 
 find_category(c::Cifdic,dataname::String) = begin
     block = c[dataname]
-    catname = block["_name.category_id"][1]
+    catname = lowercase(block["_name.category_id"][1])
 end
 
-get_categories(c::abstract_cif_dictionary) = begin
+find_object(c::Cifdic,dataname::String) = begin
+    block = c[dataname]
+    objname = lowercase(block["_name.object_id"][1])
+end
+
+get_categories(c::Cifdic) = begin
     cats = [x for x in keys(c) if get(c[x],"_definition.scope",["Item"])[]=="Category"]
     lowercase.([c[x]["_definition.id"][] for x in cats])
 end
 
-get_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
-    names = [n for n in keys(c) if lowercase(get(c[n],"_name.category_id",[""])[1]) == lowercase(cat)]
+get_names_in_cat(c::abstract_cif_dictionary,cat::String;aliases=false) = begin
+    names = [n for n in keys(c) if find_category(c,n) == lowercase(cat)]
+    if aliases
+        alias_srch = copy(names)
+        for n in alias_srch
+            append!(names,list_aliases(c,n))
+        end
+    end
     return names
 end
 
-get_keys_for_cat(c::abstract_cif_dictionary,cat::String) = begin
-    keys = c[cat]["_category_key.name"]
-    return keys
+get_objs_in_cat(c::abstract_cif_dictionary,cat::String) = begin
+    names = get_names_in_cat(c,cat)
+    [find_object(c,n) for n in names]
+end
+
+get_keys_for_cat(c::Cifdic,cat::String;aliases=false) = begin
+    loop_keys = get(c[cat],"_category_key.name",[])
+    key_aliases = []
+    if aliases
+        for k in loop_keys
+            append!(key_aliases,list_aliases(c,k))
+        end
+    end
+    append!(key_aliases,loop_keys)
+    return key_aliases
 end
 
 get_linked_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
@@ -491,282 +525,4 @@ resolve_full_imports!(c::NativeCif,imp_blocks) = begin
     return c
 end
 
-#== ===========================================
-
-Adding dictionary information to a data block. Dictionary
-information is used statically (types and default
-values) and dynamically (derivation).
-
-===========================================  ==#
-
-abstract type cif_container_with_dict <: cif_container{Any} end
-
-abstract type cif_with_dict end   #TODO: find a spot in the type tree
-
-#== Should always define the following methods
-==#
-get_dictionary(c::cif_container_with_dict) = begin
-    error("get_dictionary not defined for concrete class!")
-end
-
-get_datablock(c::cif_container_with_dict) = begin
-    error("get_datablock not defined for concrete class!")
-end
-
-struct cif_block_with_dict{V <: cif_container} <: cif_container_with_dict
-    data::V
-    dictionary::Cifdic
-end
-
-assign_dictionary(c::cif_container,d::Cifdic) = cif_block_with_dict(c,d)
-get_dictionary(c::cif_block_with_dict) = c.dictionary
-get_datablock(c::cif_block_with_dict) = c.data
-get_loop_names(c::cif_block_with_dict) = get_loop_names(c.data)
-
-Base.show(io::IO,c::cif_block_with_dict) = show(io,c.data)
-
-"""
-get_typed_datablock(c)
-
-Return a data block that is aware of typing information, but will not
-attempt to derive missing values.
-"""
-get_typed_datablock(c::cif_block_with_dict) = c
-
-
-Base.getindex(c::cif_container_with_dict,s::String) = begin
-    # go through all aliases
-    root_def = get_dictionary(c)[s]  #will find definition
-    true_name = root_def["_definition.id"][1]
-    as_string = missing
-    try
-        as_string = get_datablock(c)[true_name]
-    catch KeyError
-        println("Couldn't find $true_name")
-        for a in get(root_def,"_alias.definition_id",[true_name])
-            try
-                as_string = get_datablock(c)[a]
-                break
-            catch KeyError
-                println("And couldn't find $a")
-            end
-        end
-        if ismissing(as_string)   #no joy
-            backup = get_default(get_dictionary(c),s)
-            if !ismissing(backup)
-                as_string = backup
-            else
-                println("Can't find $s")
-                throw(Base.KeyError(s))
-            end
-        end
-    end
-    actual_type = get_julia_type(get_dictionary(c),s,as_string)
-end
-
-Base.get(c::cif_container_with_dict,s::String,default) = begin
-    try
-        c[s]
-    catch KeyError
-        return default
-    end
-end
-
-
-Base.iterate(c::cif_container_with_dict) = iterate(get_datablock(c))
-Base.iterate(c::cif_container_with_dict,s) = iterate(get_datablock(c),s)
-
-Base.haskey(c::cif_container_with_dict,s::String) = begin
-    actual_data = get_datablock(c)
-    # go through all aliases
-    ref_dic = get_dictionary(c)
-    if !(haskey(ref_dic,s)) #no alias information
-        return haskey(actual_data,s)
-    end
-    root_def = ref_dic[s]  #will find definition
-    if haskey(actual_data,root_def["_definition.id"][1])
-        return true
-    end
-    for a in get(root_def,"_alias.definition_id",[])
-        if haskey(actual_data,a) return true end
-    end
-    return false
-end
-
-# As a dictionary is available, we return the loop that
-# would contain the name, even if it is absent
-
-get_loop(b::cif_container_with_dict,s::String) = begin
-    dict = get_dictionary(b)
-    raw_data = get_typed_datablock(b)  #
-    category = dict[s]["_name.category_id"]
-    all_names = [n for n in keys(dict) if get(dict[n],"_name.category_id",nothing) == category]
-    #println("All names in category of $s: $all_names")
-    loop_names = [l for l in all_names if l in keys(raw_data)]
-    if length(loop_names) == 0
-        println("WARNING: Non-existent loop requested, category of $s")
-    end
-    println("All names present in datafile: $loop_names")
-    # Construct a data frame using Dictionary knowledge
-    df = DataFrame()
-    for n in loop_names
-        println("$n")
-        obj_name = dict[n]["_name.object_id"][1]
-        df[!,Symbol(lowercase(obj_name))] = raw_data[n]
-    end
-    return df
-end
-
-# Anything not defined in the dictionary is invisible
-Base.keys(c::cif_container_with_dict) = begin
-    true_keys = lowercase.(collect(keys(get_datablock(c))))
-    dnames = [d for d in keys(get_dictionary(c)) if lowercase(d) in true_keys]
-    return dnames
-end
-#==
-The dREL type machinery. Defined that take a string
-as input and return an object of the appropriate type
-==#
-
-#== Type annotation ==#
-const type_mapping = Dict( "Text" => String,        
-                           "Code" => Symbol("CaselessString"),                                                
-                           "Name" => String,        
-                           "Tag"  => String,         
-                           "Uri"  => String,         
-                           "Date" => String,  #change later        
-                           "DateTime" => String,     
-                           "Version" => String,     
-                           "Dimension" => Integer,   
-                           "Range"  => String, #TODO       
-                           "Count"  => Integer,    
-                           "Index"  => Integer,       
-                           "Integer" => Integer,     
-                           "Real" =>    Float64,        
-                           "Imag" =>    Complex,  #really?        
-                           "Complex" => Complex,     
-                           # Symop       
-                           # Implied     
-                           # ByReference
-                           "Array" => Array,
-                           "Matrix" => Array,
-                           "List" => Array{Any}
-                           )
-
-get_julia_type_name(cdic,cat::String,obj::String) = begin
-    definition = get_by_cat_obj(cdic,(cat,obj))
-    base_type = definition["_type.contents"][1]
-    cont_type = get(definition,"_type.container",["Single"])[1]
-    jl_base_type = type_mapping[base_type]
-    return jl_base_type,cont_type
-end
-
-"""Convert to the julia type for a given category, object and String value.
-This is clearly insufficient as it only handles one level of arrays.
-
-The value is assumed to be an array containing string values of the particular 
-dataname, which is as usually returned by the CIF readers, even for single values.
-"""
-get_julia_type(cdic,cat,obj,value) = begin
-    julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
-    change_func = (x->x)
-    # println("Julia type for $base_type is $julia_base_type, converting $value")
-    if julia_base_type == Integer
-        change_func = (x -> map(y->parse(Int,y),x))
-    elseif julia_base_type == Float64
-        change_func = (x -> map(y->real_from_meas(y),x))
-    elseif julia_base_type == Complex
-        change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
-    elseif julia_base_type == String
-        change_func = (x -> map(y->String(y),x))
-    elseif julia_base_type == Symbol("CaselessString")
-        change_func = (x -> map(y->CaselessString(y),x))
-    end
-    if cont_type == "Single"
-        return change_func(value)
-    elseif cont_type in ["Array","Matrix"]
-        return map(change_func,value)
-    else error("Unsupported container type $cont_type")   #we can do nothing
-    end
-end
-
-get_julia_type(cdic,dataname::String,value) = begin
-    definition = cdic[dataname]
-    return get_julia_type(cdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
-end
-
-# return dimensions as an Array. Note that we do not handle
-# asterisks, I think they are no longer allowed?
-# The first dimension in Julia is number of rows, then number
-# of columns. This is the opposite to dREL
-
-get_dimensions(cdic,cat,obj) = begin
-    definition = get_by_cat_obj(cdic,(cat,obj))
-    dims = get(definition,"_type.dimension",["[]"])[1]
-    final = eval(Meta.parse(dims))
-    if length(final) > 1
-        t = final[1]
-        final[1] = final[2]
-        final[2] = t
-    end
-    return final
-end
-    
-real_from_meas(value::String) = begin
-    println("Getting real value from $value")
-    if '(' in value
-        println("NB $(value[1:findfirst(isequal('('),value)])")
-        return parse(Float64,value[1:findfirst(isequal('('),value)-1])
-    end
-    return parse(Float64,value)
-end
-
-Range(v::String) = begin
-    lower,upper = split(v,":")
-    parse(Number,lower),parse(Number,upper)
-end
-
-#== This type of string compares as a caseless string
-Most other operations are left undefined for now ==#
-
-struct CaselessString <: AbstractString
-    actual_string::String
-end
-
-Base.:(==)(a::CaselessString,b::AbstractString) = begin
-    lowercase(a.actual_string) == lowercase(b)
-end
-
-Base.:(==)(a::AbstractString,b::CaselessString) = begin
-    lowercase(a) == lowercase(b.actual_string)
-end
-
-Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
-
-#== the following don't work, for now we have explicit types 
-Base.:(==)(a::AbstractString,b::SubString{T} where {T}) = a == T(b)
-
-Base.:(==)(a::SubString{T} where {T},b::AbstractString) = T(a) == b
-==#
-
-Base.:(==)(a::SubString{CaselessString},b::AbstractString) = CaselessString(a) == b
-Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = CaselessString(b) == a
-Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = a == CaselessString(b)
-
-Base.iterate(c::CaselessString) = iterate(c.actual_string)
-Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
-Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
-Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
-Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
-
-#== A caseless string should match both upper and lower case
-==#
-Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
-    for (k,v) in d
-        if lowercase(k) == lowercase(key)
-            return v
-        end
-    end
-    KeyError("$key not found")
-end
 

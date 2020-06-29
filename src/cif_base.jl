@@ -10,7 +10,7 @@ held in a loop with a single row.
 
 export CifValue,NativeCif,NativeBlock
 export cif_container, nested_cif_container
-export get_save_frame,get_frames
+export get_save_frame,get_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
 
@@ -107,6 +107,7 @@ Base.show(io::IO,c::NativeCif) = begin
     end
 end
 
+get_contents(n::NativeCif) = n.contents
 get_source_file(n::NativeCif) = n.original_file
 
 """
