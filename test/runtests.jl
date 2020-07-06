@@ -25,7 +25,7 @@ prepare_sources() = begin
     return (cdic,data)
 end
 
-#==
+
 @testset "Test simple dict as DataSource" begin
     testdic = Dict("a"=>[1,2,3],"b"=>[4,5,6],"c"=>[0],"d"=>[11,12])
     @test get_assoc_index(testdic,"b",3,"a") == 3
@@ -36,6 +36,7 @@ end
     @test collect(get_all_associated_values(testdic,"b","c")) == [0,0,0]
 end
 
+#==
 @testset "Test CIF block as DataSource" begin
 
     # Within loop
@@ -114,20 +115,6 @@ end
     end
 end
 
-@testset "Test auxiliary functions" begin
-    cdic,data = prepare_sources()
-    g = generate_keys(data,cdic,["_atom_site.label"],["_atom_site.fract_x"])
-    println("keys are $g")
-    @test ("c3",) in g
-
-    i = generate_index(data,cdic,g,["_atom_site.label"],"_atom_site.fract_x")
-    all_fracts = data["_atom_site.fract_x"]
-    c3_index = indexin([("c3",)],g)[1]
-    println("Index into data is $i")
-    println("c3_index is $c3_index")
-    @test all_fracts[i[c3_index]] == ".2789(8)"
-end
-
 @testset "Test TypedDataSources" begin
     cdic,data = prepare_sources()
     t = TypedDataSource(data,cdic)
@@ -184,3 +171,5 @@ end
     # sets
     @test get_category(my_rc,"cell")[:volume][] == 635.3
 end
+
+include("namespaces.jl")

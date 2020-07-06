@@ -245,6 +245,7 @@ end
 
 get_dictionary(t::TypedDataSource) = t.dict
 get_datasource(t::TypedDataSource) = t.data
+get_namespace(t::TypedDataSource) = get_dic_namespace(get_dictionary(t))
 
 """
 getindex(t::TypedDataSource,s::String)
@@ -252,19 +253,19 @@ getindex(t::TypedDataSource,s::String)
 The correctly-typed value for dataname `s` in `t` is returned, including
 searching for dataname aliases and providing a default value if defined.
 """
-Base.getindex(t::TypedDataSource,s::String) = begin
+Base.getindex(t::TypedDataSource,s::AbstractString) = begin
     # go through all aliases
     refdict = get_dictionary(t)
     ds = get_datasource(t)
     root_def = refdict[s]  #will find definition
-    true_name = root_def["_definition.id"][1]
+    true_name = find_name(refdict,s)
     raw_val = missing
     try
         raw_val = ds[true_name]
     catch KeyError
         println("Couldn't find $true_name")
-        aliases = list_aliases(refdict,s)
-        for a in get(root_def,"_alias.definition_id",[true_name])
+        aliases = list_aliases(refdict,s;include_self=true)
+        for a in aliases
             try
                 raw_val = ds[a]
                 break
@@ -285,7 +286,7 @@ Base.getindex(t::TypedDataSource,s::String) = begin
     actual_type = convert_to_julia(refdict,s,raw_val)
 end
 
-Base.get(t::TypedDataSource,s::String,default) = begin
+Base.get(t::TypedDataSource,s::AbstractString,default) = begin
     try
         t[s]
     catch KeyError
@@ -297,7 +298,7 @@ end
 Base.iterate(t::TypedDataSource) = iterate(get_datasource(t))
 Base.iterate(t::TypedDataSource,s) = iterate(get_datasource(t),s)
 
-Base.haskey(t::TypedDataSource,s::String) = begin
+Base.haskey(t::TypedDataSource,s::AbstractString) = begin
     actual_data = get_datasource(t)
     # go through all aliases
     ref_dic = get_dictionary(t)
@@ -334,7 +335,7 @@ get_assoc_index(t::TypedDataSource,name,index,other_name) = begin
         # try for linked names now
         raw_other = nothing
         while !haskey(ds,raw_other) && raw_other != nothing
-            raw_other = get(dict[raw_other],"_name.linked_item_id",[nothing])[]
+            raw_other = get_parent_name(dict,raw_other)
         end
         if raw_other == nothing
             return missing
@@ -391,12 +392,17 @@ const type_mapping = Dict( "Text" => String,
                            "List" => Array{Any}
                            )
 
-get_julia_type_name(cdic,cat::String,obj::String) = begin
+get_julia_type_name(cdic::Cifdic,cat::String,obj::String) = begin
     definition = get_by_cat_obj(cdic,(cat,obj))
     base_type = definition["_type.contents"][1]
     cont_type = get(definition,"_type.container",["Single"])[1]
     julia_base_type = type_mapping[base_type]
     return julia_base_type,cont_type
+end
+
+get_julia_type_name(cdic::DDL2_Dictionary,cat::String,obj::String) = begin
+    # only strings...
+    return String,"Single"
 end
 
 """Convert to the julia type for a given category, object and String value.
@@ -429,9 +435,8 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     end
 end
 
-convert_to_julia(cdic,dataname::String,value) = begin
-    definition = cdic[dataname]
-    return convert_to_julia(cdic,definition["_name.category_id"][1],definition["_name.object_id"][1],value)
+convert_to_julia(cdic,dataname::AbstractString,value) = begin
+    return convert_to_julia(cdic,find_category(cdic,dataname),find_object(cdic,dataname),value)
 end
 
 # return dimensions as an Array. Note that we do not handle

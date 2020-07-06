@@ -52,51 +52,123 @@ Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 
 # == General Relational Containers == #
 
+#==
+
+A relational container may contain data covered by more than one
+dictionary. However, any given data source may only be described
+by a single dictionary. We store these together and disambiguate
+them using namespaces.
+
+==#
+
+RelationalContainer(data,dict::abstract_cif_dictionary) = RelationalContainer(Dict(""=>data),Dict(""=>dict))
+
+RelationalContainer(data) = begin
+    dict = get_dictionary(data)
+    nspace = get_dic_namespace(dict)
+    RelationalContainer(nspace=>data,nspace=>dict)
+end
+
+RelationalContainer(data::Array) = begin
+    dics = get_dictionary.(data)
+    names = get_dic_namespace.(dics)
+    RelationalContainer(Dict(zip(names,data)),Dict(zip(names,dics)))
+end
+
 """
 get_category(r::RelationalContainer,s::String)
 
 Return a DDLmCategory described by `s` constructed from the contents of `r`
 """
-get_category(r::AbstractRelationalContainer,one_cat::String) = construct_category(r,one_cat)
+get_category(r::AbstractRelationalContainer,one_cat::String,nspace::String) = construct_category(r,one_cat,nspace)
 
-has_category(r::AbstractRelationalContainer,one_cat::String) = begin
-    dict = get_dictionary(r)
+get_category(r::AbstractRelationalContainer,one_cat::String) = begin
+    if occursin('‡', one_cat) nspace,realcat = split(one_cat,'‡')
+    else
+        nspace,realcat = "",one_cat
+    end
+    get_category(r,one_cat,nspace)
+end
+
+has_category(r::AbstractRelationalContainer,one_cat::String,nspace) = begin
+    dict = get_dictionary(r,nspace)
     if any(n-> haskey(get_data(r),n),get_names_in_cat(dict,one_cat))
         return true
     end
     return false
 end
 
+has_category(r::AbstractRelationalContainer,one_cat::String) = begin
+    if occursin('‡', one_cat) nspace,realcat = split(one_cat,'‡')
+    else
+        nspace,realcat = "",one_cat
+    end
+    has_category(r,one_cat,nspace)
+end
+
 construct_category(r::AbstractRelationalContainer,one_cat::String) = begin
-    dict = get_dictionary(r)
-    cat_type = get(dict[one_cat],"_definition.class",["Datum"])[]
-    if cat_type == "Set" return SetCategory(one_cat,r,dict) end
+    if occursin('‡', one_cat) nspace,realcat = split(one_cat,'‡')
+    else
+        nspace,realcat = "",one_cat
+    end
+    construct_category(r,one_cat,nspace)
+end
+
+construct_category(r::AbstractRelationalContainer,one_cat::String,nspace) = begin
+    dict = get_dictionary(r,nspace)
+    cat_type = get_cat_class(dict,one_cat)
+    if cat_type == "Set" return SetCategory(one_cat,get_data(r,nspace),dict) end
     if cat_type == "Loop"
         all_names = get_keys_for_cat(dict,one_cat)
-        if all(k -> haskey(get_data(r),k), all_names)
+        if all(k -> haskey(get_data(r,nspace),k), all_names)
             println("$one_cat is in relation")
-            return LoopCategory(one_cat,r,dict)
+            return LoopCategory(one_cat,get_data(r,nspace),dict)
         end
     end
-    if any(n-> haskey(get_data(r),n),get_names_in_cat(dict,one_cat))
+    if any(n-> haskey(get_data(r,nspace),n),get_names_in_cat(dict,one_cat))
         # A legacy loop category which is missing keys
         println("Legacy category $one_cat is present in relation")
-        return LegacyCategory(one_cat,r,dict)
+        return LegacyCategory(one_cat,r,dict,nspace)
     end
     return missing
 end
 
-Base.keys(r::AbstractRelationalContainer) = keys(get_data(r))
-Base.haskey(r::AbstractRelationalContainer,k) = k in keys(r)
-Base.getindex(r::AbstractRelationalContainer,s) = begin
-    get_data(r)[s]
+# getindex can only have one argument. So we allow the namespace
+# to be prepended using a character unlikely to be present in a
+# dataname: ‡ . We carry this through to the other Base methods.
+
+Base.keys(r::AbstractRelationalContainer) = begin
+    if length(r.rawdata) == 1
+        return keys(get_data(r))
+    else
+        return Iterators.flatten((
+            string.(n*"‡",keys(get_data(r,n))) for n in keys(r.rawdata)))
+    end
 end
 
-get_dictionary(r::RelationalContainer) = r.cifdic
-get_data(r::RelationalContainer) = r.rawdata
+Base.haskey(r::AbstractRelationalContainer,k) = k in keys(r)
+Base.getindex(r::AbstractRelationalContainer,s) = begin
+    parts = split(s,"‡")
+    if length(parts)>1
+        get_data(r,parts[1])[parts[2]]
+    else
+        get_data(r)[s]
+    end
+end
 
-get_all_datanames(r) = keys(r)
+"""
 
+If a dictionary is requested and only one is present, we need
+not specify the namespace, simply taking the first one
+"""
+get_dictionary(r::RelationalContainer) = first(r.cifdics).second
+get_dictionary(r::RelationalContainer,nspace::String) = r.cifdics[nspace]
+    
+get_data(r::RelationalContainer) = first(r.rawdata).second
+get_data(r::RelationalContainer,nspace::AbstractString) = r.rawdata[nspace]
+
+get_all_datanames(r::RelationalContainer) = keys(r)
+get_all_datanames(r::RelationalContainer,nspace::AbstractString) = keys(get_data(r,nspace))
 
 #== Relational Containers ==#
 
@@ -204,7 +276,7 @@ get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
 Base.show(io::IO,d::CifCategory) = begin
     print(io,"Category $(get_name(d)) ")
-    print(io,"Length $(length(d))")
+    print(io,"Length $(length(d))\n")
     df = DataFrame()
     for n in keys(d)
         if haskey(d,n)
@@ -219,15 +291,14 @@ end
 Construct a category from a data source and a dictionary. Type and alias information
 should be handled by the datasource.
 """
-LoopCategory(catname::String,data,cifdic::Cifdic) = begin
+LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     #
     # Absorb dictionary information
     # 
-    object_names = [lowercase(a) for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
-    data_names = lowercase.([cifdic[a]["_definition.id"][1] for a in object_names])
-    internal_object_names = Symbol.(lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names]))
+    data_names = get_names_in_cat(cifdic,catname)
+    internal_object_names = Symbol.(find_object(cifdic,a) for a in data_names)
     name_to_object = Dict(zip(data_names,internal_object_names))
-    object_to_name = Dict(zip(internal_object_names,data_names))
+    object_to_name = Dict(((i,find_name(cifdic,catname,String(i))) for i in internal_object_names))
     key_names = get_keys_for_cat(cifdic,catname)
     
     # Use unique as aliases might have produced multiple occurrences
@@ -261,11 +332,6 @@ LoopCategory(catname::String,data,cifdic::Cifdic) = begin
 
 end
 
-LoopCategory(catname,c::cif_container_with_dict) = LoopCategory(catname,get_datablock(c),get_dictionary(c))
-
-# Minimal initialiser
-LoopCategory(catname::String,cifdic::cif_container_with_dict) = LoopCategory(catname,Dict{String,Any}(),cifdic)
- 
 LoopCategory(catname::String,t::TypedDataSource) = LoopCategory(catname,get_datasource(t),get_dictionary(t))
 
 # A legacy category was missing key values, which are provided to make it into
