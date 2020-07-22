@@ -3,10 +3,10 @@
 
 export Cifdic,get_by_cat_obj,assign_dictionary,get_julia_type,get_alias, is_alias
 export cif_block_with_dict, abstract_cif_dictionary,cif_container_with_dict
-export get_dictionary,get_datablock,find_category,get_categories,get_set_categories
+export get_datablock,find_category,get_categories,get_set_categories
 export get_typed_datablock
 export translate_alias,list_aliases
-export find_object
+export find_object,find_name
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
 export get_objs_in_cat
@@ -17,6 +17,10 @@ export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
 export get_default
+export get_dic_name
+export get_cat_class
+export get_dic_namespace
+export is_category
 
 abstract type abstract_cif_dictionary end
 
@@ -44,6 +48,9 @@ an object in <c> (that is, "_c.q" is the dataname), then "p.q" refers
 to the same item as "c.q" in dREL methods. It is not the case that
 "_p.q" is a defined dataname.  The code here therefore implements only
 the methods needed to find parents and children. 
+
+Namespaces: data names in the dictionary may be assigned to a particular
+namespace.
 ==#
 
 struct Cifdic <: abstract_cif_dictionary
@@ -55,9 +62,10 @@ struct Cifdic <: abstract_cif_dictionary
     func_text::Dict{String,Expr} #unevaluated Julia code
     def_meths::Dict{Tuple,Function}
     def_meths_text::Dict{Tuple,Expr}
+    namespace::String
 end
 
-Cifdic(b,d,c,parents) = begin
+Cifdic(b,d,c,parents,nspace) = begin
     all_names = collect(keys(get_frames(b)))
     if !issubset(values(d),all_names)
         miss_vals = setdiff(values(d),all_names)
@@ -68,7 +76,7 @@ Cifdic(b,d,c,parents) = begin
         error("""Cifdic: supplied cat-obj lookup contains save frames that are
                        not present in the dictionary block""")
     end
-    Cifdic(b,d,c,parents,Dict(),Dict(),Dict(),Dict())
+    Cifdic(b,d,c,parents,Dict(),Dict(),Dict(),Dict(),nspace)
 end
 
 
@@ -80,6 +88,9 @@ Cifdic(c::NativeCif) = begin
 end
 
 Cifdic(base_b::FullBlock) = begin
+    # Namespace
+    nspace = get(base_b,"_dictionary.namespace",[""])[]
+
     # importation first as it changes the block contents
     b = resolve_imports!(base_b)
     # create the definition names
@@ -90,6 +101,7 @@ Cifdic(base_b::FullBlock) = begin
     cat_obj_dict = Dict()
     parent_dict = Dict()
     if b["_dictionary.class"][1] != "Template"
+
         merge!(match_dict, Dict(lowercase(defs[k]["_definition.id"][1]) => k for k in bnames))
         # create all aliases
         extra_aliases = generate_aliases(defs)
@@ -106,17 +118,17 @@ Cifdic(base_b::FullBlock) = begin
         merge!(match_dict, Dict(k=>k for k in bnames))
         merge!(match_dict, Dict(lowercase(k)=>k for k in bnames))
     end
-    return Cifdic(b,match_dict,cat_obj_dict,parent_dict)
+    return Cifdic(b,match_dict,cat_obj_dict,parent_dict,nspace)
 end
 
 Cifdic(a::String;verbose=false) = Cifdic(NativeCif(a,verbose=verbose))
 
 # The index in a dictionary is the _definition.id or an alias
-Base.getindex(cdic::Cifdic,definition::String) = begin
+Base.getindex(cdic::Cifdic,definition::AbstractString) = begin
     get_save_frame(cdic.block,cdic.definitions[lowercase(definition)])
 end
 
-Base.get(cdic::Cifdic,definition::String,default) = begin
+Base.get(cdic::Cifdic,definition::AbstractString,default) = begin
     try
         return cdic[definition]
     catch KeyError
@@ -128,7 +140,7 @@ Base.keys(cdic::Cifdic) = begin
     keys(cdic.definitions)    
 end
 
-Base.haskey(cdic::Cifdic,k::String) = begin
+Base.haskey(cdic::Cifdic,k::AbstractString) = begin
     haskey(cdic.definitions,k)
 end
 
@@ -146,6 +158,9 @@ Base.iterate(c::Cifdic,s) = begin
     end
     return c[popfirst!(s)],s
 end
+
+get_dic_name(c::Cifdic) = c.block["_dictionary.title"][]
+get_dic_namespace(c::Cifdic) = c.namespace
 
 # Create an alias dictionary: b is actually the save frame collection
 generate_aliases(b::NativeCif;alias_att = "_alias.definition_id") = begin
@@ -178,6 +193,8 @@ is_alias(c::Cifdic,d::String) = begin
     c[d]["_definition.id"][1] != d
 end
 
+is_category(c::Cifdic,d::String) = get(c[d],"_definition.scope",["Item"])[] == "Category"
+
 get_by_cat_obj(c::Cifdic,catobj::Tuple) = begin
     if get(c[catobj[1]],"_definition.class",["Set"])[1] == "Loop"
         children = get_child_categories(c,catobj[1])
@@ -191,14 +208,32 @@ get_by_cat_obj(c::Cifdic,catobj::Tuple) = begin
     get_save_frame(c.block,c.by_cat_obj[lowercase.(catobj)])
 end
 
-find_category(c::Cifdic,dataname::String) = begin
+find_category(c::Cifdic,dataname::AbstractString) = begin
     block = c[dataname]
     catname = lowercase(block["_name.category_id"][1])
 end
 
-find_object(c::Cifdic,dataname::String) = begin
+find_object(c::Cifdic,dataname::AbstractString) = begin
     block = c[dataname]
     objname = lowercase(block["_name.object_id"][1])
+end
+
+"""
+find_name(c::Cifdic,s) = begin
+
+Find the canonical name for `s` in `c`
+"""
+find_name(c::Cifdic,s) = begin
+    return c[s]["_definition.id"][]
+end
+
+"""
+find_name(c::Cifdic,cat,obj) = begin
+
+Find the canonical name for `cat.obj` in `c`
+"""
+find_name(c::Cifdic,cat,obj) = begin
+    get_by_cat_obj(c,(cat,obj))["_definition.id"][]
 end
 
 get_categories(c::Cifdic) = begin
@@ -206,7 +241,9 @@ get_categories(c::Cifdic) = begin
     lowercase.([c[x]["_definition.id"][] for x in cats])
 end
 
-get_names_in_cat(c::abstract_cif_dictionary,cat::String;aliases=false) = begin
+get_cat_class(c::Cifdic,catname) = get(c[catname],"_definition.class",["Datum"])[]
+
+get_names_in_cat(c::abstract_cif_dictionary,cat::AbstractString;aliases=false) = begin
     names = [n for n in keys(c) if find_category(c,n) == lowercase(cat)]
     if aliases
         alias_srch = copy(names)
@@ -217,12 +254,12 @@ get_names_in_cat(c::abstract_cif_dictionary,cat::String;aliases=false) = begin
     return names
 end
 
-get_objs_in_cat(c::abstract_cif_dictionary,cat::String) = begin
+get_objs_in_cat(c::abstract_cif_dictionary,cat::AbstractString) = begin
     names = get_names_in_cat(c,cat)
     [find_object(c,n) for n in names]
 end
 
-get_keys_for_cat(c::Cifdic,cat::String;aliases=false) = begin
+get_keys_for_cat(c::Cifdic,cat::AbstractString;aliases=false) = begin
     loop_keys = get(c[cat],"_category_key.name",[])
     key_aliases = []
     if aliases
@@ -234,10 +271,23 @@ get_keys_for_cat(c::Cifdic,cat::String;aliases=false) = begin
     return key_aliases
 end
 
-get_linked_names_in_cat(c::abstract_cif_dictionary,cat::String) = begin
+get_linked_names_in_cat(c::Cifdic,cat::AbstractString) = begin
     names = [n for n in get_names_in_cat(c,cat) if length(get(c[n],"_name.linked_item_id",[]))==1]
     names = [n for n in names if get(c[n],"_type.purpose",["Datum"])[1] != "SU"]
     return names
+end
+
+"""
+get_parent_name(c::Cifdic,name)
+
+Get any linked data name, return `nothing` if there
+are no links
+"""
+get_parent_name(c::Cifdic,name) = begin
+    poss = get(c[name],"_name.linked_item_id",[nothing])[]
+    if isnothing(poss) return nothing end
+    if get(c[name],"_type.purpose",["Datum"])[] != "SU" return poss end
+    return nothing
 end
 
 """
@@ -261,6 +311,7 @@ Return the names of all functions defined in the dictionary, together with the f
 """
 get_dict_funcs(dict::abstract_cif_dictionary) = begin
     func_cat = [a for a in keys(dict) if get(dict[a],"_definition.class",["Datum"])[1] == "Functions"]
+    func_catname = nothing
     if length(func_cat) > 0
         func_catname = lowercase(dict[func_cat[1]]["_name.object_id"][1])
         all_funcs = [a for a in keys(dict) if lowercase(dict[a]["_name.category_id"][1]) == func_catname]
@@ -282,7 +333,7 @@ end
     
 #== Get the object part of a single dataname that acts as a key
 ==#
-get_single_keyname(d::abstract_cif_dictionary,c::String) = begin
+get_single_keyname(d::abstract_cif_dictionary,c::AbstractString) = begin
     definition = d[c]
     cat_keys = get(definition,"_category_key.name",[])
     obj = missing
@@ -319,7 +370,7 @@ end
 Find the ultimately-linked dataname, if there is one. Protect against
 simple self-referential loops.
 """
-get_ultimate_link(d::abstract_cif_dictionary,dataname::String) = begin
+get_ultimate_link(d::abstract_cif_dictionary,dataname::AbstractString) = begin
     if haskey(d,dataname)
         #println("Searching for ultimate value of $dataname")
         if haskey(d[dataname],"_name.linked_item_id") &&
