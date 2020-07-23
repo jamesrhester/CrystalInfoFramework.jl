@@ -9,6 +9,6 @@ include("cif_errors.jl")
 include("libcifapi.jl")
 include("cif_base.jl")
 include("cif_dic.jl")
-include("ddl2_dictionary.jl")
+include("ddl2_dictionary_ng.jl")
 include("merge_dic.jl")
 end
