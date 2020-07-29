@@ -1,5 +1,5 @@
 # Testing dictionary functionality
-#==
+
 @testset "Testing dictionary access and construction" begin
     @test begin
         t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
@@ -23,7 +23,7 @@ end
     ud = prepare_system()
     @test String(ud["_atom_site_rotation.label"]["_name.linked_item_id"][1]) == "_atom_site.label"
 end
-==#
+
 @testset "DDL2 dictionaries" begin
     t = DDL2_Dictionary(joinpath(@__DIR__,"ddl_core_2.1.3.dic"))
     @test find_category(t,"_sub_category_examples.case") == "sub_category_examples"

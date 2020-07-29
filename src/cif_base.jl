@@ -164,17 +164,8 @@ Base.show(io::IO,c::cif_container) = begin
     
     # now go through the loops
     for one_loop in get_loop_names(c)
-        write(io,"\nloop_\n")
-        values = map(x -> getindex(c,x),one_loop)
-        for o in one_loop
-            write(io,"$o\n")
-        end
-        for value_pkt in zip(values...)
-            for one_val in value_pkt
-                write(io,"$(format_for_cif(one_val)) ")
-            end
-            write(io,"\n")
-        end
+        a_loop = get_loop(c,first(one_loop))
+        write(io,format_for_cif(a_loop))
     end
 end
 
@@ -184,25 +175,8 @@ Base.show(io::IO,b::nested_cif_container) = begin
     show(io,NativeBlock(b))
 end
 
-# Obviously not CIF conformant as doesn't deal with internal inverted commas
-format_for_cif(s::String) = "'$s'"
-
-format_for_cif(l::Array) = "[\n"* join(format_for_cif.(l)," ") * "\n]"
-
-format_for_cif(d::Dict) = begin
-    outstring = "{"
-    for k in keys(d)
-        outstring *= "$k:$(format_for_cif(d[k])) "
-    end
-    return outstring * "}"
-end
-
-format_for_cif(n::Nothing) = "."
-format_for_cif(n::Missing) = "?"
-format_for_cif(a) = "#Unknown type below \n$a"
-
 """
-    get_loop(b,s) -> DataFrame
+    `get_loop(b,s) -> DataFrame`
 
 Return the contents of the loop containing data name s in block
 b. If no data are available, a zero-length DataFrame is returned.
@@ -229,7 +203,7 @@ take the values provided in the dictionary.
 lookup_loop(b::cif_container,request::Dict{String,String}) = begin
     df = get_loop(b,first(request).first)
     for (k,v) in request
-        df = df[df[Symbol(k)] .== v,:]
+        df = df[df[!,Symbol(k)] .== v,:]
     end
     return df
 end

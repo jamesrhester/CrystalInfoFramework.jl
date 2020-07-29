@@ -35,7 +35,7 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
         # process unlooped
         unlooped = [x for x in keys(defs[k]) if !(x in Iterators.flatten(loops))]
         cats = unique([split(x,'.')[1][2:end] for x in unlooped])
-        println("Cats for $k: $cats")
+        #println("Cats for $k: $cats")
         for one_cat in cats
             dnames = filter(x-> split(x,'.')[1][2:end] == one_cat,unlooped)
             new_vals = (defs[k][x][] for x in dnames)
@@ -77,7 +77,7 @@ Base.getindex(d::DDL2_Dictionary,k::String) = begin
         cat = Symbol(find_category(d,one_child))
         if !haskey(d.block,cat) continue end
         obj = Symbol(find_object(d,one_child))
-        println("Filtering on $cat / $obj")
+        #println("Filtering on $cat / $obj")
         info_dict[cat] = d.block[cat][d.block[cat][!,obj] .== k,:]
         if nrow(info_dict[cat]) == 0 delete!(info_dict,cat) end
     end
@@ -102,9 +102,13 @@ get_keys_for_cat(d::DDL2_Dictionary,catname) = begin
     d[catname][:category_key][!,:name]
 end
 
-# Remember that a DDL2 save frame uses its name
 list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
-    d.block[name][:item_aliases][!,:alias_name]
+    if include_self result = [name] else result = [] end
+    alias_block = get(d[name],:item_aliases,nothing)
+    if !isnothing(alias_block)
+        append!(result, alias_block[!,:alias_name])
+    end
+    return result
 end
 
 # No aliases supported for this one
@@ -233,7 +237,7 @@ populate_implicits(all_tables) = begin
             target_name = objs[indexin([cat],cats)[]]
             if !(target_name in names(table))
                 rename!(table,(:__blockname=>target_name))
-                println("Added implicit value for $cat.$target_name")
+                #println("Added implicit value for $cat.$target_name")
             end
         end
     end
