@@ -2,26 +2,24 @@
 
 @testset "Testing dictionary access and construction" begin
     @test begin
-        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
+        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
         true
     end
     @test begin
-        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
-        String(t["_alias.deprecation_date"]["_type.source"][1]) == "Assigned"
-    end
-    @test begin
-        t = Cifdic(joinpath(@__DIR__,"ddl.dic"))
-        String(get_by_cat_obj(t,("Type","Contents"))["_definition.class"][1]) == "Attribute"
+        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+        String(t["_alias.deprecation_date"][:type][!,:source][]) == "Assigned"
     end
 end
 
 prepare_system() = begin
-    t = Cifdic(joinpath(@__DIR__,"cif_mag.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_mag.dic"))
 end
 
 @testset "Importation" begin
     ud = prepare_system()
-    @test String(ud["_atom_site_rotation.label"]["_name.linked_item_id"][1]) == "_atom_site.label"
+    @test String(ud["_atom_site_rotation.label"][:name][:linked_item_id][]) == "_atom_site.label"
+    # everything has a definition
+    @test nrow(parent(ud[:definition])[ismissing.(parent(ud[:definition]).id),:]) == 0
 end
 
 @testset "DDL2 dictionaries" begin

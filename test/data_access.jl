@@ -49,15 +49,15 @@ end
     # test loop lookup
     p = lookup_loop(b,Dict("_col2"=>"v3","_col3"=>"12.5(2)"))
     @test size(p,1) == 1
-    @test p[!,Symbol("_col1")][1] == "3"
+    @test p[!,"_col1"][1] == "3"
     # create a new loop
     create_loop!(b,["_col1","_single"])
     df = get_loop(b,"_col1")
-    @test Symbol("_single") in names(df)
-    @test !(Symbol("_col2") in names(df))
+    @test "_single" in names(df)
+    @test !("_col2" in names(df))
     add_to_loop!(b,"_col1","_col2")
     df = get_loop(b,"_col3")
-    @test !(Symbol("_col2") in names(df))
+    @test !("_col2" in names(df))
 end
 
 # Test lists

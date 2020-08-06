@@ -26,7 +26,8 @@ get_data_values(c::cif_container) = error("Implement `get_data_values` for $(typ
 """
 A basic type for input CIFS
 """
-CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
+const CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
+Base.nameof(CifValue) = Symbol("Cif Value")
 
 Base.length(c::cif_container) = length(keys(c))
 Base.keys(b::cif_container) = keys(get_data_values(b))

@@ -8,6 +8,6 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 URIParser = "30578b45-9adc-5946-b283-645ec420af67"
 
 [compat]
-julia = "1.2.0"
-DataFrames = "0.20.0"
-URIParser = "0.4.0"
+DataFrames = "^0.21.0"
+URIParser = "^0.4.0"
+julia = "^1.2.0"
