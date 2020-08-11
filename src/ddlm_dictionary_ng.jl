@@ -64,7 +64,7 @@ DDLm_Dictionary(b::FullBlock) = begin
     bnames = keys(defs)
     for k in bnames
         # process loops
-        defid = get(defs[k],"_definition.id",[k])[]
+        defid = lowercase(get(defs[k],"_definition.id",[k])[])
         loops = get_loop_names(defs[k])
         for one_loop in loops
             new_info = get_loop(defs[k],first(one_loop))
@@ -97,6 +97,10 @@ DDLm_Dictionary(b::FullBlock) = begin
     end
     # process imports - could we do this separately?
     resolve_imports!(all_dict_info,b.original_file)
+    # Apply default values if not a template dictionary
+    if all_dict_info[:dictionary][!,:class][] != "Template"
+        enter_defaults(all_dict_info)
+    end
     # group for efficiency
     gdf = Dict{Symbol,GroupedDataFrame}()
     for k in keys(all_dict_info)
@@ -106,17 +110,17 @@ DDLm_Dictionary(b::FullBlock) = begin
 end
 
 Base.keys(d::DDLm_Dictionary) = begin
-    native = unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block)))))
+    native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))
     extra = []
     if haskey(d.block,:alias)
-        extra = parent(d.block[:alias])[!,:definition_id]
+        extra = lowercase.(parent(d.block[:alias])[!,:definition_id])
     end
     return Iterators.flatten((native,extra))
 end
 
 #flatten(parent(d.block[:definition])[!,:id],parent(d.block[:alias])[!,:definition_id])
 
-Base.haskey(d::DDLm_Dictionary,k::String) = k in keys(d)
+Base.haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
 
 # Obtain all information about definition `k`
 Base.getindex(d::DDLm_Dictionary,k::String) = begin
@@ -125,8 +129,8 @@ Base.getindex(d::DDLm_Dictionary,k::String) = begin
 end
 
 # If a symbol is passed we access the block directly.
-Base.getindex(d::DDLm_Dictionary,k::Symbol) = getindex(d.block,k)
-Base.get(d::DDLm_Dictionary,k::Symbol,default) = get(d.block,k,default)
+Base.getindex(d::DDLm_Dictionary,k::Symbol) = parent(getindex(d.block,k)) #not a grouped data frame
+Base.get(d::DDLm_Dictionary,k::Symbol,default) = parent(get(d.block,k,default))
 
 """
 delete!(d::DDLm_Dictionary,k::String)
@@ -142,6 +146,7 @@ Base.delete!(d::DDLm_Dictionary,k::String) = begin
     end
 end
 
+# `k` is assumed to be already lower coase
 filter_on_name(d::Dict{Symbol,GroupedDataFrame},k) = begin
     info_dict = Dict{Symbol,DataFrame}()
     for cat in keys(d)
@@ -164,30 +169,31 @@ end
 
 get_dic_name(d::DDLm_Dictionary) = parent(d[:dictionary])[!,:title][]
 get_dic_namespace(d::DDLm_Dictionary) = begin
-    if :title in propertynames(parent(d[:dictionary]))
-        parent(d[:dictionary])[!,:title][]
+    if :namespace in propertynames(d[:dictionary])
+        d[:dictionary][!,:namespace][]
     else
         "ddlm"
     end
 end
 
 list_aliases(d::DDLm_Dictionary,name;include_self=false) = begin
-    if include_self result = [name] else result = [] end
+    result = d[name][:definition][:,:id]
     alias_block = get(d[name],:alias,nothing)
-    if !isnothing(alias_block)
+    if !isnothing(alias_block) && nrow(d[name][:alias]) > 0
         append!(result, alias_block[!,:definition_id])
     end
+    if !include_self filter!(!isequal(name),result) end
     return result
 end
 
 translate_alias(d::DDLm_Dictionary,name) = begin
     lname = lowercase(name)
     # A template etc. dictionary has no defs
-    if !haskey(d.block,:definition) return name end
-    if !(:id in names(d[:definition])) return name end
-    if lname in parent(d[:definition])[!,:id] return lname end
-    potentials = d[lname][!,:master_id]
-    if nrows(potentials) == 1 return potentials[] end
+    if !haskey(d.block,:definition) return lname end
+    if !(:id in propertynames(d[:definition])) return lname end
+    if lname in lowercase.(d[:definition][!,:id]) return lname end
+    potentials = d[:alias][lowercase.(d[:alias][!,:definition_id]) .== lname,:master_id]
+    if length(potentials) == 1 return potentials[] end
     KeyError(name)
 end
 
@@ -197,14 +203,14 @@ Find the canonical name for `name`.
 find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
 
 find_name(d::DDLm_Dictionary,cat,obj) = begin
-    parent(d[:name])[parent(d[:name])[:category_id] == cat && parent(d[:name])[:object_id]== obj,:master_id][]
+    d[:name][(d[:name][!,:category_id] .== cat) .& (d[:name][!,:object_id].== obj),:master_id][]
 end
 
 find_category(d::DDLm_Dictionary,dataname) = d[dataname][:name][!,:category_id][]
 find_object(d::DDLm_Dictionary,dataname) = d[dataname][:name][!,:object_id][]
 is_category(d::DDLm_Dictionary,name) = get(d[name][:definition],:scope,["Item"]) == "Category"
 get_categories(d::DDLm_Dictionary) = parent(d[:definition])[parent(d[:definition])[!,:scope] == "Category",:id]
-get_cat_class(d::DDLm_Dictionary,catname) = get(d[catname][:definition],:class,["Datum"])[]
+get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
 
 get_names_in_cat(d::DDLm_Dictionary,catname;aliases=false) = begin
     all_objs = get_objs_in_cat(d,catname)
@@ -218,10 +224,10 @@ get_names_in_cat(d::DDLm_Dictionary,catname;aliases=false) = begin
     return canonical_names
 end
 
-get_objs_in_cat(d::DDLm_Dictionary,cat) = d[:name][d[:name][:category_id]== catname,:object_id]
+get_objs_in_cat(d::DDLm_Dictionary,cat) = d[:name][d[:name][!,:category_id].== cat,:object_id]
 
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
-    loop_keys = d[:category_key][d[:category_key][:master_id == cat],:name]
+    loop_keys = d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name]
     key_aliases = []
     if aliases
         for k in loop_keys
@@ -526,7 +532,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
         import_table = one_row.get
         for one_entry in import_table
             import_def = missing
-            println("one import instruction: $one_entry")
+            #println("one import instruction: $one_entry")
     (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
@@ -557,8 +563,8 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             #println("Now merging $block into $(get(one_block,"_definition.id","?"))")
             definition = one_row.master_id
             prior_contents = filter_on_name(d,definition)
-            println("Already present for $definition:")
-            println("$prior_contents")
+            #println("Already present for $definition:")
+            #println("$prior_contents")
 
 #==
 Merging each category. There are two cases where the category
@@ -583,7 +589,7 @@ can simply be appended.
                 if nrow(import_def[k])==0 continue end
                 # drop old master id
                 # println("Dropping :master_id from $k")
-                println("Processing $k for $definition")
+                #println("Processing $k for $definition")
                 select!(import_def[k],Not(:master_id))
                 if haskey(prior_contents,k) && nrow(prior_contents[k]) > 0
                     #println("$k already present for $definition")
@@ -592,7 +598,7 @@ can simply be appended.
                     filter!(x->!(all(ismissing,prior_contents[k][!,x])) && !(all(ismissing,import_def[k][!,x])),dupls)
                     import_def[k][!,:master_id] .= definition
                     if length(dupls) > 0
-                        println("For $k handling duplicate defs $dupls")
+                        #println("For $k handling duplicate defs $dupls")
                         if if_dupl == "Exit"
                             throw(error("Keys $dupls duplicated when importing from $block at $location in category $k"))
                         end
@@ -629,11 +635,14 @@ can simply be appended.
     return d
 end
 
-#== A full import of Head into Head will add all definitions from the imported dictionary,
+#== 
+A full import of Head into Head will add all definitions from the imported dictionary,
 and in addition will reparent all children of the imported Head category to the new
 Head category.  We first merge the two sets of save frames, and then fix the parent category
 of any definitions that had the old head category as parent. Note that the NativeCif
 object passed to us is just the save frames from a dictionary.
+
+The importing Head category is given a category of "." (nothing).
 ==#
 resolve_full_imports!(c::NativeCif,imp_blocks) = begin
     original_dir = dirname(c.original_file)
@@ -670,9 +679,9 @@ resolve_full_imports!(c::NativeCif,imp_blocks) = begin
             new_head = into_block["_name.object_id"][1]
             delete!(importee.block.save_frames,block)
             # merge the save frames
-            println("Before merging, $(length(c.contents)) save frames")
+            # println("Before merging, $(length(c.contents)) save frames")
             merge!(combiner,c.contents,importee.block.save_frames)
-            println("After merging, $(length(c.contents)) save frames")
+            # println("After merging, $(length(c.contents)) save frames")
             # reparent those blocks that have the old head category as parent
             for k in keys(c)
                 if lowercase(get(c[k],"_name.category_id",[""])[1]) == old_head
@@ -707,8 +716,8 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             old_head = lowercase(importee_head[:name][!,:object_id][])
             new_head = d[:name][d[:name].master_id .== block_id,:].object_id[]
             # find duplicates
-            all_defs = keys(importee[:definition])
-            println("All visible defs: $all_defs")
+            all_defs = importee[:definition][!,:master_id]
+            #println("All visible defs: $all_defs")
             dups = filter(x-> count(isequal(x),all_defs)>1,all_defs)
             if length(dups) > 0
                 println("Duplicated frames: $dups")
@@ -716,6 +725,8 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             end
             # Remove old head category
             delete!(importee,block)
+            # Remove old dictionary information
+            delete!(importee.block,:dictionary)
             # Concatenate them all
             for k in keys(importee.block)
                 if !haskey(d,k)
@@ -731,4 +742,39 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
         end
     end
     return d
+end
+
+const ddlm_defaults = Dict(
+(:definition,:class)=>"Datum",
+(:definition,:scope)=>"Item",
+(:dictionary,:class)=>"Instance",
+(:dictionary_valid,:option)=>"Recommended",
+(:enumeration,:mandatory)=>"Yes",
+(:import_details,:if_dupl)=>"Exit",
+(:import_details,:if_miss)=>"Exit",
+    (:import_details,:mode)=>"Content",
+    (:name,:linked_item_id)=>nothing,
+    (:name,:category_id)=>nothing,
+    (:name,:object_id)=>nothing,
+(:method,:purpose)=>"Evaluation",
+(:type,:container)=>"Single",
+(:type,:contents)=>"Text",
+(:type,:indices)=>"Text",
+(:type,:purpose)=>"Describe",
+(:type,:source)=>"Assigned",
+(:units,:code)=>"Arbitrary"
+)
+
+"""
+enter_defaults(d)
+
+Replace any missing values with the defaults for that value. The column type
+is changed.
+"""
+enter_defaults(d) = begin
+    for ((tab,obj),val) in ddlm_defaults
+        if haskey(d,tab) && obj in propertynames(d[tab])
+            d[tab][!,obj] = coalesce.(d[tab][!,obj],val)
+        end
+    end
 end

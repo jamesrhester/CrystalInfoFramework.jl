@@ -156,7 +156,7 @@ the contents of `new_info`, filling in implicit values
 with `blockname`
 """
 update_dict!(all_dict_info,new_info,blockname) = begin
-    tablename = Symbol(split(String(first(names(new_info))),'.')[1][2:end])
+    tablename = Symbol(split(first(names(new_info)),'.')[1][2:end])
     rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
     if !haskey(all_dict_info,tablename)
         all_dict_info[tablename] = DataFrame()
@@ -235,7 +235,7 @@ populate_implicits(all_tables) = begin
     for (cat,table) in all_tables
         if cat in cats
             target_name = objs[indexin([cat],cats)[]]
-            if !(target_name in names(table))
+            if !(target_name in propertynames(table))
                 rename!(table,(:__blockname=>target_name))
                 #println("Added implicit value for $cat.$target_name")
             end
