@@ -172,7 +172,7 @@ struct LegacyCategory <: CifCategory
     rawdata
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
+    dictionary::DDLm_Dictionary
 end
 
 """
@@ -193,7 +193,7 @@ struct SetCategory <: DDLmCategory
     present::Array{Symbol,1}
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
+    dictionary::DDLm_Dictionary
 end
 
 DataSource(::SetCategory) = IsDataSource()
@@ -208,7 +208,7 @@ struct LoopCategory <: CifCategory
     rawdata
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
-    dictionary::Cifdic
+    dictionary::abstract_cif_dictionary
 end
 
     

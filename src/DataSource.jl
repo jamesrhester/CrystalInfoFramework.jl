@@ -6,14 +6,20 @@ A DataSource is a generic source of data that is capable
 only of providing an array of values and stating which
 values could be associated with which other values.
 
-A RelationalDataSource builds on this by providing 
-associations from multiple arrays to single arrays, and
-from single arrays to multiple arrays.
 """
 
 export get_assoc_index, get_all_associated_indices
 export get_assoc_value, get_all_associated_values
 export get_julia_type_name,convert_to_julia,get_dimensions
+export get_namespaces
+
+"""
+get_namespaces(x)
+
+Return the designators for the namespaces from which the names used to
+access the data are drawn.
+"""
+get_namespaces(x) = [""]
 
 """
 Return the index into `other_name` for position `index` of the array returned
@@ -245,7 +251,13 @@ end
 
 get_dictionary(t::TypedDataSource) = t.dict
 get_datasource(t::TypedDataSource) = t.data
-get_namespace(t::TypedDataSource) = get_dic_namespace(get_dictionary(t))
+get_namespaces(t::TypedDataSource) = [get_dic_namespace(get_dictionary(t))]
+select_namespace(t::TypedDataSource,nspace) = begin
+    if nspace != get_namespaces(t)[]
+        throw(KeyError(t))
+    end
+    t
+end
 
 """
 getindex(t::TypedDataSource,s::String)
@@ -392,15 +404,15 @@ const type_mapping = Dict( "Text" => String,
                            "List" => Array{Any}
                            )
 
-get_julia_type_name(cdic::Cifdic,cat::String,obj::String) = begin
-    definition = get_by_cat_obj(cdic,(cat,obj))
-    base_type = definition["_type.contents"][1]
-    cont_type = get(definition,"_type.container",["Single"])[1]
+get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString) = begin
+    definition = cdic[find_name(cdic,cat,obj)]
+    base_type = definition[:type][!,:contents][]
+    cont_type = definition[:type][!,:container][]
     julia_base_type = type_mapping[base_type]
     return julia_base_type,cont_type
 end
 
-get_julia_type_name(cdic::DDL2_Dictionary,cat::String,obj::String) = begin
+get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractString) = begin
     # only strings...
     return String,"Single"
 end

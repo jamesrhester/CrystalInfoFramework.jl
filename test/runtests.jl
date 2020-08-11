@@ -20,7 +20,7 @@ prepare_blocks() = begin
 end
 
 prepare_sources() = begin
-    cdic = Cifdic(core_dic)
+    cdic = DDLm_Dictionary(core_dic)
     data = prepare_files()
     return (cdic,data)
 end
@@ -36,7 +36,6 @@ end
     @test collect(get_all_associated_values(testdic,"b","c")) == [0,0,0]
 end
 
-#==
 @testset "Test CIF block as DataSource" begin
 
     # Within loop
@@ -132,7 +131,7 @@ end
     q = get_all_associated_indices(t,"_atom_site_fract_x","_atom_site_label")
     @test length(q) == length(t["_atom_site_fract_x"]) #aliases
 end
-==#
+
 @testset "Test construction of a CifCategory" begin
     cdic,data = prepare_sources()
     atom_cat = LoopCategory("atom_site",data,cdic)

@@ -160,7 +160,7 @@ create_nspace_data() = begin
         write(s,second_dic)
         close(s)
     end
-    sdic = Cifdic("second.dic")
+    sdic = DDLm_Dictionary("second.dic")
     sdata = first(NativeCif("second.cif")).second
     tdata = TypedDataSource(data,cdic)
     sdata = TypedDataSource(sdata,sdic)
@@ -174,9 +174,7 @@ end
     @test !has_category(nrc,"atom_site","dodgy")
     @test get_data(nrc,"dodgy")["_atom_type.symbol"] == ["Oxygen","Carbon","Hydrogen"]
     @test get_data(nrc,"dodgy")["_cell.length_a"] == ["A"]
-    @test nrc["dodgy‡_atom_type.symbol"] == ["Oxygen","Carbon","Hydrogen"]
     @test !haskey(nrc,"_atom_type.symbol")
-    @test haskey(nrc,"CifCore‡_atom_type.symbol")
     c = get_category(nrc,"atom_site","CifCore")
     println("$c")
     @test haskey(c,"_atom_site.label")
