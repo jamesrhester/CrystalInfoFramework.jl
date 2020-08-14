@@ -203,13 +203,13 @@ Find the canonical name for `name`.
 find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
 
 find_name(d::DDLm_Dictionary,cat,obj) = begin
-    d[:name][(d[:name][!,:category_id] .== cat) .& (d[:name][!,:object_id].== obj),:master_id][]
+    d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(cat)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id][]
 end
 
-find_category(d::DDLm_Dictionary,dataname) = d[dataname][:name][!,:category_id][]
-find_object(d::DDLm_Dictionary,dataname) = d[dataname][:name][!,:object_id][]
-is_category(d::DDLm_Dictionary,name) = get(d[name][:definition],:scope,["Item"]) == "Category"
-get_categories(d::DDLm_Dictionary) = parent(d[:definition])[parent(d[:definition])[!,:scope] == "Category",:id]
+find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
+find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:object_id][])
+is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope] == "Category" : false
+get_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
 get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
 
 get_names_in_cat(d::DDLm_Dictionary,catname;aliases=false) = begin
@@ -224,10 +224,10 @@ get_names_in_cat(d::DDLm_Dictionary,catname;aliases=false) = begin
     return canonical_names
 end
 
-get_objs_in_cat(d::DDLm_Dictionary,cat) = d[:name][d[:name][!,:category_id].== cat,:object_id]
+get_objs_in_cat(d::DDLm_Dictionary,cat) = lowercase.(d[:name][lowercase.(d[:name][!,:category_id]) .== lowercase(cat),:object_id])
 
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
-    loop_keys = d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name]
+    loop_keys = lowercase.(d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name])
     key_aliases = []
     if aliases
         for k in loop_keys
@@ -252,15 +252,15 @@ get_parent_name(d::DDLm_Dictionary,name) = begin
 end
 ==#
 
-get_set_categories(d::DDLm_Dictionary) = d[:definition][d[:definition][:class == "Set",!],:id]
-get_loop_categories(d::DDLm_Dictionary) = d[:definition][d[:definition][:class == "Loop",!],:id]
+get_set_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Set",:id])
+get_loop_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Loop",:id])
 
 get_dict_funcs(d::DDLm_Dictionary) = begin
-    func_cat = d[:definition][d[:definition][:class] == "Functions",:id]
+    func_cat = d[:definition][d[:definition][!,:class] .== "Functions",:id]
     func_catname = nothing
     if length(func_cat) > 0
         func_catname = lowercase(d[func_cat[]][:name][!,:object_id][])
-        all_funcs = get_objs_in_cat(func_catname)
+        all_funcs = get_objs_in_cat(d,func_catname)
     else
         all_funcs = []
     end
