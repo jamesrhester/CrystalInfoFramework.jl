@@ -457,8 +457,8 @@ end
 # of columns. This is the opposite to dREL
 
 get_dimensions(cdic,cat,obj) = begin
-    definition = get_by_cat_obj(cdic,(cat,obj))
-    dims = get(definition,"_type.dimension",["[]"])[1]
+    definition = cdic[find_name(cdic,cat,obj)][:type]
+    dims = :dimension in propertynames(definition) ? definition[!,:dimension][] : "[]"
     final = eval(Meta.parse(dims))
     if length(final) > 1
         t = final[1]
