@@ -296,10 +296,11 @@ current_row(c::CatPacket) = begin
     return getfield(c,:id)-1
 end
 
+# TODO: child categories
 get_value(row::CatPacket,name::Symbol) = begin
     rownum = getfield(row,:id)
     c = get_category(row)
-    c[name][rownum]
+    c[name,rownum]
 end
 
 # Relation interface.
@@ -318,11 +319,23 @@ data name column.
 get_data(c::CifCategory,mapname) = throw(error("Not implemented"))
 get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
+Base.getindex(d::CifCategory,keyval) = begin
+    a = get_key_datanames(d)
+    if length(a) != 1
+        throw(error("Category $(get_name(d)) accessed with value $keyval but has $(length(a)) key datanames"))
+    end
+    return d[Dict{Symbol,Any}(a[1]=>keyval)]
+end
+
+Base.getindex(d::CifCategory,dict::Dict{Symbol,V} where V) = begin
+    get_row(d,dict)
+end
+
 Base.show(io::IO,d::CifCategory) = begin
     print(io,"Category $(get_name(d)) ")
     print(io,"Length $(length(d))\n")
     df = DataFrame()
-    for n in keys(d)
+    for n in d.column_names
         if haskey(d,n)
             df[!,n] = d[n]
         end
@@ -388,9 +401,11 @@ LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
         end
     end
     key_names = [name_to_object[k] for k in key_names]
-
+    # Child categories
+    child_cats = create_children(catname,data,cifdic)
     LoopCategory(catname,internal_object_names,key_names,data,
-                            name_to_object,object_to_name,cifdic)
+                 name_to_object,object_to_name, child_cats,
+                 cifdic)
 
 end
 
@@ -414,8 +429,11 @@ LoopCategory(l::LegacyCategory,k) = begin
 end
 
 Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]]])
-Base.haskey(d::LoopCategory,n::Symbol) = haskey(d.rawdata,d.object_to_name[n])
+Base.haskey(d::LoopCategory,n::Symbol) = begin
+    haskey(d.rawdata,get(d.object_to_name,n,"")) || any(x->haskey(d.rawdata,get(x.object_to_name,n,"")),d.child_categories)
+end
 Base.haskey(d::LoopCategory,n::String) = haskey(d.rawdata,n)
+
 """
 Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
 to the end arbitrarily
@@ -431,29 +449,22 @@ get_name(d::LoopCategory) = d.name
 
 """
 get_data(d::LoopCategory,colname) differs from getting the data out of the
-dataframe because of linked data names (note yet implemented).
+dataframe because of linked data names (not yet implemented).
 
 """
-Base.getindex(d::CifCategory,keyval) = begin
-    a = get_key_datanames(d)
-    if length(a) != 1
-        throw(error("Category $(get_name(d)) accessed with value $keyval but has $(length(a)) key datanames"))
-    end
-    return d[Dict{Symbol,Any}(a[1]=>keyval)]
-end
-
-Base.getindex(d::CifCategory,dict::Dict{Symbol,V} where V) = begin
-    get_row(d,dict)
-end
 
 # Getindex by symbol is the only way to get at a column. We reserve
-# other values for row and key based indexing.
+# other types for row and key based indexing.  We try all child
+# categories after trying the parent category
 
 Base.getindex(d::LoopCategory,name::Symbol) = begin
-    if !(name in d.column_names) throw(KeyError(name)) end
-    aka = d.object_to_name[name]
-    return d.rawdata[aka]
+    if name in d.column_names return d.rawdata[d.object_to_name[name]] end
+    for x in d.child_categories
+        if name in x.column_names return x.rawdata[x.object_to_name[name]] end
+    end
 end
+
+Base.getindex(d::LoopCategory,name::Symbol,index::Integer) = get_value(d,index,name)
 
 # If a single value is provided we turn it into a keyed access as long as
 # we have a single value for the key
@@ -467,19 +478,103 @@ get_by_key_val(d::LoopCategory,x::Union{SubString,String,Array{Any},Number}) = b
     throw(KeyError(x))
 end
 
-get_value(d::LoopCategory,n::Int,colname::Symbol) = begin
-    aka = d.object_to_name[colname]
-    return get_value(d,n,aka)
+"""
+Get the row number for the provided key values
+"""
+get_rownum(d::LoopCategory,keyvals::Dict{Symbol,V} where V) = begin
+    targvals = values(keyvals)
+    targcols = keys(keyvals)
+    for i in 1:length(d)
+        testvals = zip(targvals,(d[k][i] for k in targcols))
+        if all(x->isequal(x[1],x[2]),testvals) return i end
+    end
+    throw(KeyError(keyvals))
+end
+
+"""
+get_value(d::LoopCategory,n::Int,colname::Symbol)
+
+Return the value corresponding to row `n` of the key
+datanames for `d` for `colname`.  If `colname` belongs
+to a child category this will not in general be
+`colname[n]`. Instead the values of the key datanames
+are used to look up the correct value 
+"""
+get_value(d::LoopCategory,n::Int,colname::Symbol) = begin    
+    if haskey(d.object_to_name,colname)
+        aka = d.object_to_name[colname]
+        return d.rawdata[aka][n]
+    end
+    if length(d.child_categories) == 0 throw(KeyError(colname)) end
+    # Handle the children recursively
+    pkeys_symb = get_key_datanames(d)
+    pkeys = [(p,d.object_to_name[p]) for p in pkeys_symb]
+    keyvals = Dict((p[2]=>get_value(d,n,p[1])) for p in pkeys_symb)
+    for c in d.child_categories
+        try
+            return get_value(c,keyvals,colname)
+        catch e
+            if e isa KeyError continue end
+            throw(e)
+        end
+    end
+    throw(KeyError(colname))
 end
 
 get_value(d::LoopCategory,n::Int,colname::String) = begin
-    return d.rawdata[colname][n]
+    return get_value(d,n,d.name_to_object[colname])
 end
 
 # If we are given only a column name, we have to put all
 # of the values in
 get_value(d::LoopCategory,colname::String) = begin
+    println("WARNING: super inefficient column access")
     return [get_value(d,n,colname) for n in 1:length(d)]
+end
+
+"""
+get_value(d::LoopCategory,k::Dict,name)
+
+Return the value of `name` corresponding to the unique values
+of key datanames given in `k`.
+"""
+get_value(d::LoopCategory,k::Dict{String,V} where V,name) = begin
+    println("Searching for $name using $k in $(d.name)")
+    if !haskey(d.object_to_name,name)
+        println("$name not found...")
+        if length(d.child_categories) > 0
+            for c in d.child_categories
+                try
+                    return get_value(c,k,name)
+                catch e
+                    if e isa KeyError continue end
+                    throw(e)
+                end
+            end
+            throw(KeyError(name))
+        end
+    end
+    key_order = get_key_datanames(d)
+    dic = get_dictionary(d)
+    ckeys = [(ko,d.object_to_name[ko]) for ko in key_order]
+    linkvals = [(ko,get_linked_name(dic,ck)) for (ko,ck) in ckeys]
+    println("Linkvals is $linkvals")
+    linkvals = Dict((l[1] => k[l[2]]) for l in linkvals)
+    println("Getting row number for $linkvals in $(d.name)")
+    rownum = 0
+    try
+        rownum = get_rownum(d,linkvals)
+    catch e
+        if e isa KeyError return missing end
+        throw(e)
+    end
+    println("Row $rownum")
+    return d.rawdata[d.object_to_name[name]][rownum]
+end
+
+get_value(d::LoopCategory,k::Dict{Symbol,V} where V,name) = begin
+    newdict = Dict((d.object_to_name[kk]=>v) for (kk,v) in k)
+    return get_value(d,newdict,name)
 end
 
 """
@@ -492,10 +587,42 @@ get_key(row::CatPacket) = begin
     return [get_value(d,rownum,c) for c in colnames]
 end
 
-get_object_names(d::LoopCategory) = d.column_names
+get_object_names(d::LoopCategory) = begin
+    result = copy(d.column_names)
+    for x in d.child_categories
+        append!(result,x.column_names)
+    end
+    return result
+end
+
 get_key_datanames(d::LoopCategory) = d.keys
 get_link_names(d::LoopCategory) = d.linked_names
 get_dictionary(d::LoopCategory) = d.dictionary
+
+merge_loops(parent::LoopCategory,child::LoopCategory) = begin
+    # find the keys
+    dic = get_dictionary(parent)
+    pkeys = get_key_datanames(parent)
+    pkeys_str = collect(parent.object_to_name[p] for p in pkeys)
+    ckeys = get_key_datanames(child)
+    lkeys = collect((c,get_linked_name(dic,child.object_to_name[c])) for c in ckeys)
+    dodgy = any(x->!(x[2] in pkeys_str),lkeys)
+    if dodgy
+        throw(error("Cannot merge: keys $pkeys and $ckeys do not match ($pkeys_str vs $(collect(lkeys)))"))
+    end
+    links = [(parent.name_to_object[c[2]],c[1]) for c in lkeys]
+    merged = leftjoin(parent,child, on = links)
+    newlookup =  merge(child.object_to_name,parent.object_to_name)
+    rename!(merged, newlookup)
+    LoopCategory(parent.name,
+                 propertynames(merged),
+                 parent.keys,
+                 merged,
+                 merge(parent.name_to_object,child.name_to_object),
+                 newlookup,
+                 [],
+                 parent.dictionary)  
+end
 
 Base.keys(d::LoopCategory) = get_object_names(d)
 
@@ -539,9 +666,8 @@ LegacyCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
     #
     # Absorb dictionary information
     # 
-    object_names = [lowercase(a) for a in keys(cifdic) if lowercase(get(cifdic[a],"_name.category_id",[""])[1]) == lowercase(catname)]
-    data_names = lowercase.([cifdic[a]["_definition.id"][1] for a in object_names])
-    internal_object_names = Symbol.(lowercase.([cifdic[a]["_name.object_id"][1] for a in data_names]))
+    data_names = get_names_in_cat(cifdic,catname)
+    internal_object_names = Symbol.(find_object(cifdic,a) for a in data_names)
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(((i,find_name(cifdic,catname,String(i))) for i in internal_object_names))
 
@@ -576,3 +702,13 @@ Base.keys(l::LegacyCategory) = begin
 end
 
 Base.haskey(l::LegacyCategory,k) = k in keys(l)  
+
+"""
+
+Given the category name, return an array of loop categories that are children
+of the supplied category
+"""
+create_children(name::String,data,cifdic) = begin
+    child_names = get_child_categories(cifdic,name)
+    return [LoopCategory(c,data,cifdic) for c in child_names]
+end

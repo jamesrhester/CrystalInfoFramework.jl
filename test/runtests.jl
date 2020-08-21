@@ -25,7 +25,6 @@ prepare_sources() = begin
     return (cdic,data)
 end
 
-
 @testset "Test simple dict as DataSource" begin
     testdic = Dict("a"=>[1,2,3],"b"=>[4,5,6],"c"=>[0],"d"=>[11,12])
     @test get_assoc_index(testdic,"b",3,"a") == 3
@@ -148,6 +147,12 @@ end
     @test set_cat[:volume][] == "635.3(11)"
     # Test getting a key value
     @test atom_cat["o2"].fract_z == ".2290(11)"
+end
+
+@testset "Test child categories" begin
+    cdic,data = prepare_sources()
+    atom_cat = LoopCategory("atom_site",data,cdic)
+    @test get_value(atom_cat,Dict(:label=>"o2"),:u_11) == ".029(3)"
 end
 
 @testset "Test behaviour of plain CatPackets" begin

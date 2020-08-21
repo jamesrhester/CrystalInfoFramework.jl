@@ -177,14 +177,15 @@ end
 
 """
 DDLm classifies relations into Set categories,
-and Loop categories.
+and Loop categories. A Loop category can have
+child Loop categories.
 """
 abstract type DDLmCategory <: CifCategory end
     
 """
 A SetCategory has a single row and no keys, which means
 that access via key values is impossible, but unambiguous
-values are available
+values are available. Child categories do not exist.
 """
 struct SetCategory <: DDLmCategory
     name::String
@@ -199,7 +200,9 @@ end
 DataSource(::SetCategory) = IsDataSource()
 
 """
-A LoopCategory is a DDLmCategory with keys
+A LoopCategory is a DDLmCategory with keys, and can have
+child categories whose columns are available for joining
+with the parent category using the keys.
 """
 struct LoopCategory <: CifCategory
     name::String
@@ -208,6 +211,7 @@ struct LoopCategory <: CifCategory
     rawdata
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
+    child_categories::Array{LoopCategory,1}
     dictionary::abstract_cif_dictionary
 end
 
