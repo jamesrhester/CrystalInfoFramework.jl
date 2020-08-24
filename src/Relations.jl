@@ -412,7 +412,8 @@ end
 LoopCategory(catname::String,t::TypedDataSource) = LoopCategory(catname,get_datasource(t),get_dictionary(t))
 
 # A legacy category was missing key values, which are provided to make it into
-# a DDLm Category
+# a DDLm Category. It cannot have child categories.
+
 LoopCategory(l::LegacyCategory,k) = begin
     keyname = get_keys_for_cat(get_dictionary(l),get_name(l))
     if length(keyname)!=1
@@ -424,7 +425,7 @@ LoopCategory(l::LegacyCategory,k) = begin
                  [keyname],
                  l.rawdata,
                  l.name_to_object,
-                 l.object_to_name,
+                 l.object_to_name,[],
                  l.dictionary)
 end
 
@@ -509,7 +510,7 @@ get_value(d::LoopCategory,n::Int,colname::Symbol) = begin
     # Handle the children recursively
     pkeys_symb = get_key_datanames(d)
     pkeys = [(p,d.object_to_name[p]) for p in pkeys_symb]
-    keyvals = Dict((p[2]=>get_value(d,n,p[1])) for p in pkeys_symb)
+    keyvals = Dict((p[2]=>get_value(d,n,p[1])) for p in pkeys)
     for c in d.child_categories
         try
             return get_value(c,keyvals,colname)
@@ -660,6 +661,7 @@ Base.getindex(s::SetCategory,name::Symbol) = begin
     return s.rawdata[s.object_to_name[name]]
 end
 
+Base.getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
 Base.length(s::SetCategory) = 1
 
 LegacyCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
