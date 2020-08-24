@@ -17,12 +17,12 @@ namespace.
 ==#
 
 export DDLm_Dictionary
-export get_by_cat_obj
 export find_category,get_categories,get_set_categories
 export translate_alias,list_aliases
 export find_object,find_name
 export get_single_key_cats
 export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
+export get_linked_name
 export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
@@ -198,12 +198,19 @@ translate_alias(d::DDLm_Dictionary,name) = begin
 end
 
 """
-Find the canonical name for `name`.
+Find the canonical name for `name`. If accessed in cat/obj format, search also child
+categories.
 """
 find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
 
 find_name(d::DDLm_Dictionary,cat,obj) = begin
-    d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(cat)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id][]
+    pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(cat)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
+    if length(pname) > 0 return pname[] end
+    for c in get_child_categories(d,cat)
+        pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(c)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
+        if length(pname) > 0 return pname[] end
+    end
+    throw(KeyError("$cat/$obj"))
 end
 
 find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
@@ -243,14 +250,19 @@ get_linked_names_in_cat(d::DDLm_Dictionary,cat) = begin
     [n for n in names if get(c[n][:type],:purpose,["Datum"])[] != "SU"]
 end
 
-#==
-get_parent_name(d::DDLm_Dictionary,name) = begin
-    poss = get(d[name][:name],:linked_item_id,[nothing])[]
-    if isnothing(poss) return nothing end
-    if get(d[name][:type],:purpose,["Datum"])[] != "SU" return poss end
-    return nothing
+"""
+get_linked_name(d::DDLm_Dictionary,name) = begin
+
+Return any name linked to `name` that is not a SU, returning `name` if none found
+"""
+get_linked_name(d::DDLm_Dictionary,name) = begin
+    info = d[name][:name]
+    poss = :linked_item_id in propertynames(info) ? info.linked_item_id[] : name
+    if isnothing(poss) return name end
+    link_type = :purpose in propertynames(d[name][:type]) ? d[name][:type].purpose[] : "Datum"
+    if link_type != "SU" return poss end
+    return name
 end
-==#
 
 get_set_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Set",:id])
 get_loop_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Loop",:id])
@@ -268,7 +280,7 @@ get_dict_funcs(d::DDLm_Dictionary) = begin
 end
 
 get_parent_category(d::DDLm_Dictionary,child) = begin
-    d[child][:name][!,:category_id]
+    lowercase(d[child][:name][!,:category_id][])
 end
 
 get_child_categories(d::DDLm_Dictionary,parent) = begin
