@@ -15,13 +15,14 @@ the methods needed to find parents and children.
 Namespaces: data names in the dictionary may be assigned to a particular
 namespace.
 ==#
+using Printf
 
 export DDLm_Dictionary
 export find_category,get_categories,get_set_categories
 export translate_alias,list_aliases
 export find_object,find_name
 export get_single_key_cats
-export get_names_in_cat,get_linked_names_in_cat,get_keys_for_cat
+export get_linked_names_in_cat,get_keys_for_cat
 export get_linked_name
 export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
@@ -97,16 +98,25 @@ DDLm_Dictionary(b::FullBlock) = begin
     end
     # process imports - could we do this separately?
     resolve_imports!(all_dict_info,b.original_file)
+    DDLm_Dictionary(all_dict_info,nspace)
+end
+
+"""
+Construct a dictionary when provided with a collection of data frames indexed
+by symbols. The symbols are DDLm attribute categories, and the dataframe columns
+are the object_ids of the DDLm attributes of that category.
+"""
+DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
     # Apply default values if not a template dictionary
-    if all_dict_info[:dictionary][!,:class][] != "Template"
-        enter_defaults(all_dict_info)
+    if attr_dict[:dictionary][!,:class][] != "Template"
+        enter_defaults(attr_dict)
     end
     # group for efficiency
     gdf = Dict{Symbol,GroupedDataFrame}()
-    for k in keys(all_dict_info)
-        gdf[k] = groupby(all_dict_info[k],:master_id)
+    for k in keys(attr_dict)
+        gdf[k] = groupby(attr_dict[k],:master_id)
     end
-    return DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace)
+    DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace)
 end
 
 Base.keys(d::DDLm_Dictionary) = begin
@@ -215,21 +225,9 @@ end
 
 find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
 find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:object_id][])
-is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope] == "Category" : false
+is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope][] == "Category" : false
 get_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
 get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
-
-get_names_in_cat(d::DDLm_Dictionary,catname;aliases=false) = begin
-    all_objs = get_objs_in_cat(d,catname)
-    canonical_names = [find_name(d,catname,x) for x in all_objs]
-    if aliases
-        search_names = copy(canonical_names)
-        for n in search_names
-            append!(canonical_names,list_aliases(d,n))
-        end
-    end
-    return canonical_names
-end
 
 get_objs_in_cat(d::DDLm_Dictionary,cat) = lowercase.(d[:name][lowercase.(d[:name][!,:category_id]) .== lowercase(cat),:object_id])
 
@@ -790,3 +788,92 @@ enter_defaults(d) = begin
         end
     end
 end
+
+"""
+
+Create a `DDLm_Dictionary` from `ds`, using the category scheme and
+attributes in `att_dic`, sorting definitions based on the attributes in
+`dividers`.  ds must contain `_dictionary.title`
+"""
+DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
+    dicname = ds["_dictionary.title"][]
+    att_cats = get_categories(att_dic)
+    att_info = Dict{Symbol,DataFrame}()
+    for ac in att_cats
+        catinfo = get_category(datasource,ac)
+        df = DataFrame(catinfo)
+        att_info[Symbol(ac)] = df
+    end
+    for d in dividers
+        tab_name = Symbol(find_category(att_dic,d))
+        col_name = Symbol(find_object(att_dic,d))
+        att_info[tab_name].master_id = att_info[tab_name].col_name
+    end
+    for (tab,cols) in att_info
+        if !(:master_id in propertynames(cols))
+            att_info[tab].master_id = dicname
+        end
+    end
+    DDLm_Dictionary(att_info)
+end
+
+# Output
+
+Base.show(io,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
+    dicname = ddlm_dic[:dictionary].title[]
+    write(io,"#\\#CIF_2.0\n")
+    write(io,"""
+##############################################################
+#
+#        $dicname (DDLm)
+#
+##############################################################\n""")
+    write(io,"data_$dicname\n")
+    top_level = ddlm_dic[:dictionary]
+    show_set(io,"dictionary",top_level)
+    # Now for the rest
+    all_cats = sort!(get_categories(ddlm_dic))
+    for one_cat in all_cats
+        cat_info = ddlm_dic[one_cat]
+        show_one_def(io,one_cat,cat_info)
+        items = get_names_in_cat(ddlm_dic,one_cat)
+        for one_item in items
+            show_one_def(io,one_item,ddlm_dic[one_item])
+        end
+    end
+    # And the looped top-level stuff
+    for c in [:dictionary_valid,:dictionary_audit]
+        if nrow(ddlm_dic[c]) > 0
+            show_loop(io,String(c),ddlm_dic[c])
+        end
+    end
+end
+
+"""
+Show one DDLm dictionary definition. `info_dic` contains
+data frames containing relevant information
+"""
+show_one_def(io,def_name,info_dic) = begin
+    write(io,"\nsave_$def_name\n\n")
+    for (cat,df) in info_dic
+        if nrow(df) == 0 continue end
+        if nrow(df) == 1 show_set(io,cat,df) end
+        if nrow(df) > 1 show_loop(io,String(cat),df) end
+    end
+    write(io,"\nsave_\n")
+end
+
+show_set(io,cat,df) = begin
+    colnames = sort!(propertynames(df))
+    for cl in colnames
+        if cl == :master_id continue end
+        if !ismissing(df[!,cl][])
+            Printf.@printf(io,"%-40s\t%s\n","_$cat.$cl","$(format_for_cif(df[!,cl][]))")
+        end
+    end
+end
+
+show_loop(io,cat,df) = begin
+    if nrow(df) == 0 return end
+    write(io,format_for_cif(df[!,Not(:master_id)];catname=cat))
+end       

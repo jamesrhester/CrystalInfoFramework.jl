@@ -1,5 +1,6 @@
 # Testing dictionary functionality
 
+#==
 @testset "Testing dictionary access and construction" begin
     @test begin
         t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
@@ -27,10 +28,12 @@ end
     # everything has a definition
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
 end
-
+==#
 @testset "DDL2 dictionaries" begin
     t = DDL2_Dictionary(joinpath(@__DIR__,"ddl_core_2.1.3.dic"))
     @test find_category(t,"_sub_category_examples.case") == "sub_category_examples"
     @test haskey(t,"_category.mandatory_code")
     @test get_keys_for_cat(t,"sub_category") == ["_sub_category.id"]
+    @test "_dictionary_history.update" in get_names_in_cat(t,"dictionary_history")
+    @test "revision" in get_objs_in_cat(t,"dictionary_history")
 end

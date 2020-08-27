@@ -61,6 +61,8 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
     populate_implicits(all_dict_info)
     # now the parent lookup: DDL2 dictionaries store children...
     parent_dict = generate_parents(defs)
+    # And add category, object
+    add_cat_obj!(all_dict_info)
     return DDL2_Dictionary(all_dict_info,parent_dict)
 end
 
@@ -91,6 +93,8 @@ find_category(d::DDL2_Dictionary,dataname) = begin
     return split(dataname,'.')[1][2:end]
 end
 
+get_child_categories(d::DDL2_Dictionary,catname) = []
+
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)
         return split(dataname,".")[end]
@@ -98,8 +102,18 @@ find_object(d::DDL2_Dictionary,dataname) = begin
     return nothing
 end
 
+get_categories(d::DDL2_Dictionary) = d.block[:category][!,:id]
+
 get_keys_for_cat(d::DDL2_Dictionary,catname) = begin
     d[catname][:category_key][!,:name]
+end
+
+get_names_in_cat(d::DDL2_Dictionary,catname) = begin
+    d.block[:item][d.block[:item].category_id .== catname,:name]
+end
+
+get_objs_in_cat(d::DDL2_Dictionary,catname) = begin
+    d.block[:item][d.block[:item].category_id .== catname,:__object_id]
 end
 
 list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
@@ -243,3 +257,8 @@ populate_implicits(all_tables) = begin
     end
 end
 
+add_cat_obj!(all_info) = begin
+    catobj = split.(all_info[:item][!,:name],".")
+    all_info[:item].category_id = [x[1][2:end] for x in catobj]
+    all_info[:item].__object_id = [x[2] for x in catobj]
+end

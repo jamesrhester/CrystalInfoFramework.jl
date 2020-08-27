@@ -32,7 +32,11 @@ format_for_cif(val::String) = begin
             if '\'' in val
                 delimiter = "\n;"
             else
-                delimiter = "'"
+                q = match(r"\w+",val)
+                if !isnothing(q) && q.match == val delimiter = ""
+                else
+                    delimiter = "'"
+                end
             end
         end
     end
@@ -115,7 +119,7 @@ format_for_cif(df::DataFrame;catname=nothing) = begin
         outname = "_"*catname*"."
     end
     for n in names(df)
-        write(outstring,outname*String(n)*"\n")
+        write(outstring,"  "*outname*String(n)*"\n")
     end
     line_pos = 1
     for one_row in eachrow(df)
