@@ -27,6 +27,7 @@ export get_linked_name
 export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
+export is_set_category,is_loop_category
 export get_func,set_func!,has_func
 export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
 export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
@@ -36,6 +37,7 @@ export get_dic_name
 export get_cat_class
 export get_dic_namespace
 export is_category
+import Base.show
 
 struct DDLm_Dictionary <: abstract_cif_dictionary
     block::Dict{Symbol,GroupedDataFrame}
@@ -111,6 +113,9 @@ DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
     if attr_dict[:dictionary][!,:class][] != "Template"
         enter_defaults(attr_dict)
     end
+    if attr_dict[:dictionary].class[] == "Reference"
+        extra_reference!(attr_dict)
+    end
     # group for efficiency
     gdf = Dict{Symbol,GroupedDataFrame}()
     for k in keys(attr_dict)
@@ -127,8 +132,6 @@ Base.keys(d::DDLm_Dictionary) = begin
     end
     return Iterators.flatten((native,extra))
 end
-
-#flatten(parent(d.block[:definition])[!,:id],parent(d.block[:alias])[!,:definition_id])
 
 Base.haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
 
@@ -156,7 +159,7 @@ Base.delete!(d::DDLm_Dictionary,k::String) = begin
     end
 end
 
-# `k` is assumed to be already lower coase
+# `k` is assumed to be already lower case
 filter_on_name(d::Dict{Symbol,GroupedDataFrame},k) = begin
     info_dict = Dict{Symbol,DataFrame}()
     for cat in keys(d)
@@ -202,6 +205,7 @@ translate_alias(d::DDLm_Dictionary,name) = begin
     if !haskey(d.block,:definition) return lname end
     if !(:id in propertynames(d[:definition])) return lname end
     if lname in lowercase.(d[:definition][!,:id]) return lname end
+    if !haskey(d.block,:alias) return lname end
     potentials = d[:alias][lowercase.(d[:alias][!,:definition_id]) .== lname,:master_id]
     if length(potentials) == 1 return potentials[] end
     KeyError(name)
@@ -220,16 +224,38 @@ find_name(d::DDLm_Dictionary,cat,obj) = begin
         pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(c)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
         if length(pname) > 0 return pname[] end
     end
+    if obj == "master_id"    #special
+        return "_$cat.$obj"
+    end
     throw(KeyError("$cat/$obj"))
 end
 
 find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
 find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:object_id][])
 is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope][] == "Category" : false
-get_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+get_categories(d) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
 get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
 
+is_set_category(d::DDLm_Dictionary,catname) = begin
+    cat_decl = get_cat_class(d,catname)
+    dic_type = d[:dictionary].class[]
+    if dic_type != "Reference" && cat_decl == "Set" return true end
+    if dic_type == "Reference" && catname == "dictionary" return true end
+    return false
+end
+
+is_loop_category(d::DDLm_Dictionary,catname) = begin
+    cat_decl = get_cat_class(d,catname)
+    dic_type = d[:dictionary].class[]
+    if dic_type == "Reference" && catname == "dictionary" return false end
+    if dic_type == "Reference" && cat_decl == "Set" return true end
+    return cat_decl == "Loop"
+end
+
 get_objs_in_cat(d::DDLm_Dictionary,cat) = lowercase.(d[:name][lowercase.(d[:name][!,:category_id]) .== lowercase(cat),:object_id])
+
+# Dictionary 'Set' categories are really loop categories with the definition id as the
+# key data name
 
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
     loop_keys = lowercase.(d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name])
@@ -262,8 +288,28 @@ get_linked_name(d::DDLm_Dictionary,name) = begin
     return name
 end
 
-get_set_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Set",:id])
-get_loop_categories(d::DDLm_Dictionary) = lowercase.(d[:definition][d[:definition][!,:class] .== "Loop",:id])
+"""
+get_set_categories(d::DDLm_Dictionary)
+
+Return all categories that may only have one row. Note that a 'Set' category for a 
+dictionary definition file can take multiple rows when separate definitions are
+concatenated.
+"""
+get_set_categories(d::DDLm_Dictionary) = begin
+    if d[:dictionary].class[] == "Instance"
+        lowercase.(d[:definition][d[:definition][!,:class] .== "Set",:id])
+    else
+        ["dictionary"]
+    end
+end
+
+get_loop_categories(d::DDLm_Dictionary) = begin
+    if d[:dictionary].class[] == "Instance"
+        lowercase.(d[:definition][d[:definition][!,:class] .== "Loop",:id])
+    else
+        lowercase.(d[:definition][d[:definition][!,:id] .!= "dictionary",:id])
+    end
+end
 
 get_dict_funcs(d::DDLm_Dictionary) = begin
     func_cat = d[:definition][d[:definition][!,:class] .== "Functions",:id]
@@ -441,24 +487,6 @@ fix_url(s::String,parent::String) = begin
     return s
 end
 
-#== We return a FullBlock for further operations. While the
-templated imports operate directly on the internal Dict entries,
-it appears that the full imports create a copy ==#
-resolve_imports!(b::nested_cif_container) = begin
-    c = get_frames(b) #dont care about actual non-save data
-    imports = [c[a] for a in keys(c) if haskey(c[a],"_import.get")]
-    if length(imports) == 0
-        return b
-    end
-    resolve_templated_imports!(c,imports)
-    new_c = resolve_full_imports!(c,imports)
-    # remove all import commands
-    for i in imports
-        delete!(i,"_import.get")
-    end
-    return FullBlock(new_c.contents,get_loop_names(b),get_data_values(b),get_source_file(b))
-end
-
 resolve_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     if !haskey(d,:import) return d end
     resolve_templated_imports!(d,original_file)
@@ -483,58 +511,6 @@ get_import_info(original_dir,import_entry) = begin
     return location,block,mode,if_dupl,if_miss
 end
 
-resolve_templated_imports!(c::NativeCif,temp_blocks) = begin
-    cached_dicts = Dict()   #to save reading twice
-    original_dir = dirname(c.original_file)
-    for one_block in temp_blocks
-        import_table = one_block["_import.get"][1]
-        import_def = nothing   #define it in the right scope
-        for one_entry in import_table
-            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
-            if mode == "Full"
-                continue   # these are done separately
-            end
-            # define a combiner function
-            combiner(a,b) = begin
-                if if_dupl == "Exit"
-                    error("Key duplicated when importing from $block at $location: $a and $b")
-                elseif if_dupl == "Ignore"
-                    return a
-                elseif if_dupl == "Replace"
-                    return b
-                end
-            end
-            # Now carry out the import
-            if !(location in keys(cached_dicts))
-                #println("Now trying to import $location")
-                try
-                    cached_dicts[location] = DDL2_Dictionary(location)
-                catch y
-                    #println("Error $y, backtrace $(backtrace())")
-                    if if_miss == "Exit"
-                        error("Unable to find import for $location")
-                    else
-                        continue
-                    end
-                end
-            end
-            # now find the data block
-            try
-                import_def = cached_dicts[location][block]
-            catch
-                if if_miss == "Exit"
-                    error("When importing frame: Unable to find save frame $block in $location")
-                else
-                    continue
-                end
-            end
-            #println("Now merging $block into $(get(one_block,"_definition.id","?"))")
-            merge!(combiner,one_block,import_def)
-        end   #of import list cycle
-    end #of loop over blocks
-    return c
-end
-
 resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     cached_dicts = Dict() # so as not to read twice
     original_dir = dirname(original_file)
@@ -542,7 +518,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
         import_table = one_row.get
         for one_entry in import_table
             import_def = missing
-            #println("one import instruction: $one_entry")
+            println("one import instruction: $one_entry")
     (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
@@ -553,7 +529,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
                 try
                     cached_dicts[location] = DDLm_Dictionary(location)
                 catch y
-                    #println("Error $y, backtrace $(backtrace())")
+                    println("Error $y, backtrace $(backtrace())")
                     if if_miss == "Exit"
                         throw(error("Unable to find import for $location"))
                     end
@@ -564,13 +540,12 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             try
                 import_def = cached_dicts[location][block]
             catch KeyError
-                #println("Error $y, backtrace $(backtrace())")
+                println("Error $y, backtrace $(backtrace())")
                 if if_miss == "Exit"
                     throw(error("When importing frame: Unable to find save frame $block in $location"))
                 end
                 continue
             end
-            #println("Now merging $block into $(get(one_block,"_definition.id","?"))")
             definition = one_row.master_id
             prior_contents = filter_on_name(d,definition)
             #println("Already present for $definition:")
@@ -598,17 +573,17 @@ can simply be appended.
             for k in keys(import_def)
                 if nrow(import_def[k])==0 continue end
                 # drop old master id
-                # println("Dropping :master_id from $k")
+                #println("Dropping :master_id from $k")
                 #println("Processing $k for $definition")
                 select!(import_def[k],Not(:master_id))
                 if haskey(prior_contents,k) && nrow(prior_contents[k]) > 0
-                    #println("$k already present for $definition")
-                    #println("intersecting $(propertynames(prior_contents[k])) , $(propertynames(import_def[k]))")
+                    println("$k already present for $definition")
+                    println("intersecting $(propertynames(prior_contents[k])) , $(propertynames(import_def[k]))")
                     dupls = intersect(propertynames(prior_contents[k]),propertynames(import_def[k]))
                     filter!(x->!(all(ismissing,prior_contents[k][!,x])) && !(all(ismissing,import_def[k][!,x])),dupls)
                     import_def[k][!,:master_id] .= definition
                     if length(dupls) > 0
-                        #println("For $k handling duplicate defs $dupls")
+                        println("For $k handling duplicate defs $dupls")
                         if if_dupl == "Exit"
                             throw(error("Keys $dupls duplicated when importing from $block at $location in category $k"))
                         end
@@ -623,13 +598,13 @@ can simply be appended.
                             end
                         end
                     else
-                        #println("imports were $(import_def[k])\n, updating with $(prior_contents[k])...")
+                        println("imports were $(import_def[k])\n, updating with $(prior_contents[k])...")
                         for n in propertynames(prior_contents[k])
                             if !all(ismissing,prior_contents[k][!,n])
                                 import_def[k][!,n] .= prior_contents[k][!,n]
                             end
                         end
-                        #println("imports now $(import_def[k])")
+                        println("imports now $(import_def[k])")
                     end
                 end
                 import_def[k][!,:master_id] .= definition
@@ -654,54 +629,6 @@ object passed to us is just the save frames from a dictionary.
 
 The importing Head category is given a category of "." (nothing).
 ==#
-resolve_full_imports!(c::NativeCif,imp_blocks) = begin
-    original_dir = dirname(c.original_file)
-    for into_block in imp_blocks
-        import_table = into_block["_import.get"][1]
-        import_def = nothing   #define it in the right scope
-        for one_entry in import_table
-            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
-            if mode == "Contents"
-                continue   # we have done this
-            end
-            if into_block["_definition.class"][1] != "Head"
-                println("WARNING: full mode imports into non-head categories not supported, ignored")
-                continue
-            end
-            importee = DDLm_Dictionary(location)  #this will perform nested imports
-            importee_head = importee[block]
-            if importee_head["_definition.class"][] != "Head"
-                println("WARNING: full mode imports of non-head categories not supported, ignored")
-                continue
-            end
-            # define a combiner function
-            combiner(a,b) = begin
-                if if_dupl == "Exit"
-                    error("Block duplicated when importing from $location: $a and $b")
-                elseif if_dupl == "Ignore"
-                    return a
-                elseif if_dupl == "Replace"
-                    return b
-                end
-            end
-            # store the name of the old head category...and delete
-            old_head = lowercase(importee_head["_name.object_id"][1])
-            new_head = into_block["_name.object_id"][1]
-            delete!(importee.block.save_frames,block)
-            # merge the save frames
-            # println("Before merging, $(length(c.contents)) save frames")
-            merge!(combiner,c.contents,importee.block.save_frames)
-            # println("After merging, $(length(c.contents)) save frames")
-            # reparent those blocks that have the old head category as parent
-            for k in keys(c)
-                if lowercase(get(c[k],"_name.category_id",[""])[1]) == old_head
-                    c[k]["_name.category_id"] = [new_head]
-                end
-            end
-        end   #of one entry
-    end  #of one _import.get statement
-    return c
-end
 
 resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     original_dir = dirname(original_file)
@@ -789,37 +716,55 @@ enter_defaults(d) = begin
     end
 end
 
-"""
+# == Reference dictionaries
 
-Create a `DDLm_Dictionary` from `ds`, using the category scheme and
-attributes in `att_dic`, sorting definitions based on the attributes in
-`dividers`.  ds must contain `_dictionary.title`
-"""
-DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
-    dicname = ds["_dictionary.title"][]
-    att_cats = get_categories(att_dic)
-    att_info = Dict{Symbol,DataFrame}()
-    for ac in att_cats
-        catinfo = get_category(datasource,ac)
-        df = DataFrame(catinfo)
-        att_info[Symbol(ac)] = df
-    end
-    for d in dividers
-        tab_name = Symbol(find_category(att_dic,d))
-        col_name = Symbol(find_object(att_dic,d))
-        att_info[tab_name].master_id = att_info[tab_name].col_name
-    end
-    for (tab,cols) in att_info
-        if !(:master_id in propertynames(cols))
-            att_info[tab].master_id = dicname
+# Reference dictionaries should include information about 'master_id', but
+# this is absent from the surface of a DDLm dictionary. We add back in all of
+# the master_id information
+
+# Every category has a master_id data name, these are linked, and they form
+# part of the key of every category. This information has to be added to the
+# reference dictionary as if these were already present.
+
+extra_reference!(t::Dict{Symbol,DataFrame}) = begin
+    # add category key information
+    cats = get_categories(t)
+    for one_cat in cats
+        if one_cat == "attributes" continue end #no head category
+        target_name = "_$one_cat.master_id"
+        push!(t[:category_key],Dict(:name => target_name,
+                                    :master_id => one_cat),cols=:union)
+        push!(t[:definition],Dict(:id => target_name,
+                                  :class => "Attribute",
+                                  :scope => "Item",
+                                  :master_id => target_name),cols=:union)
+        push!(t[:type],Dict(:contents => "Code",
+                            :purpose => "Link",
+                            :source => "Related",
+                            :container => "Single",
+                            :master_id => target_name),cols=:union)
+        push!(t[:description],Dict(:text=> "Auto-generated dataname to satisfy relational model",
+                                  :master_id => target_name),cols=:union)
+
+        if Symbol(one_cat) in [:dictionary,:dictionary_audit,:dictionary_valid]
+            push!(t[:name],Dict(:object_id => "master_id",
+                                :category_id => one_cat,
+                                :linked_item_id => "_dictionary.master_id",
+                                :master_id => "_$one_cat.master_id"),cols=:union)
+        else
+            push!(t[:name],Dict(:object_id => "master_id",
+                                :category_id => one_cat,
+                                :linked_item_id => "_definition.master_id",
+                                :master_id => target_name),cols=:union)
         end
-    end
-    DDLm_Dictionary(att_info)
+                                  
+    end        
 end
+
 
 # Output
 
-Base.show(io,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
+show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     dicname = ddlm_dic[:dictionary].title[]
     write(io,"#\\#CIF_2.0\n")
     write(io,"""

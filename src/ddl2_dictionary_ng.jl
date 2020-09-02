@@ -95,6 +95,9 @@ end
 
 get_child_categories(d::DDL2_Dictionary,catname) = []
 
+is_set_category(d::DDL2_Dictionary,catname) = false
+is_loop_category(d::DDL2_Dictionary,catname) = true
+
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)
         return split(dataname,".")[end]
@@ -184,7 +187,7 @@ update_row!(all_dict_info,new_vals,blockname) = begin
     if !haskey(all_dict_info,catname)
         all_dict_info[catname] = DataFrame()
     end
-    final_vals = Dict((Symbol(split(x.first,'.')[end]),x.second) for x in new_vals)
+    final_vals = Dict{Symbol,Any}((Symbol(split(x.first,'.')[end]),x.second) for x in new_vals)
     final_vals[:__blockname] = blockname
     #push!(all_dict_info[catname],final_vals,cols=:union) dataframes 0.21
     all_dict_info[catname] = vcat(all_dict_info[catname],DataFrame(final_vals),cols=:union)

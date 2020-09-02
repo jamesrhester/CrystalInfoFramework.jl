@@ -29,6 +29,18 @@ end
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
 end
 ==#
+
+@testset "DDLm reference dictionaries" begin
+    t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+    @test "_definition.master_id" in keys(t)
+    @test t["_definition.master_id"][:definition].id[] == "_definition.master_id"
+    @test find_name(t,"enumeration_set","master_id") == "_enumeration_set.master_id"
+    @test find_object(t,"_type.master_id") == "master_id"
+    @test "master_id" in get_objs_in_cat(t,"enumeration_set")
+    @test "_units.master_id" in get_keys_for_cat(t,"units")
+    @test get_linked_name(t,"_method.master_id") == "_definition.master_id"
+end
+
 @testset "DDL2 dictionaries" begin
     t = DDL2_Dictionary(joinpath(@__DIR__,"ddl_core_2.1.3.dic"))
     @test find_category(t,"_sub_category_examples.case") == "sub_category_examples"
