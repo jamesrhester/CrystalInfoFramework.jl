@@ -4,10 +4,12 @@
 # Next generation: reads the dictionary as a database the way
 # the PDB intended, and split on '.' for cat/obj
 #
-export DDL2_Dictionary
+export DDL2_Dictionary,as_data
 
 struct DDL2_Dictionary <: abstract_cif_dictionary
     block::Dict{Symbol,DataFrame}
+    func_defs::Dict{String,Function}
+    func_text::Dict{String,Expr} #unevaluated Julia code
     parent_lookup::Dict{String,String}
 end
 
@@ -30,7 +32,7 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
         loops = get_loop_names(defs[k])
         for one_loop in loops
             new_info = get_loop(defs[k],first(one_loop))
-            update_dict!(all_dict_info,new_info,lowercase(k))
+            update_dict!(all_dict_info,new_info,CaselessString(k))
         end
         # process unlooped
         unlooped = [x for x in keys(defs[k]) if !(x in Iterators.flatten(loops))]
@@ -40,14 +42,14 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
             dnames = filter(x-> split(x,'.')[1][2:end] == one_cat,unlooped)
             new_vals = (defs[k][x][] for x in dnames)
             @assert length(new_vals)>0
-            update_row!(all_dict_info,Dict(zip(dnames,new_vals)),lowercase(k))
+            update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString(k))
         end
     end
     # and now store information in the enclosing block
     loops = get_loop_names(b)
     for one_loop in loops
         new_info = get_loop(b,first(one_loop))
-        update_dict!(all_dict_info,new_info,blockname)
+        update_dict!(all_dict_info,new_info,CaselessString(blockname))
     end
     # process unlooped
     unlooped = [x for x in keys(b) if !(x in Iterators.flatten(loops))]
@@ -55,7 +57,7 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
     for one_cat in cats
         dnames = filter(x-> split(x,'.')[1][2:end] == one_cat,unlooped)
         new_vals = (b[x][] for x in dnames)
-        update_row!(all_dict_info,Dict(zip(dnames,new_vals)),blockname)
+        update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString(blockname))
     end
     # Add implicit values
     populate_implicits(all_dict_info)
@@ -63,7 +65,18 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
     parent_dict = generate_parents(defs)
     # And add category, object
     add_cat_obj!(all_dict_info)
-    return DDL2_Dictionary(all_dict_info,parent_dict)
+    return DDL2_Dictionary(all_dict_info,Dict(),Dict(),parent_dict)
+end
+
+"""
+Construct a dictionary when provided with a collection of data frames indexed
+by symbols. The symbols are DDL2 attribute categories, and the dataframe columns
+are the object_ids of the DDL2 attributes of that category.
+
+TODO: work out child-parent relations as well
+"""
+DDL2_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
+    DDL2_Dictionary(attr_dict,Dict(),Dict(),Dict())
 end
 
 # Methods needed for creating DDLm Loop categories
@@ -72,7 +85,7 @@ Base.keys(d::DDL2_Dictionary) = Iterators.flatten((d.block[:item][!,:name],d.blo
 Base.haskey(d::DDL2_Dictionary,k::String) = k in keys(d)
 
 # Obtain all information about item `k` or category `k`
-Base.getindex(d::DDL2_Dictionary,k::String) = begin
+Base.getindex(d::DDL2_Dictionary,k) = begin
     info_dict = Dict{Symbol,DataFrame}()
     if '.' in k search_space = children_of_item else search_space = children_of_category end
     for one_child in search_space
@@ -86,11 +99,15 @@ Base.getindex(d::DDL2_Dictionary,k::String) = begin
     return info_dict
 end
 
+# If a symbol is passed we access the block directly.
+Base.getindex(d::DDL2_Dictionary,k::Symbol) = getindex(d.block,k)
+Base.get(d::DDL2_Dictionary,k::Symbol,default) = get(d.block,k,default)
+
 get_dic_name(d::DDL2_Dictionary) = d.block[:dictionary][:title][]
 get_dic_namespace(d::DDL2_Dictionary) = "ddl2"  #single namespace
 
 find_category(d::DDL2_Dictionary,dataname) = begin
-    return split(dataname,'.')[1][2:end]
+    return String(split(dataname,'.')[1][2:end])
 end
 
 get_child_categories(d::DDL2_Dictionary,catname) = []
@@ -100,12 +117,14 @@ is_loop_category(d::DDL2_Dictionary,catname) = true
 
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)
-        return split(dataname,".")[end]
+        return String(split(dataname,".")[end])
     end
     return nothing
 end
 
 get_categories(d::DDL2_Dictionary) = d.block[:category][!,:id]
+get_set_categories(d::DDL2_Dictionary) = []
+get_loop_categories(d::DDL2_Dictionary) = get_categories(d)
 
 get_keys_for_cat(d::DDL2_Dictionary,catname) = begin
     d[catname][:category_key][!,:name]
@@ -118,6 +137,17 @@ end
 get_objs_in_cat(d::DDL2_Dictionary,catname) = begin
     d.block[:item][d.block[:item].category_id .== catname,:__object_id]
 end
+
+get_default(d::DDL2_Dictionary,dataname) = begin
+    info = d[dataname]
+    if haskey(info,:item_default) && :value in propertynames(info[:item_default])
+        return info[:item_default].value[]
+    end
+    return missing
+end
+
+# Not available for DDL2
+lookup_default(d::DDL2_Dictionary,dataname,packet) = missing
 
 list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
     if include_self result = [name] else result = [] end
@@ -145,6 +175,7 @@ find_name(d::DDL2_Dictionary,cat,obj) = begin
     return "_"*cat*"."*obj
 end
 
+has_drel_methods(d::DDL2_Dictionary) = true
 """
 
 Create a dictionary allowing lookup in the direction child -> parent
@@ -262,6 +293,128 @@ end
 
 add_cat_obj!(all_info) = begin
     catobj = split.(all_info[:item][!,:name],".")
-    all_info[:item].category_id = [x[1][2:end] for x in catobj]
-    all_info[:item].__object_id = [x[2] for x in catobj]
+    all_info[:item].category_id = [String(x[1][2:end]) for x in catobj]
+    all_info[:item].__object_id = [String(x[2]) for x in catobj]
 end
+
+"""
+as_data(d::DDL2_Dictionary)
+
+Return an object `o` accessible using 
+`o[attribute]` where `attribute`
+is a ddl2 attribute.
+"""
+as_data(d::DDL2_Dictionary) = begin
+    output = Dict{String,Any}()
+    for c in keys(d.block)
+        for o in propertynames(d.block[c])
+            output["_$c.$o"] = d.block[c][!,o]
+        end
+    end
+    return output
+end
+
+## Handling functions
+
+# Methods for setting and retrieving evaluated functions
+set_func!(d::DDL2_Dictionary,func_name::String,func_text::Expr,func_code) = begin
+    d.func_defs[func_name] = func_code
+    d.func_text[func_name] = func_text
+    println("All funcs: $(keys(d.func_defs))")
+end
+
+get_func(d::DDL2_Dictionary,func_name::String) = d.func_defs[func_name]
+get_func_text(d::DDL2_Dictionary,func_name::String) = d.func_text[func_name]
+has_func(d::DDL2_Dictionary,func_name::String) = begin
+    try
+        d.func_defs[func_name]
+    catch KeyError
+        return false
+    end
+    return true
+end
+
+"""
+Return functions defined in the dictionary. DDL2 does not have this
+"""
+get_dict_funcs(d::DDL2_Dictionary) = (nothing,[])
+
+#== Extract the dREL text from the dictionary, if any
+DDL2 holds all methods in a table indexed by method_id, with the
+text listed in "_method_list.inline", the type of method given
+in "_method_list.code" and the language in _method_list.language.
+
+We say that 'Evaluation' == 'calculation' and accept only 'dREL'
+for now.
+==#
+load_func_text(dict::DDL2_Dictionary,dataname::String,meth_type::String) =  begin
+    if meth_type != "Evaluation" return "" end
+    full_def = dict[dataname]
+    meth_text = ""
+    println("Full def: $full_def")
+    if haskey(full_def,:item_methods)
+        for one_row in eachrow(full_def[:item_methods])
+            target = dict[:method_list][dict[:method_list].id .== one_row.method_id,:]
+            if lowercase(target.code[]) == "calculation" &&
+                lowercase(target.language[]) == "drel" meth_text = target.inline[]
+            end
+        end
+    elseif haskey(full_def,:category_methods)
+        for one_row in eachrow(full_def[:category_methods])
+            target = dict[:method_list][dict[:method_list].id .== one_row.method_id,:]
+            if lowercase(target.code[]) == "calculation" &&
+                lowercase(target.language[]) == "drel" meth_text = target.inline[]
+            end
+        end
+    end
+    return meth_text
+end
+
+# Methods for setting and retrieving definition functions
+has_default_methods(d::DDL2_Dictionary) = false
+
+get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractString) = begin
+    definition = cdic[find_name(cdic,cat,obj)]
+    type_index = definition[:item_type][!,:code][]
+    all_types = cdic[:item_type_list]
+    type_base = all_types[all_types[!,:code] .== type_index,:primitive_code][]
+    # only strings...
+    # println("DDL2 type for $cat/$obj is $type_base")
+    if type_base != "uchar" return String,"Single" end
+    return Symbol("CaselessString"),"Single"
+end
+
+get_container_type(cdic::DDL2_Dictionary,dataname) = "Single"
+    
+# Output
+
+show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
+    dicname = ddl2_dic[:dictionary].title[]
+    write(io,"#")
+    write(io,"""
+##############################################################
+#
+#        $dicname (DDL2)
+#
+##############################################################\n""")
+    write(io,"data_$dicname\n")
+    top_level = ddl2_dic[:dictionary]
+    show_set(io,"dictionary",top_level)
+    # Now for the rest
+    all_cats = sort!(get_categories(ddl2_dic))
+    for one_cat in all_cats
+        cat_info = ddl2_dic[one_cat]
+        show_one_def(io,one_cat,cat_info)
+        items = get_names_in_cat(ddl2_dic,one_cat)
+        for one_item in items
+            show_one_def(io,one_item,ddl2_dic[one_item])
+        end
+    end
+    # And the looped top-level stuff
+    for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history]
+        if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
+            show_loop(io,String(c),ddl2_dic[c])
+        end
+    end
+end
+

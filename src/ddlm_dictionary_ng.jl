@@ -28,15 +28,17 @@ export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
 export is_set_category,is_loop_category
-export get_func,set_func!,has_func
-export get_def_meth,get_def_meth_txt    #Methods for calculating defaults
-export get_julia_type_name,get_loop_categories, get_dimensions, get_single_keyname
+export get_func,get_func_text,set_func!,has_func,load_func_text
+export has_default_methods
+export get_def_meth,get_def_meth_txt,has_def_meth    #Methods for calculating defaults
+export get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
-export get_default
+export get_default,lookup_default
 export get_dic_name
 export get_cat_class
 export get_dic_namespace
 export is_category
+export find_head_category,add_head_category!
 import Base.show
 
 struct DDLm_Dictionary <: abstract_cif_dictionary
@@ -71,7 +73,7 @@ DDLm_Dictionary(b::FullBlock) = begin
         loops = get_loop_names(defs[k])
         for one_loop in loops
             new_info = get_loop(defs[k],first(one_loop))
-            update_dict!(all_dict_info,new_info,"master_id",defid)
+            update_dict!(all_dict_info,new_info,CaselessString("master_id"),defid)
         end
         # process unlooped
         unlooped = [x for x in keys(defs[k]) if !(x in Iterators.flatten(loops))]
@@ -81,14 +83,14 @@ DDLm_Dictionary(b::FullBlock) = begin
             dnames = filter(x-> split(x,'.')[1][2:end] == one_cat,unlooped)
             new_vals = (defs[k][x][] for x in dnames)
             @assert length(new_vals)>0
-            update_row!(all_dict_info,Dict(zip(dnames,new_vals)),"master_id",defid)
+            update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString("master_id"),defid)
         end
     end
     # and now store information in the enclosing block
     loops = get_loop_names(b)
     for one_loop in loops
         new_info = get_loop(b,first(one_loop))
-        update_dict!(all_dict_info,new_info,"master_id",title)
+        update_dict!(all_dict_info,new_info,CaselessString("master_id"),title)
     end
     # process unlooped
     unlooped = [x for x in keys(b) if !(x in Iterators.flatten(loops))]
@@ -96,7 +98,7 @@ DDLm_Dictionary(b::FullBlock) = begin
     for one_cat in cats
         dnames = filter(x-> split(x,'.')[1][2:end] == one_cat,unlooped)
         new_vals = (b[x][] for x in dnames)
-        update_row!(all_dict_info,Dict(zip(dnames,new_vals)),"master_id",title)
+        update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString("master_id"),title)
     end
     # process imports - could we do this separately?
     resolve_imports!(all_dict_info,b.original_file)
@@ -136,7 +138,7 @@ end
 Base.haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
 
 # Obtain all information about definition `k`
-Base.getindex(d::DDLm_Dictionary,k::String) = begin
+Base.getindex(d::DDLm_Dictionary,k) = begin
     canonical_name = find_name(d,k)
     return filter_on_name(d.block,canonical_name)
 end
@@ -213,19 +215,24 @@ end
 
 """
 Find the canonical name for `name`. If accessed in cat/obj format, search also child
-categories.
+categories. Note that the head category may not have a category associated with it.
 """
 find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
 
 find_name(d::DDLm_Dictionary,cat,obj) = begin
-    pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(cat)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
-    if length(pname) > 0 return pname[] end
+    catcol = d[:name][!,:category_id]
+    selector = map(x-> !isnothing(x) && x == lowercase(cat),catcol)
+    pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
+    if length(pname) == 1 return pname[]
+    elseif length(pname) > 1
+        throw(error("More than one name satisfies $cat.$obj: $pname"))
+    end
     for c in get_child_categories(d,cat)
         pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(c)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
-        if length(pname) > 0 return pname[] end
-    end
-    if obj == "master_id"    #special
-        return "_$cat.$obj"
+        if length(pname) == 1 return pname[]
+        elseif length(pname) > 1
+            throw(error("More than one name satisfies $c.$obj: $pname"))
+        end
     end
     throw(KeyError("$cat/$obj"))
 end
@@ -252,7 +259,12 @@ is_loop_category(d::DDLm_Dictionary,catname) = begin
     return cat_decl == "Loop"
 end
 
-get_objs_in_cat(d::DDLm_Dictionary,cat) = lowercase.(d[:name][lowercase.(d[:name][!,:category_id]) .== lowercase(cat),:object_id])
+get_objs_in_cat(d::DDLm_Dictionary,cat) = begin
+    temp = d[:name][!,:category_id]
+    selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),temp)
+    lowercase.(d[:name][selector,:object_id])
+end
+
 
 # Dictionary 'Set' categories are really loop categories with the definition id as the
 # key data name
@@ -385,7 +397,66 @@ get_default(b::DDLm_Dictionary,s) = begin
     return info
 end
 
+#==   Lookup 
+
+A default value may be tabulated, and some other value in the
+current packet is used to index into the table. `cp` is an
+object with symbolic properties corresponding to the
+items in a category.
+
+==#
+
+lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
+    definition = dict[dataname][:enumeration]
+    index_name = :def_index_id in propertynames(definition) ? definition[!,:def_index_id][] : missing
+    if ismissing(index_name) return missing end
+    object_name = find_object(dict,index_name)
+    # Note non-deriving form of getproperty
+    println("Looking for $object_name in $(get_name(getfield(cp,:source_cat)))")
+    current_val = getproperty(cp,Symbol(object_name))
+    print("Indexing $dataname using $current_val to get")
+    # Now index into the information
+    indexlist = dict[dataname][:enumeration_default][!,:index]
+    pos = indexin([current_val],indexlist)
+    if pos[1] == nothing return missing end
+    return dict[dataname][:enumeration_default][!,:value][pos[1]]
+end
+
 # Methods for setting and retrieving evaluated functions
+#== Extract the dREL text from the dictionary, if any
+==#
+load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String) =  begin
+    full_def = dict[dataname]
+    func_text = full_def[:method]
+    if size(func_text,2) == 0   #nothing
+        return ""
+    end
+    # TODO: allow multiple methods
+    eval_meths = func_text[func_text[!,:purpose] .== meth_type,:]
+    println("Meth size for $dataname is $(size(eval_meths))")
+    if size(eval_meths,1) == 0
+        return ""
+    end
+    eval_meth = eval_meths[!,:expression][]
+end
+
+"""
+as_data(d::DDLm_Dictionary)
+
+Return an object `o` accessible using 
+`o[attribute]` where `attribute`
+is a ddlm attribute.
+"""
+as_data(d::DDLm_Dictionary) = begin
+    output = Dict{String,Any}()
+    for c in keys(d.block)
+        for o in propertynames(parent(d.block[c]))
+            output["_$c.$o"] = parent(d.block[c])[!,o]
+        end
+    end
+    return output
+end
+
 set_func!(d::DDLm_Dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
@@ -404,7 +475,8 @@ has_func(d::DDLm_Dictionary,func_name::String) = begin
 end
 
 # Methods for setting and retrieving definition functions
-
+has_default_methods(d::DDLm_Dictionary) = true
+has_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = haskey(d.def_meths,(func_name,ddlm_attr))
 get_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = d.def_meths[(func_name,ddlm_attr)]
 get_def_meth_txt(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = d.def_meths_text[(func_name,ddlm_attr)]
 
@@ -441,6 +513,50 @@ update_row!(all_dict_info,new_vals,extra_name,extra_value) = begin
     final_vals[Symbol(extra_name)] = extra_value
     #push!(all_dict_info[catname],final_vals,cols=:union) dataframes 0.21
     all_dict_info[catname] = vcat(all_dict_info[catname],DataFrame(final_vals),cols=:union)
+end
+
+"""
+find_head_category(ds)
+
+Find the category that is at the top of the category tree.
+`df` is essentially the `:name` category as a DataFrame.
+"""
+find_head_category(df::DataFrame) = begin
+    # get first and follow it up
+    some_cat = df.category_id[1]
+    old_cat = some_cat
+    while true
+        some_cat = df[df[!,:object_id] .== some_cat,:category_id]
+        if length(some_cat) == 0 || some_cat[] == old_cat break end
+        println("$old_cat -> $some_cat")
+        old_cat = some_cat[]
+    end
+    println("head category is $old_cat")
+    return lowercase(old_cat)
+end
+
+find_head_category(df::Dict) = begin
+    find_head_category(df[:name])
+end
+
+find_head_category(df::DDLm_Dictionary) = begin
+    find_head_category(df[:name])
+end
+
+"""
+add_head_category!(df)
+
+Add a missing head category to the DataFrame dictionary `df`
+"""
+add_head_category!(df,head_name) = begin
+    hn = lowercase(head_name)
+    new_info = Dict("_definition.id"=>hn,"_definition.scope"=>"Category",
+                    "_definition.class"=>"Head")
+    update_row!(df,new_info,"master_id",hn)
+    new_info = Dict("_description.text"=>"This category is the parent of all other categories in the dictionary.")
+    update_row!(df,new_info,"master_id",hn)
+    new_info = Dict("_name.object_id"=>hn,"_name.category_id"=>hn)
+    update_row!(df,new_info,"master_id",hn)
 end
 
 const ddlm_categories = [
@@ -738,7 +854,7 @@ extra_reference!(t::Dict{Symbol,DataFrame}) = begin
                                   :class => "Attribute",
                                   :scope => "Item",
                                   :master_id => target_name),cols=:union)
-        push!(t[:type],Dict(:contents => "Code",
+        push!(t[:type],Dict(:contents => "Text",
                             :purpose => "Link",
                             :source => "Related",
                             :container => "Single",
@@ -777,8 +893,11 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     top_level = ddlm_dic[:dictionary]
     show_set(io,"dictionary",top_level)
     # Now for the rest
+    head = find_head_category(ddlm_dic)
+    show_one_def(io,head,ddlm_dic[head])
     all_cats = sort!(get_categories(ddlm_dic))
     for one_cat in all_cats
+        if one_cat == head continue end
         cat_info = ddlm_dic[one_cat]
         show_one_def(io,one_cat,cat_info)
         items = get_names_in_cat(ddlm_dic,one_cat)
@@ -788,37 +907,72 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     end
     # And the looped top-level stuff
     for c in [:dictionary_valid,:dictionary_audit]
-        if nrow(ddlm_dic[c]) > 0
+        if c in keys(ddlm_dic.block) && nrow(ddlm_dic[c]) > 0
             show_loop(io,String(c),ddlm_dic[c])
         end
     end
 end
 
-"""
-Show one DDLm dictionary definition. `info_dic` contains
-data frames containing relevant information
-"""
-show_one_def(io,def_name,info_dic) = begin
-    write(io,"\nsave_$def_name\n\n")
-    for (cat,df) in info_dic
-        if nrow(df) == 0 continue end
-        if nrow(df) == 1 show_set(io,cat,df) end
-        if nrow(df) > 1 show_loop(io,String(cat),df) end
-    end
-    write(io,"\nsave_\n")
+#==
+The dREL type machinery. Defined that take a string
+as input and return an object of the appropriate type
+==#
+
+#== Type annotation ==#
+const type_mapping = Dict( "Text" => String,        
+                           "Code" => Symbol("CaselessString"),                                                
+                           "Name" => String,        
+                           "Tag"  => String,         
+                           "Uri"  => String,         
+                           "Date" => String,  #change later        
+                           "DateTime" => String,     
+                           "Version" => String,     
+                           "Dimension" => Integer,   
+                           "Range"  => String, #TODO       
+                           "Count"  => Integer,    
+                           "Index"  => Integer,       
+                           "Integer" => Integer,     
+                           "Real" =>    Float64,        
+                           "Imag" =>    Complex,  #really?        
+                           "Complex" => Complex,     
+                           "Symop" => String,       
+                           # Implied     
+                           # ByReference
+                           "Array" => Array,
+                           "Matrix" => Array,
+                           "List" => Array{Any}
+                           )
+
+#TODO: Handle implied types
+get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString) = begin
+    if obj == "master_id" return AbstractString,"Single" end
+    definition = cdic[find_name(cdic,cat,obj)]
+    base_type = definition[:type][!,:contents][]
+    cont_type = definition[:type][!,:container][]
+    if cont_type == "Implied" cont_type = "Single" end  
+    julia_base_type = get(type_mapping,base_type,String)
+    return julia_base_type,cont_type
 end
 
-show_set(io,cat,df) = begin
-    colnames = sort!(propertynames(df))
-    for cl in colnames
-        if cl == :master_id continue end
-        if !ismissing(df[!,cl][])
-            Printf.@printf(io,"%-40s\t%s\n","_$cat.$cl","$(format_for_cif(df[!,cl][]))")
-        end
+# return dimensions as an Array. Note that we do not handle
+# asterisks, I think they are no longer allowed?
+# The first dimension in Julia is number of rows, then number
+# of columns. This is the opposite to dREL
+
+get_dimensions(cdic::DDLm_Dictionary,cat,obj) = begin
+    definition = cdic[find_name(cdic,cat,obj)][:type]
+    dims = :dimension in propertynames(definition) ? definition[!,:dimension][] : "[]"
+    if ismissing(dims) dims = "[]" end
+    final = eval(Meta.parse(dims))
+    if length(final) > 1
+        t = final[1]
+        final[1] = final[2]
+        final[2] = t
     end
+    return final
 end
 
-show_loop(io,cat,df) = begin
-    if nrow(df) == 0 return end
-    write(io,format_for_cif(df[!,Not(:master_id)];catname=cat))
-end       
+get_container_type(cdic::DDLm_Dictionary,dataname) = begin
+    return cdic[dataname][:type][!,:container][]
+end
+
