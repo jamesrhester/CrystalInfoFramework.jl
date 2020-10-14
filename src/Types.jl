@@ -1,7 +1,6 @@
 # Types for working with arbitrary data
 export DataSource,MultiDataSource, TypedDataSource
 export IsDataSource
-export CaselessString
 export AbstractRelationalContainer,RelationalContainer,DDLmCategory, CatPacket
 export CifCategory, LegacyCategory, SetCategory, LoopCategory
 
@@ -172,7 +171,7 @@ struct LegacyCategory <: CifCategory
     rawdata
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
-    dictionary::DDLm_Dictionary
+    dictionary::abstract_cif_dictionary
 end
 
 """
@@ -218,8 +217,3 @@ end
     
 DataSource(LoopCategory) = IsDataSource()
 
-# == Caseless strings ==#
-
-struct CaselessString <: AbstractString
-    actual_string::String
-end

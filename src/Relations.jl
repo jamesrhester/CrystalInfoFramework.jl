@@ -2,6 +2,8 @@ export generate_index,generate_keys
 export get_key_datanames,get_value, get_all_datanames, get_name, current_row
 export get_category,has_category,first_packet, construct_category, get_data
 export get_dictionary,get_packets
+export select_namespace,get_namespaces
+using CrystalInfoFramework:DDL2_Dictionary,DDLm_Dictionary
 
 get_key(row::Row) = begin
     kd = get_key_datanames(get_category(row))
@@ -105,7 +107,7 @@ get_category(r::RelationalContainer,one_cat::String) = begin
     get_category(r,realcat,nspace)
 end
 
-has_category(r::AbstractRelationalContainer,one_cat::String,nspace) = begin
+has_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace) = begin
     small_r = select_namespace(r,nspace)
     dict = get_dictionary(small_r,nspace)
     if any(n-> haskey(get_data(small_r),n),get_names_in_cat(dict,one_cat))
@@ -143,8 +145,8 @@ construct_category(r::AbstractRelationalContainer,one_cat::String,nspace) = begi
     small_r = select_namespace(r,nspace)
     dict = get_dictionary(small_r)
     cat_type = get_cat_class(dict,one_cat)
-    if cat_type == "Set" return SetCategory(one_cat,get_data(small_r),dict) end
-    if cat_type == "Loop"
+    if is_set_category(dict,one_cat) return SetCategory(one_cat,get_data(small_r),dict)
+    elseif is_loop_category(dict,one_cat)
         all_names = get_keys_for_cat(dict,one_cat)
         if all(k -> haskey(get_data(small_r),k), all_names)
             println("$one_cat is in relation")
@@ -162,10 +164,12 @@ end
 """
 get_packets distinguishes between Set categories and Loop categories,
 returns Loop categories unchanged and returns a single packet
-for Set categories.
+for Set categories.  If a category is missing, an empty array is
+returned.
 """
 get_packets(s::SetCategory) = first_packet(s)
 get_packets(l::LoopCategory) = l
+get_packets(missing) = []
 
 # getindex can only have one argument. So we allow the namespace
 # to be prepended using a character unlikely to be present in a
@@ -322,7 +326,7 @@ get_link_names(c::CifCategory) = throw(error("Not implemented"))
 Base.getindex(d::CifCategory,keyval) = begin
     a = get_key_datanames(d)
     if length(a) != 1
-        throw(error("Category $(get_name(d)) accessed with value $keyval but has $(length(a)) key datanames"))
+        throw(error("Category $(get_name(d)) accessed with value $keyval but has $(length(a)) key datanames $a"))
     end
     return d[Dict{Symbol,Any}(a[1]=>keyval)]
 end
@@ -330,6 +334,11 @@ end
 Base.getindex(d::CifCategory,dict::Dict{Symbol,V} where V) = begin
     get_row(d,dict)
 end
+
+Base.getindex(d::CifCategory,pairs...) = begin
+    getindex(d,Dict(pairs))
+end
+
 
 Base.show(io::IO,d::CifCategory) = begin
     print(io,"Category $(get_name(d)) ")
@@ -345,12 +354,7 @@ end
 
 Base.show(io::IO,::MIME"text/cif",d::LoopCategory) = begin
     catname = get_name(d)
-    df = DataFrame()
-    for n in keys(d)
-        if haskey(d,n)
-            df[!,n] = d[n]
-        end
-    end
+    df = DataFrame(d)
     formatted = format_for_cif(df,catname)
     print(io,formatted)
 end
@@ -381,25 +385,6 @@ LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     have_vals = unique(filter(k-> haskey(data,k) && !(k in key_names),data_names))
 
     println("For $catname datasource has names $have_vals")
-    #
-    # Keys are provided as symbols referring to column names
-    #
-    #
-    # Coherency check: all associated keys should have the same length
-    #
-    all_lengths = unique(length(data[k]) for k in have_vals)
-    if length(all_lengths)> 1
-        error("Inconsistent columns for $catname: $all_lengths")
-    end
-    if length(have_vals) > 0
-        keylengths = unique(length.(get_all_associated_indices(data,have_vals[1],k) for k in key_names))
-        if length(keylengths) > 1
-            error("Inconsistent key lengths for $catname: $keylengths")
-        end
-        if keylengths[] != all_lengths[]
-            error("For $catname key length $keylengths does not match value length: $all_lengths")
-        end
-    end
     key_names = [name_to_object[k] for k in key_names]
     # Child categories
     child_cats = create_children(catname,data,cifdic)
@@ -600,31 +585,6 @@ get_key_datanames(d::LoopCategory) = d.keys
 get_link_names(d::LoopCategory) = d.linked_names
 get_dictionary(d::LoopCategory) = d.dictionary
 
-merge_loops(parent::LoopCategory,child::LoopCategory) = begin
-    # find the keys
-    dic = get_dictionary(parent)
-    pkeys = get_key_datanames(parent)
-    pkeys_str = collect(parent.object_to_name[p] for p in pkeys)
-    ckeys = get_key_datanames(child)
-    lkeys = collect((c,get_linked_name(dic,child.object_to_name[c])) for c in ckeys)
-    dodgy = any(x->!(x[2] in pkeys_str),lkeys)
-    if dodgy
-        throw(error("Cannot merge: keys $pkeys and $ckeys do not match ($pkeys_str vs $(collect(lkeys)))"))
-    end
-    links = [(parent.name_to_object[c[2]],c[1]) for c in lkeys]
-    merged = leftjoin(parent,child, on = links)
-    newlookup =  merge(child.object_to_name,parent.object_to_name)
-    rename!(merged, newlookup)
-    LoopCategory(parent.name,
-                 propertynames(merged),
-                 parent.keys,
-                 merged,
-                 merge(parent.name_to_object,child.name_to_object),
-                 newlookup,
-                 [],
-                 parent.dictionary)  
-end
-
 Base.keys(d::LoopCategory) = get_object_names(d)
 
 SetCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
@@ -648,6 +608,7 @@ get_dictionary(s::SetCategory) = s.dictionary
 get_name(s::SetCategory) = s.name
 get_object_names(s::SetCategory) = s.present
 Base.keys(s::SetCategory) = s.present
+Base.haskey(s::SetCategory,name::String) = name in (s.object_to_name[x] for x in keys(s))
 
 get_value(s::SetCategory,i::Int,name::Symbol) = begin
     if i != 1
@@ -664,7 +625,7 @@ end
 Base.getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
 Base.length(s::SetCategory) = 1
 
-LegacyCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
+LegacyCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     #
     # Absorb dictionary information
     # 
@@ -714,3 +675,111 @@ create_children(name::String,data,cifdic) = begin
     child_names = get_child_categories(cifdic,name)
     return [LoopCategory(c,data,cifdic) for c in child_names]
 end
+
+"""
+Create a DataFrame from a Loop Category. Child categories are ignored. If `canonical`
+is true, canonical names are used instead of the default object names
+"""
+DataFrames.DataFrame(l::LoopCategory;canonical=false) = begin
+    rawnames = [l.object_to_name[o] for o in l.column_names if haskey(l.rawdata,l.object_to_name[o])]
+    rawdata = [l.rawdata[r] for r in rawnames]
+    if canonical
+        DataFrames.DataFrame(rawdata,rawnames,copycols=false)
+    else
+        objects = [l.name_to_object[q] for q in rawnames]
+        DataFrames.DataFrame(rawdata,objects,copycols=false)
+    end
+end
+
+DataFrames.DataFrame(s::SetCategory;canonical=false) = begin
+    rawnames = [s.object_to_name[o] for o in s.column_names if haskey(s.rawdata,s.object_to_name[o])]
+    rawdata = [s.rawdata[r] for r in rawnames]
+    if canonical
+        DataFrames.DataFrame(rawdata,rawnames,copycols=false)
+    else
+        objects = [s.name_to_object[q] for q in rawnames]
+        DataFrames.DataFrame(rawdata,objects,copycols=false)
+    end
+end
+
+"""
+DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers)
+
+Create a `DDLm_Dictionary` from `ds`, using the category scheme and
+attributes in `att_dic`, sorting definitions based on the attributes in
+`dividers`.  ds must contain `_dictionary.title`
+"""
+DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
+    dicname = ds["_dictionary.title"][]
+    nspace = haskey(ds,"_dictionary.namespace") ? ds["_dictionary.namespace"][] : "ddlm"
+    att_cats = get_categories(att_dic)
+    att_info = Dict{Symbol,DataFrames.DataFrame}()
+    #println("Cached values: $(ds.value_cache["ddlm"])")
+    println("All cats: $att_cats")
+    for ac in att_cats
+        println("Preparing category $ac")
+        if has_category(ds,ac,"ddlm") println("We have category $ac") end
+        catinfo = get_category(ds,ac,"ddlm")
+        println("We have catinfo $catinfo")
+        if ismissing(catinfo) continue end
+        df = unique!(DataFrame(catinfo))
+        att_info[Symbol(ac)] = df
+    end
+#==    for d in dividers
+        tab_name = Symbol(find_category(att_dic,d))
+        col_name = Symbol(find_object(att_dic,d))
+        println("For $d have $(att_info[tab_name])")
+        att_info[tab_name].master_id = att_info[tab_name][!,col_name]   
+end ==#
+    for (tab,cols) in att_info
+        if !(:master_id in propertynames(cols))
+            println("Adding a master_id to $tab")
+            att_info[tab].master_id = dicname
+        end
+    end
+    # make sure there is a head category
+    h = find_head_category(att_info)
+    if !(lowercase(h) in lowercase.(att_info[:definition][!,:id]))
+        add_head_category!(att_info,h)
+    end
+    DDLm_Dictionary(att_info,nspace)
+end
+
+"""
+DDL2_Dictionary(ds,att_dic::DDL2_Dictionary,dividers)
+
+Create a `DDL2_Dictionary` from `ds`, using the category scheme and
+attributes in `att_dic`, sorting definitions based on the attributes in
+`dividers`.  ds must contain `_dictionary.title`
+"""
+DDL2_Dictionary(ds,att_dic,dividers) = begin
+    dicname = ds["_dictionary.title"][]
+    nspace = "ddl2"
+    att_cats = get_categories(att_dic)
+    att_info = Dict{Symbol,DataFrames.DataFrame}()
+    #println("Cached values: $(ds.value_cache["ddlm"])")
+    println("All cats: $att_cats")
+    for ac in att_cats
+        println("Preparing category $ac")
+        if has_category(ds,ac,"ddl2") println("We have category $ac") end
+        catinfo = get_category(ds,ac,"ddl2")
+        println("We have catinfo $catinfo")
+        if ismissing(catinfo) continue end
+        df = unique!(DataFrame(catinfo))
+        att_info[Symbol(ac)] = df
+    end
+#==    for d in dividers
+        tab_name = Symbol(find_category(att_dic,d))
+        col_name = Symbol(find_object(att_dic,d))
+        println("For $d have $(att_info[tab_name])")
+        att_info[tab_name].master_id = att_info[tab_name][!,col_name]   
+end ==#
+    for (tab,cols) in att_info
+        if !(:master_id in propertynames(cols))
+            println("Adding a master_id to $tab")
+            att_info[tab].master_id = dicname
+        end
+    end
+    DDL2_Dictionary(att_info,nspace)
+end
+

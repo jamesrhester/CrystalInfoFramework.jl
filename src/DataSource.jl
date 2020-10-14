@@ -10,7 +10,6 @@ values could be associated with which other values.
 
 export get_assoc_index, get_all_associated_indices
 export get_assoc_value, get_all_associated_values
-export get_julia_type_name,convert_to_julia,get_dimensions
 export get_namespaces
 
 """
@@ -373,101 +372,7 @@ get_all_associated_indices(t::TypedDataSource,name,other_name) = begin
     println("Getting all linked values for $(raw_name[]) -> $(raw_other[]))")
     return get_all_associated_indices(ds,raw_name[],raw_other[])
 end
-
-#==
-The dREL type machinery. Defined that take a string
-as input and return an object of the appropriate type
-==#
-
-#== Type annotation ==#
-const type_mapping = Dict( "Text" => String,        
-                           "Code" => Symbol("CaselessString"),                                                
-                           "Name" => String,        
-                           "Tag"  => String,         
-                           "Uri"  => String,         
-                           "Date" => String,  #change later        
-                           "DateTime" => String,     
-                           "Version" => String,     
-                           "Dimension" => Integer,   
-                           "Range"  => String, #TODO       
-                           "Count"  => Integer,    
-                           "Index"  => Integer,       
-                           "Integer" => Integer,     
-                           "Real" =>    Float64,        
-                           "Imag" =>    Complex,  #really?        
-                           "Complex" => Complex,     
-                           "Symop" => String,       
-                           # Implied     
-                           # ByReference
-                           "Array" => Array,
-                           "Matrix" => Array,
-                           "List" => Array{Any}
-                           )
-
-get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString) = begin
-    definition = cdic[find_name(cdic,cat,obj)]
-    base_type = definition[:type][!,:contents][]
-    cont_type = definition[:type][!,:container][]
-    julia_base_type = type_mapping[base_type]
-    return julia_base_type,cont_type
-end
-
-get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractString) = begin
-    # only strings...
-    return String,"Single"
-end
-
-"""Convert to the julia type for a given category, object and String value.
-This is clearly insufficient as it only handles one level of arrays.
-
-The value is assumed to be an array containing string values of the particular 
-dataname, which is as usually returned by the CIF readers, even for single values.
-"""
-convert_to_julia(cdic,cat,obj,value::Array) = begin
-    julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
-    if typeof(value) == Array{julia_base_type,1} return value end
-    change_func = (x->x)
-    # println("Julia type for $base_type is $julia_base_type, converting $value")
-    if julia_base_type == Integer
-        change_func = (x -> map(y->parse(Int,y),x))
-    elseif julia_base_type == Float64
-        change_func = (x -> map(y->real_from_meas(y),x))
-    elseif julia_base_type == Complex
-        change_func = (x -> map(y->parse(Complex{Float64},y),x))   #TODO: SU on values
-    elseif julia_base_type == String
-        change_func = (x -> map(y-> if isnothing(y) "." else String(y) end,x))
-    elseif julia_base_type == Symbol("CaselessString")
-        change_func = (x -> map(y->CaselessString(y),x))
-    end
-    if cont_type == "Single"
-        return change_func(value)
-    elseif cont_type in ["Array","Matrix"]
-        return map(change_func,value)
-    else error("Unsupported container type $cont_type")   #we can do nothing
-    end
-end
-
-convert_to_julia(cdic,dataname::AbstractString,value) = begin
-    return convert_to_julia(cdic,find_category(cdic,dataname),find_object(cdic,dataname),value)
-end
-
-# return dimensions as an Array. Note that we do not handle
-# asterisks, I think they are no longer allowed?
-# The first dimension in Julia is number of rows, then number
-# of columns. This is the opposite to dREL
-
-get_dimensions(cdic,cat,obj) = begin
-    definition = cdic[find_name(cdic,cat,obj)][:type]
-    dims = :dimension in propertynames(definition) ? definition[!,:dimension][] : "[]"
-    final = eval(Meta.parse(dims))
-    if length(final) > 1
-        t = final[1]
-        final[1] = final[2]
-        final[2] = t
-    end
-    return final
-end
-    
+   
 real_from_meas(value::String) = begin
     #println("Getting real value from $value")
     if '(' in value
@@ -482,46 +387,5 @@ Range(v::String) = begin
     parse(Number,lower),parse(Number,upper)
 end
 
-# == CaselessString == #
-
-Base.:(==)(a::CaselessString,b::AbstractString) = begin
-    lowercase(a.actual_string) == lowercase(b)
-end
-
-Base.:(==)(a::AbstractString,b::CaselessString) = begin
-    lowercase(a) == lowercase(b.actual_string)
-end
-
-Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
-
-#== the following don't work, for now we have explicit types 
-Base.:(==)(a::AbstractString,b::SubString{T} where {T}) = a == T(b)
-
-Base.:(==)(a::SubString{T} where {T},b::AbstractString) = T(a) == b
-==#
-
-Base.:(==)(a::SubString{CaselessString},b::AbstractString) = CaselessString(a) == b
-Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = CaselessString(b) == a
-Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = a == CaselessString(b)
-
-Base.iterate(c::CaselessString) = iterate(c.actual_string)
-Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
-Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
-Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
-Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
-
-#== A caseless string should match both upper and lower case
-==#
-Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
-    for (k,v) in d
-        if lowercase(k) == lowercase(key)
-            return v
-        end
-    end
-    KeyError("$key not found")
-end
-
-Base.haskey(d::Dict{CaselessString,Any},key) = haskey(d,lowercase(key)) 
-#
 #== End of Data Sources ==#
 
