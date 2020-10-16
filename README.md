@@ -1,3 +1,4 @@
+![Testing](https://github.com/jamesrhester/CrystalInfoFramework.jl/workflows/Run%20tests/badge.svg)
 # CrystalInfoFramework.jl
 
 Julia tools for working with the
