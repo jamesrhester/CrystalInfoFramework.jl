@@ -20,7 +20,7 @@ now is the time to raise an issue.
 ## Installation
 
 Apart from installing Julia, you will need the C library
-[cifapi](https://github.org/comcifs/cif_api) installed in a standard
+[cifapi](https://github.com/COMCIFS/cif_api) installed in a standard
 place on your system.
 
 ## Getting started
