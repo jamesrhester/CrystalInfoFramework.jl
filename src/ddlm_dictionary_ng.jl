@@ -221,7 +221,7 @@ find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
 
 find_name(d::DDLm_Dictionary,cat,obj) = begin
     catcol = d[:name][!,:category_id]
-    selector = map(x-> !isnothing(x) && x == lowercase(cat),catcol)
+    selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),catcol)
     pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
     if length(pname) == 1 return pname[]
     elseif length(pname) > 1
@@ -412,7 +412,7 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     if ismissing(index_name) return missing end
     object_name = find_object(dict,index_name)
     # Note non-deriving form of getproperty
-    println("Looking for $object_name in $(get_name(getfield(cp,:source_cat)))")
+    println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
     current_val = getproperty(cp,Symbol(object_name))
     print("Indexing $dataname using $current_val to get")
     # Now index into the information

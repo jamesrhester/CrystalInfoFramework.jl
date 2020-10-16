@@ -51,7 +51,7 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
     if typeof(value) == Array{julia_base_type,1} return value end
     change_func = (x->x)
-    # println("Julia type for $base_type is $julia_base_type, converting $value")
+    #println("Julia type for $cat/$obj is $julia_base_type, converting $value")
     if julia_base_type == Integer
         change_func = (x -> map(y->parse(Int,y),x))
     elseif julia_base_type == Float64
