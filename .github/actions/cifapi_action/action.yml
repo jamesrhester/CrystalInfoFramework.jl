@@ -1,0 +1,9 @@
+name: 'Install CIFAPI'
+description: 'Make the cifapi library available to workflows'
+outputs:
+        result:
+                description: 'Successful installation'
+
+runs:
+        using: 'docker'
+        image: 'Dockerfile'
