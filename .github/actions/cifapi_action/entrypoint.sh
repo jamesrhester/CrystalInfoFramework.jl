@@ -4,6 +4,6 @@
 
 git clone https://github.com/COMCIFS/cif_api cif_api
 pushd cif_api
-./configure
-make install-exec
+./configure --without-docs
+make install
 
