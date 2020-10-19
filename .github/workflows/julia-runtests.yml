@@ -15,10 +15,10 @@ jobs:
             julia-arch: x86
 
     steps:
+      - uses: ./.github/actions/cifapi_action
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
-      - uses: ./.github/actions/cifapi_action
       - uses: julia-actions/julia-runtest@latest
