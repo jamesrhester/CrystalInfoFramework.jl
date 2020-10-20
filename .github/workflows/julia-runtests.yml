@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    env:
+            LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
     strategy:
       matrix:
         julia-version: ['1.2', '1', 'nightly']
@@ -18,8 +20,6 @@ jobs:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/cifapi_action
       - name: check the file location
-        env: 
-            LD_LIBRARY_PATH: ${{ env.GITHUB_WORKSPACE }}/lib
         run: |
                 ls $GITHUB_WORKSPACE/lib
                 set
@@ -28,5 +28,3 @@ jobs:
            version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
-        env: 
-           LD_LIBRARY_PATH: ${{ env.GITHUB_WORKSPACE }}/lib
