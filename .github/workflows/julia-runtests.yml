@@ -6,7 +6,7 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     env:
-            LD_LIBRARY_PATH: ${{ github.workspace }}/lib
+            LD_LIBRARY_PATH: ${{ github.workspace }}/lib:/usr/lib:/lib:/lib64
     strategy:
       matrix:
         julia-version: ['1.2', '1', 'nightly']
@@ -22,6 +22,7 @@ jobs:
       - name: check the file location
         run: |
                 ls $GITHUB_WORKSPACE/lib
+                ldd $GITHUB_WORKSPACE/lib/libcif.so
                 set
       - uses: julia-actions/setup-julia@latest
         with:
