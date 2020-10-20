@@ -21,8 +21,8 @@ jobs:
         env: 
             LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
         run: |
-                pwd
                 ls $GITHUB_WORKSPACE/lib
+                set
       - uses: julia-actions/setup-julia@latest
         with:
            version: ${{ matrix.julia-version }}
