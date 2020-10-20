@@ -19,7 +19,7 @@ jobs:
       - uses: ./.github/actions/cifapi_action
       - name: check the file location
         env: 
-            LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
+            LD_LIBRARY_PATH: ${{ GITHUB_WORKSPACE }}/lib
         run: |
                 ls $GITHUB_WORKSPACE/lib
                 set
@@ -29,4 +29,4 @@ jobs:
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
         env: 
-           LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
+           LD_LIBRARY_PATH: ${{ GITHUB_WORKSPACE }}/lib
