@@ -19,14 +19,14 @@ jobs:
       - uses: ./.github/actions/cifapi_action
       - name: check the file location
         env: 
-            LD_LIBRARY_PATH: $HOME/lib
+            LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
         run: |
                 pwd
-                ls $HOME/lib
+                ls $GITHUB_WORKSPACE/lib
       - uses: julia-actions/setup-julia@latest
         with:
            version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
         env: 
-           LD_LIBRARY_PATH: $HOME/lib
+           LD_LIBRARY_PATH: $GITHUB_WORKSPACE/lib
