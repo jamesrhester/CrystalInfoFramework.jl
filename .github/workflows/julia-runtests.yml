@@ -17,12 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/cifapi_action
-      - name: check library is present and findable
+      - name: check the file location
+        env: LD_LIBRARY_PATH ${{ github.repository }}/lib
         run: |
                 pwd
-                ldconfig -v
+                ls ${{ github.repository }}/lib
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
+        env: LD_LIBRARY_PATH ${{ github.repository }}/lib
