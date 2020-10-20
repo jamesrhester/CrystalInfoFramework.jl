@@ -19,7 +19,7 @@ jobs:
       - uses: ./.github/actions/cifapi_action
       - name: check library is present and findable
         run: |
-                ls /usr/local/lib
+                pwd
                 ldconfig -v
       - uses: julia-actions/setup-julia@latest
         with:
