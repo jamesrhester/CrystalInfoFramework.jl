@@ -7,5 +7,5 @@ outputs:
 runs:
         using: 'docker'
         image: 'Dockerfile'
-        args:
-                - ${{ HOME }}
+        env:
+           INST_HOME: $HOME
