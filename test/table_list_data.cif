@@ -1,0 +1,10 @@
+#\#CIF_2.0
+
+data_tl_data
+
+_import.get [{"file":. "block":? "mode":"Contents"}
+             {"a":1 "b":2 "c":whatever}
+             ]
+             
+_list_in_table {"a":[1 2 3 4] "q":[a b c d]}
+
