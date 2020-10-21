@@ -1,5 +1,5 @@
 ![Testing](https://github.com/jamesrhester/CrystalInfoFramework.jl/workflows/Run%20tests/badge.svg)
-![Coverage Status](https://coveralls.io/repos/github/jamesrhester/CrystalInfoFramework.jl/badge.svg?branch=master)]
+![Coverage Status](https://coveralls.io/repos/github/jamesrhester/CrystalInfoFramework.jl/badge.svg?branch=master)
 # CrystalInfoFramework.jl
 
 Julia tools for working with the
