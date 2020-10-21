@@ -33,14 +33,14 @@ jobs:
         with:
                 coverage: 'false'
       - name: Do the coverage run
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64'
         uses: julia-actions/julia-runtest@latest
       - name: Process the coverage run
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64'
         run: |
                        julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info",process_folder())'
       - name: Upload coverage data
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64'
         uses: coverallsapp/github-action@master
         with:
               github-token: ${{ secrets.GITHUB_TOKEN }}
