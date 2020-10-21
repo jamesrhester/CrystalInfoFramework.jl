@@ -28,27 +28,20 @@ jobs:
         with:
            version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
+        name: Run test no coverage
       - uses: julia-actions/julia-runtest@latest
         with:
                 coverage: 'false'
-  coverage:
-     runs-on: ubuntu-latest
-     needs: test
-     env:
-            LD_LIBRARY_PATH: ${{ github.workspace }}/lib:/usr/lib:/lib:/lib64
-     strategy:
-             matrix:
-                 julia-version: ['1.2']
-                 julia-arch: [x64]
-                 os: [ubuntu-latest]
-     steps:
-             - uses: julia-actions/julia-runtest@latest
-             - name: Convert coverage to LCOV
-               run: |
-
+      - name: Do the coverage run
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        uses: julia-actions/julia-runtest@latest
+      - name: Process the coverage run
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        run: |
                        julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info",process_folder())'
-             - uses: coverallsapp/github-action@master
+      - name: Upload coverage data
+        if: matrix.julia-version == '1.2' && matrix.julia-arch == x64
+        uses: coverallsapp/github-action@master
                with:
                        github-token: ${{ secrets.GITHUB_TOKEN }}
-                       path-to-lcov: "./lcov.info"
-
+                       path-to-lcov: './lcov.info'
