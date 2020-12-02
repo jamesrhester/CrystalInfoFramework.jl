@@ -1,10 +1,13 @@
-#= This file defines the basic methods for interaction with CIF files.
+# **Working with libcifapi**
 
-Note that the earlier methods define types and provide functions 
-that interact directly with the libcif C API. The minimum required
-are defined here, plus some no longer used destructors. Comprehensive
-functions for working with a CIF held within the C API have been
-removed. =#
+# Note that the earlier methods define types and provide functions 
+# that interact directly with the libcif C API. The minimum required
+# are defined here, plus some no longer used destructors. Comprehensive
+# functions for working with a CIF held within the C API have been
+# removed.
+#
+# The types defined here should mimic the layout expected by libcifapi.
+#
 
 import Base.Libc:FILE
 
@@ -23,10 +26,10 @@ end
 
 """A finalizer for a C-allocated CIF object"""
 cif_destroy!(x) =  begin
-    #q = time_ns()
-    #error_string = "$q: Finalizing CIF object $x"
-    #t = @task println(error_string)
-    #schedule(t)
+    ##q = time_ns()
+    ##error_string = "$q: Finalizing CIF object $x"
+    ##t = @task println(error_string)
+    ##schedule(t)
     val = ccall((:cif_destroy,"libcif"),Cint,(Ptr{cif_tp},),x.handle)
     if val != 0
         error(error_codes[val])
@@ -78,11 +81,7 @@ end
 
 Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
 
-#==
-
-   CIF values
-
-   ==#
+# **CIF values**
 
 """The general value type of a CIF file"""
 mutable struct cif_value_tp
@@ -105,6 +104,8 @@ value_free!(x::cif_value_tp_ptr) = begin
     ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
+# All values returned by libcifapi have a string representation.
+
 Base.String(t::cif_value_tp_ptr) = begin
    #Get the textual representation
    s = Uchar(0)
@@ -115,8 +116,8 @@ Base.String(t::cif_value_tp_ptr) = begin
    new_string = make_jl_string(s)
 end
 
-#== Use syntactical information to pin down the types a bit
-==#
+# Classify the type. For numbers and strings we leave alone, so that the string
+# retrieval above can use the pointer.
 
 get_syntactical_type(t::cif_value_tp_ptr) = begin
     val_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),t.handle)
@@ -128,12 +129,7 @@ get_syntactical_type(t::cif_value_tp_ptr) = begin
     end
 end
     
-#==
-   Loops.
-
-   We need to define loop types, packet types, and iteration over them
-
-   ==#
+# **Loops**
 
 mutable struct cif_loop_tp
 end
@@ -178,29 +174,14 @@ Base.keys(l::Ptr{cif_loop_tp}) = begin
     return key_list
 end
     
-
-#==
- Loop packets. Only used as a pointer type for the callbacks
- ==#
+# Loop packets. Only used as a pointer type for the callbacks
 
 struct cif_packet_tp
 end
 
+# **Lists and Tables**
 
-"""Utility routine to get the length of a C null-terminated array"""
-get_c_length(s::Ptr,max=-1) = begin
-    # Now loop over the values we have
-    n = 1
-    b = unsafe_load(s,n)
-    while b!=0 && (max == -1 || (max != -1 && n < max))
-        n = n + 1
-        b = unsafe_load(s,n)
-        #println("Char is $b")
-    end
-    n = n - 1
-    #println("Length of string: $n")
-    return n
-end
+# These routines copy lists and tables from C to Julia
 
 cif_list(cv::cif_value_tp_ptr) = begin
     cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
@@ -315,14 +296,31 @@ mutable struct Uchar_list
     strings::Ptr{Uchar}
 end
 
-#== Utilities
-==#
+# **Utility routines**
+
+"""Utility routine to get the length of a C null-terminated array"""
+get_c_length(s::Ptr,max=-1) = begin
+    # Now loop over the values we have
+    n = 1
+    b = unsafe_load(s,n)
+    while b!=0 && (max == -1 || (max != -1 && n < max))
+        n = n + 1
+        b = unsafe_load(s,n)
+        #println("Char is $b")
+    end
+    n = n - 1
+    #println("Length of string: $n")
+    return n
+end
+
 # TODO: if this is used to make keys for a CIF table,
 # we segfault if "own" is true. Why is that, and can
 # we fix it
+
 """Turning an ICU string into a Jula string"""
 make_jl_string(s::Uchar) = begin
     n = get_c_length(s.string,-1)  # short for testing
     icu_string = unsafe_wrap(Array{UInt16,1},s.string,n,own=false)
     block_code = transcode(String,icu_string)
 end
+

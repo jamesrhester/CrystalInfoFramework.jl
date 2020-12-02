@@ -31,6 +31,10 @@ format_for_cif(val::AbstractString) = begin
         else
             if '\'' in val
                 delimiter = "\n;"
+            elseif length(val) == 0
+                delimiter = "'"
+            elseif first(val) == "_"
+                delimiter = "'"
             else
                 q = match(r"\w+",String(val))
                 if !isnothing(q) && q.match == val delimiter = ""
@@ -152,23 +156,27 @@ end
 
 """
 Show one dictionary definition. `info_dic` contains
-data frames containing relevant information
+data frames containing relevant information. `implicits`
+is a list of category.column names that should not be
+printed. No underscore appears before the category
+name.
 """
-show_one_def(io,def_name,info_dic) = begin
+show_one_def(io,def_name,info_dic;implicits=[]) = begin
     write(io,"\nsave_$def_name\n\n")
     for (cat,df) in info_dic
         if nrow(df) == 0 continue end
-        if nrow(df) == 1 show_set(io,cat,df) end
-        if nrow(df) > 1 show_loop(io,String(cat),df) end
+        if nrow(df) == 1 show_set(io,cat,df,implicits=implicits) end
+        if nrow(df) > 1 show_loop(io,String(cat),df,implicits=implicits) end
     end
     write(io,"\nsave_\n")
 end
 
 # We can skip defaults
-show_set(io,cat,df) = begin
+show_set(io,cat,df;implicits=[]) = begin
     colnames = sort!(propertynames(df))
     for cl in colnames
-        if cl == :master_id continue end
+        if cl in [:master_id,:__blockname,:__object_id] continue end
+        if "$cat.$(String(cl))" in implicits continue end
         this_val = df[!,cl][]
         if ismissing(this_val) continue end
         if haskey(ddlm_defaults,(cat,cl)) && ddlm_defaults[(cat,cl)] == this_val continue end
@@ -176,7 +184,11 @@ show_set(io,cat,df) = begin
     end
 end
 
-show_loop(io,cat,df) = begin
+show_loop(io,cat,df;implicits=[]) = begin
     if nrow(df) == 0 return end
-    write(io,format_for_cif(df[!,Not(:master_id)];catname=cat))
+    rej_names = filter(x->split(x,".")[1]==cat,implicits)
+    rej_names = map(x->split(x,".")[2],rej_names)
+    append!(rej_names,["master_id","__blockname","__object_id"])
+    imp_reg = Regex("$(join(rej_names,"|^"))")
+    write(io,format_for_cif(df[!,Not(imp_reg)];catname=cat))
 end       

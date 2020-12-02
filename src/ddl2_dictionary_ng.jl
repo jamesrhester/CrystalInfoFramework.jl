@@ -65,6 +65,10 @@ DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
     parent_dict = generate_parents(defs)
     # And add category, object
     add_cat_obj!(all_dict_info)
+    # Remove any duplicates
+    for (x,df) in all_dict_info
+        unique!(df,Not(r"^__blockname"))
+    end
     return DDL2_Dictionary(all_dict_info,Dict(),Dict(),parent_dict)
 end
 
@@ -76,6 +80,10 @@ are the object_ids of the DDL2 attributes of that category.
 TODO: work out child-parent relations as well
 """
 DDL2_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
+    # make sure all rows are unique
+    for (_,df) in attr_dict
+        unique!(df,Not(r"^__blockname"))
+    end
     DDL2_Dictionary(attr_dict,Dict(),Dict(),Dict())
 end
 
@@ -86,6 +94,7 @@ Base.haskey(d::DDL2_Dictionary,k::String) = k in keys(d)
 
 # Obtain all information about item `k` or category `k`
 Base.getindex(d::DDL2_Dictionary,k) = begin
+    lk = lowercase(k)
     info_dict = Dict{Symbol,DataFrame}()
     if '.' in k search_space = children_of_item else search_space = children_of_category end
     for one_child in search_space
@@ -93,7 +102,7 @@ Base.getindex(d::DDL2_Dictionary,k) = begin
         if !haskey(d.block,cat) continue end
         obj = Symbol(find_object(d,one_child))
         #println("Filtering on $cat / $obj")
-        info_dict[cat] = d.block[cat][d.block[cat][!,obj] .== k,:]
+        info_dict[cat] = d.block[cat][lowercase.(d.block[cat][!,obj]) .== lk,:]
         if nrow(info_dict[cat]) == 0 delete!(info_dict,cat) end
     end
     return info_dict
@@ -126,16 +135,18 @@ get_categories(d::DDL2_Dictionary) = d.block[:category][!,:id]
 get_set_categories(d::DDL2_Dictionary) = []
 get_loop_categories(d::DDL2_Dictionary) = get_categories(d)
 
-get_keys_for_cat(d::DDL2_Dictionary,catname) = begin
+get_keys_for_cat(d::DDL2_Dictionary,catname::String) = begin
     d[catname][:category_key][!,:name]
 end
 
+get_keys_for_cat(d::DDL2_Dictionary,catname::Symbol) = get_keys_for_cat(d,String(catname))
+
 get_names_in_cat(d::DDL2_Dictionary,catname) = begin
-    d.block[:item][d.block[:item].category_id .== catname,:name]
+    unique!(d.block[:item][d.block[:item].category_id .== catname,:name])
 end
 
 get_objs_in_cat(d::DDL2_Dictionary,catname) = begin
-    d.block[:item][d.block[:item].category_id .== catname,:__object_id]
+    unique!(d.block[:item][d.block[:item].category_id .== catname,:__object_id])
 end
 
 get_default(d::DDL2_Dictionary,dataname) = begin
@@ -277,6 +288,10 @@ const children_of_category = [ "_category.id",
     "_category_methods.category_id"
 ]
 
+#
+#  All of the implicit are defined as caseless, so we use this information
+#  as we might find ourselves comparing stuff in the future.
+#
 populate_implicits(all_tables) = begin
     cats = map(x->Symbol(split(x,'.')[1][2:end]),implicits)
     objs = map(x->Symbol(split(x,'.')[2]),implicits)
@@ -286,6 +301,8 @@ populate_implicits(all_tables) = begin
             if !(target_name in propertynames(table))
                 rename!(table,(:__blockname=>target_name))
                 #println("Added implicit value for $cat.$target_name")
+            else
+                table[target_name] = CaselessString.(table[target_name])
             end
         end
     end
@@ -317,15 +334,15 @@ end
 ## Handling functions
 
 # Methods for setting and retrieving evaluated functions
-set_func!(d::DDL2_Dictionary,func_name::String,func_text::Expr,func_code) = begin
+set_func!(d::DDL2_Dictionary,func_name::AbstractString,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
     println("All funcs: $(keys(d.func_defs))")
 end
 
-get_func(d::DDL2_Dictionary,func_name::String) = d.func_defs[func_name]
-get_func_text(d::DDL2_Dictionary,func_name::String) = d.func_text[func_name]
-has_func(d::DDL2_Dictionary,func_name::String) = begin
+get_func(d::DDL2_Dictionary,func_name::AbstractString) = d.func_defs[func_name]
+get_func_text(d::DDL2_Dictionary,func_name::AbstractString) = d.func_text[func_name]
+has_func(d::DDL2_Dictionary,func_name::AbstractString) = begin
     try
         d.func_defs[func_name]
     catch KeyError
@@ -347,7 +364,7 @@ in "_method_list.code" and the language in _method_list.language.
 We say that 'Evaluation' == 'calculation' and accept only 'dREL'
 for now.
 ==#
-load_func_text(dict::DDL2_Dictionary,dataname::String,meth_type::String) =  begin
+load_func_text(dict::DDL2_Dictionary,dataname::AbstractString,meth_type::String) =  begin
     if meth_type != "Evaluation" return "" end
     full_def = dict[dataname]
     meth_text = ""
@@ -385,8 +402,13 @@ get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractStrin
 end
 
 get_container_type(cdic::DDL2_Dictionary,dataname) = "Single"
-    
-# Output
+
+#
+# **Output**
+#
+# DDL2 makes use of implicit values based on the block name. We
+# ignore any columns contained in the 'implicit' const above.
+#
 
 show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     dicname = ddl2_dic[:dictionary].title[]
@@ -398,23 +420,34 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
 #
 ##############################################################\n""")
     write(io,"data_$dicname\n")
+    implicit_info = get_implicit_list()
+    top_level = ddl2_dic[:datablock]
+    show_set(io,"datablock",top_level,implicits=implicit_info)
     top_level = ddl2_dic[:dictionary]
-    show_set(io,"dictionary",top_level)
+    show_set(io,"dictionary",top_level,implicits=implicit_info)
     # Now for the rest
-    all_cats = sort!(get_categories(ddl2_dic))
+    all_cats = sort(get_categories(ddl2_dic))
     for one_cat in all_cats
         cat_info = ddl2_dic[one_cat]
-        show_one_def(io,one_cat,cat_info)
+        show_one_def(io,one_cat,cat_info,implicits=implicit_info)
         items = get_names_in_cat(ddl2_dic,one_cat)
         for one_item in items
-            show_one_def(io,one_item,ddl2_dic[one_item])
+            show_one_def(io,one_item,ddl2_dic[one_item],implicits=implicit_info)
         end
     end
     # And the looped top-level stuff
     for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history]
         if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
-            show_loop(io,String(c),ddl2_dic[c])
+            show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info)
         end
     end
 end
 
+#
+# We always want item.name to be printed.
+#
+get_implicit_list() = begin
+    all_imps = map(x->x[2:end],implicits)
+    filter!(x-> !(x in ["item.name","item.category_id",
+                        "item_linked.parent_name"]),all_imps)
+end

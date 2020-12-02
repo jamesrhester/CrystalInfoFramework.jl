@@ -14,6 +14,10 @@ the methods needed to find parents and children.
 
 Namespaces: data names in the dictionary may be assigned to a particular
 namespace.
+
+A reference dictionary may be supplied containing the definitions of the
+DDLm attributes. A default reference dictionary is supplied.
+
 ==#
 using Printf
 
@@ -29,7 +33,7 @@ export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
 export is_set_category,is_loop_category
 export get_func,get_func_text,set_func!,has_func,load_func_text
-export has_default_methods
+export has_default_methods,remove_methods!
 export get_def_meth,get_def_meth_txt,has_def_meth    #Methods for calculating defaults
 export get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
@@ -39,7 +43,10 @@ export get_cat_class
 export get_dic_namespace
 export is_category
 export find_head_category,add_head_category!
+export get_julia_type_name,get_dimensions
 import Base.show
+
+const ddlm_std_ref = joinpath(@__DIR__,"ddl.dic")
 
 struct DDLm_Dictionary <: abstract_cif_dictionary
     block::Dict{Symbol,GroupedDataFrame}
@@ -63,7 +70,7 @@ DDLm_Dictionary(b::FullBlock) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
-    title = b["_dictionary.title"][]
+    title = lowercase(b["_dictionary.title"][])
     # loop over all blocks, storing information
     defs = get_frames(b)
     bnames = keys(defs)
@@ -441,6 +448,13 @@ load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String) =  begi
 end
 
 """
+Remove all methods from the dictionary. This will stop any
+automatic derivation taking place.
+"""
+remove_methods!(dict::DDLm_Dictionary) = begin
+    dict.block[:method] = groupby(DataFrame([[]],[:master_id]),:master_id)
+end
+"""
 as_data(d::DDLm_Dictionary)
 
 Return an object `o` accessible using 
@@ -519,28 +533,60 @@ end
 find_head_category(ds)
 
 Find the category that is at the top of the category tree.
-`df` is essentially the `:name` category as a DataFrame.
+`df` is essentially the `:name` category as a DataFrame. If
+`definition.class == Head` returns a unique value that is
+preferred.
 """
 find_head_category(df::DataFrame) = begin
     # get first and follow it up
-    some_cat = df.category_id[1]
+    some_cat = lowercase(df.category_id[1])
     old_cat = some_cat
     while true
-        some_cat = df[df[!,:object_id] .== some_cat,:category_id]
+        some_cat = lowercase.(df[lowercase.(df[!,:object_id]) .== some_cat,:category_id])
         if length(some_cat) == 0 || some_cat[] == old_cat break end
         println("$old_cat -> $some_cat")
         old_cat = some_cat[]
     end
     println("head category is $old_cat")
-    return lowercase(old_cat)
+    return old_cat
 end
 
 find_head_category(df::Dict) = begin
+    if haskey(df,:definition)
+        explicit_head = df[:definition][df[:definition].class .== "Head",:master_id]
+        if length(explicit_head) == 1
+            return explicit_head[]
+        elseif length(explicit_head) > 1
+            println("Warning, more than one head category: $explicit_head")
+        end
+    end
     find_head_category(df[:name])
 end
 
 find_head_category(df::DDLm_Dictionary) = begin
+    explicit_head = df[:definition][df[:definition].class .== "Head",:master_id]
+    if length(explicit_head) == 1
+        return explicit_head[]
+    elseif length(explicit_head) > 1
+        println("Warning, more than one head category: $explicit_head")
+    end
     find_head_category(df[:name])
+end
+
+"""
+Find categories that are at the top level of the dictionary. `ref_dic` is a DDLm
+attribute dictionary. 
+"""
+find_top_level_cats(ref_dic::DDLm_Dictionary) = begin
+    domain = ref_dic[:dictionary_valid]
+    acceptable = []
+    for onerow in eachrow(domain)
+        if onerow.application[1] == "Dictionary" && onerow.application[2] != "Prohibited"
+            append!(acceptable,onerow.attributes)
+        end
+    end
+    println("All possibles: $acceptable")
+    unique!(map(x->find_category(ref_dic,x),acceptable))
 end
 
 """
@@ -575,7 +621,7 @@ const ddlm_categories = [
             "ENUMERATION_DEFAULT",
             "ENUMERATION_SET",
             "IMPORT",
-           "IMPORT_DETAILS",
+            "IMPORT_DETAILS",
             "LOOP",
             "METHOD",
             "NAME",
@@ -779,7 +825,11 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             # Remove old head category
             delete!(importee,block)
             # Remove old dictionary information
+            oldname = importee[:dictionary].title[]
             delete!(importee.block,:dictionary)
+            for k in keys(importee.block)
+                filter!(x->x.master_id != oldname,parent(importee.block[k]))
+            end
             # Concatenate them all
             for k in keys(importee.block)
                 if !haskey(d,k)
@@ -842,11 +892,16 @@ end
 # part of the key of every category. This information has to be added to the
 # reference dictionary as if these were already present.
 
+# `ref_dict` is a dictionary used for reference to obtain the list of global
+# categories
+#
 extra_reference!(t::Dict{Symbol,DataFrame}) = begin
     # add category key information
     cats = get_categories(t)
+    head_cat = find_head_category(t)
+    println("Head category is $head_cat")
     for one_cat in cats
-        if one_cat == "attributes" continue end #no head category
+        if one_cat == head_cat continue end #no head category
         target_name = "_$one_cat.master_id"
         push!(t[:category_key],Dict(:name => target_name,
                                     :master_id => one_cat),cols=:union)
@@ -873,8 +928,12 @@ extra_reference!(t::Dict{Symbol,DataFrame}) = begin
                                 :linked_item_id => "_definition.master_id",
                                 :master_id => target_name),cols=:union)
         end
-                                  
-    end        
+    end
+    unique!(t[:name])   #importing dictionaries may cause duplicate rows
+    unique!(t[:category_key])
+    unique!(t[:definition])
+    unique!(t[:type])
+    unique!(t[:description])
 end
 
 
@@ -892,6 +951,14 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     write(io,"data_$dicname\n")
     top_level = ddlm_dic[:dictionary]
     show_set(io,"dictionary",top_level)
+    # And the unlooped top-level stuff
+    top_level = ddlm_dic[dicname]
+    for c in keys(top_level)
+        if c == :dictionary continue end
+        if nrow(top_level[c]) == 1
+            show_set(io,String(c),top_level[c])
+        end
+    end
     # Now for the rest
     head = find_head_category(ddlm_dic)
     show_one_def(io,head,ddlm_dic[head])
@@ -906,9 +973,11 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
         end
     end
     # And the looped top-level stuff
-    for c in [:dictionary_valid,:dictionary_audit]
-        if c in keys(ddlm_dic.block) && nrow(ddlm_dic[c]) > 0
-            show_loop(io,String(c),ddlm_dic[c])
+    top_level = ddlm_dic[dicname]
+    for c in keys(top_level)
+        if c == :dictionary continue end
+        if nrow(top_level[c]) > 1
+            show_loop(io,String(c),top_level[c])
         end
     end
 end
@@ -927,7 +996,7 @@ const type_mapping = Dict( "Text" => String,
                            "Date" => String,  #change later        
                            "DateTime" => String,     
                            "Version" => String,     
-                           "Dimension" => Integer,   
+                           "Dimension" => String,   
                            "Range"  => String, #TODO       
                            "Count"  => Integer,    
                            "Index"  => Integer,       

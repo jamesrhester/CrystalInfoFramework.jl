@@ -1,33 +1,29 @@
-
-#== A CIF in Native Julia
-
-Our Julia datastructure is built of a Dictionary of data blocks. A
-data block is a List of Loops and a List of save frames, which are
-themselves data blocks. A loop is a DataFrame. Single-valued items are
-held in a loop with a single row.
-
-==#
+#
+# *Basic operations on CIF*
+#
+# **Exports**
 
 export CifValue,NativeCif,NativeBlock
 export cif_container, nested_cif_container
-export get_save_frame,get_frames,get_contents
+export get_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!,lookup_loop
 
+#  **CIF values**
+#
+# CIF1 allows only string/missing/null values, whereas CIF2 introduces both
+# "tables" and lists.
 
-"""
-A container for CIF data. A dictionary which might remember where
-it came from.
-"""
+const CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
+Base.nameof(CifValue) = Symbol("Cif Value")
+
+# **CIF containers**
+#
+# CIF containers hold collections of CIF values, indexed by strings.
+
 abstract type cif_container{V} <: AbstractDict{String,V} end
 
 get_source_file(c::cif_container) = error("Implement `get_source_file` for $(typeof(c))")
 get_data_values(c::cif_container) = error("Implement `get_data_values` for $(typeof(c))")
-
-"""
-A basic type for input CIFS
-"""
-const CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
-Base.nameof(CifValue) = Symbol("Cif Value")
 
 Base.length(c::cif_container) = length(keys(c))
 Base.keys(b::cif_container) = keys(get_data_values(b))
@@ -36,10 +32,14 @@ Base.iterate(b::cif_container) = iterate(get_data_values(b))
 Base.iterate(b::cif_container,s) = iterate(get_data_values(b),s)
 Base.getindex(b::cif_container,s::String) = get_data_values(b)[lowercase(s)]
 Base.get(b::cif_container,s::String,a) = get(get_data_values(b),lowercase(s),a)
-get_datablock(b::cif_container) = b
 
-# We can specify a particular row in a loop by giving the
-# values of the datanames.
+"""
+getindex(b::cif_container,s::Dict)
+
+Return the set of values in `b` corresponding to the key
+values provided in `s`. The keys of `s` must
+be datanames found in `b`. A DataFrameRow is returned.
+"""
 Base.getindex(b::cif_container,s::Dict) = begin
     l = get_loop(b,first(s).first)
     for pr in s
@@ -52,69 +52,40 @@ Base.getindex(b::cif_container,s::Dict) = begin
     first(l)
 end
 
+"""
+setindex!(b::cif_container,v,s)
+
+Set the value of `s` in `b` to `v`
+"""
 Base.setindex!(b::cif_container,v,s) = begin
     get_data_values(b)[lowercase(s)]=v
 end
 
+"""
+delete!(b::cif_container,s)
+
+Remove the value of `s` from `b`
+"""
 Base.delete!(b::cif_container,s) = begin
     delete!(get_data_values(b),lowercase(s))
 end
 
-"""
-A container with nested blocks (save frames). These are returned by the
-method `get_frames`. In all other ways a nested cif container behaves
-as if the save frames are absent.
-"""
+# ***Nested CIF containers***
+
+# A container with nested blocks (save frames). These are returned by the
+# method `get_frames`. In all other ways a nested cif container behaves
+# as if the save frames are absent.
+
 abstract type nested_cif_container{V} <: cif_container{V} end
 
 get_frames(c::nested_cif_container) = error("get_frames not implemented for $(typeof(c))")
 
+# Two types of concrete `cif_container`s are available: `NativeBlock`,
+# which is not nested, and `FullBlock` which may contain nested
+# containers. Loops are represented as lists of the datanames that are
+# in the same loop. All data values are stored separately as lists
+# indexed by dataname.
 
-"""
-A CIF file is a cif_collection. The important distinction is that indexing produces a
-cif_container, not an array of data values.  There are no values at the top level.
-"""
-abstract type CifCollection{V} <: AbstractDict{String,V} end
-
-get_dataname_type(c::cif_container{V} where V, d::AbstractString) = begin
-    return V
-end
-
-Base.show(io::IO,c::CifCollection) = begin
-    for k in keys(c)
-        write(io,"save_$k\n")
-        show(io,c[k])
-    end
-end
-
-struct NativeCif{V} <: CifCollection{V}
-    contents::Dict{String,cif_container{V}}
-    original_file::String
-end
-
-Base.keys(n::NativeCif) = keys(n.contents)
-Base.first(n::NativeCif) = first(n.contents)
-Base.length(n::NativeCif) = length(n.contents)
-Base.haskey(n::NativeCif,s) = haskey(n.contents,s)
-Base.getindex(n::NativeCif,s) = n.contents[s]
-Base.setindex!(c::NativeCif,v,s) = begin
-    c.contents[s]=v
-end
-
-Base.show(io::IO,c::NativeCif) = begin
-    for k in keys(c)
-        write(io,"data_$k\n")
-        show(io,c[k])
-    end
-end
-
-get_contents(n::NativeCif) = n.contents
-get_source_file(n::NativeCif) = n.original_file
-
-"""
-We define both `NativeBlock`, which has no save frames, and
-`FullBlock` which has save frames
-"""
 mutable struct NativeBlock{V} <: cif_container{V}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
@@ -150,11 +121,25 @@ set_loop_names(b::FullBlock,n) = begin b.loop_names = n end
 get_source_file(b::NativeBlock) = b.original_file
 get_source_file(f::FullBlock) = f.original_file
 
-# nested API
-get_frames(f::FullBlock{V}) where V = NativeCif{V}(f.save_frames,get_source_file(f))
-                  
+# **Collections of CIF containers**
+#
+# A CIF file is a `CifCollection`. Indexing produces a
+# `cif_container`.  There are no CIF Values held at the top level.
+
+abstract type CifCollection{V} <: AbstractDict{String,V} end
+
+# When displaying a `CifCollection` a save frame is generated
+
+Base.show(io::IO,c::CifCollection) = begin
+    for k in keys(c)
+        write(io,"save_$k\n")
+        show(io,c[k])
+    end
+end
+
 # Show does not produce a conformant CIF (yet) but a
 # quasi-CIF for informational purposes
+
 Base.show(io::IO,c::cif_container) = begin
     write(io,"\n")
     key_vals = setdiff(collect(keys(c)),get_loop_names(c))
@@ -213,7 +198,8 @@ end
     add_to_loop!(b::cif_container, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
-be present and have the same length as other values in the loop."""
+be present and have the same length as other values in the loop.
+"""
 add_to_loop!(b::cif_container, tgt, newname) = begin
     loop_id = filter(l -> tgt in l, get_loop_names(b))
     if length(loop_id) != 1
@@ -234,7 +220,8 @@ end
 
 Create a loop in ``b`` containing the datanames in ``names``.  Datanames assigned to
 other loops are silently transferred to the new loop. All data attached to ``names`` 
-should have the same length."""
+should have the same length.
+"""
 create_loop!(b::cif_container,names::Array{String,1}) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) != 1
@@ -247,6 +234,61 @@ create_loop!(b::cif_container,names::Array{String,1}) = begin
     push!(get_loop_names(b),names)
 end
 
+# **CIF files**
+# 
+# A CIF file is represented as a collection of CIF blocks, and retains
+# memory of the source file. The `Native` part of the name refers to
+# the information being held within Julia, not the underlying cifapi
+# routines. Each of the component blocks is indexed by a string.
+#
+struct NativeCif{V} <: CifCollection{V}
+    contents::Dict{String,cif_container{V}}
+    original_file::String
+end
+
+NativeCif{V}() where V = begin
+    return NativeCif(Dict{String,cif_container{V}}(),"")
+end
+
+Base.keys(n::NativeCif) = keys(n.contents)
+Base.first(n::NativeCif) = first(n.contents)
+Base.length(n::NativeCif) = length(n.contents)
+Base.haskey(n::NativeCif,s) = haskey(n.contents,s)
+Base.getindex(n::NativeCif,s) = n.contents[s]
+Base.setindex!(c::NativeCif,v,s) = begin
+    c.contents[s]=v
+end
+
+Base.show(io::IO,c::NativeCif) = begin
+    for k in keys(c)
+        write(io,"data_$k\n")
+        show(io,c[k])
+    end
+end
+
+get_contents(n::NativeCif) = n.contents
+get_source_file(n::NativeCif) = n.original_file
+
+# Obtaining save frames.
+
+"""
+get_frames(f::FullBlock{V})
+
+Return all nested CIF containers in `f` as a `NativeCif{V}` object.
+"""
+get_frames(f::FullBlock{V}) where V = NativeCif{V}(f.save_frames,get_source_file(f))
+
+# **Interface to low-level C API**
+
+# We use the C libcifapi facility to stream values into Julia,
+# building out our data structures in Julia, rather than using the
+# higher-level cifapi routines that store values within the C side. In
+# order to do this we have to maintain a context that is passed
+# through the C library to the callback routines. We store the actual
+# CIF collection that we are constructing, a list of blocks currently
+# under construction, the source filename, and whether or not to print
+# verbose information.
+    
 mutable struct cif_builder_context
     actual_cif::Dict{String,cif_container{CifValue}}
     block_stack::Array{cif_container{CifValue}}
@@ -254,20 +296,10 @@ mutable struct cif_builder_context
     verbose::Bool
 end
 
-get_save_frame(c::FullBlock,s::String) = begin
-    get_frames(c)[s]
-end
+# libcifapi uses the `cif_parse_options` structure to manage parsing
+# of the supplied CIF file. We set the appropriate values, in particular
+# the `user_data` field will contain a `cif_builder_context` object above.
 
-#== Merge the save frame lists of the second block files into the
-first block. This routine is used in order to merge
-dictionaries, for which the data block contents are less important ==#
-
-merge_saves(combiner::Function,c,d) = begin
-    merged_saves = merge(combiner,get_frames(c),get_frames(d))
-    FullBlock(merged_saves,get_loop_names(c),get_data_values(c),c.original_file)
-end
-
-"""An opaque type representing the parse options object in libcif"""
 mutable struct cif_parse_options
     prefer_cif2::Int32
     default_encoding_name::Ptr{UInt8}
@@ -285,10 +317,16 @@ mutable struct cif_parse_options
     user_data::cif_builder_context
 end
 
-"""A pointer to a parse options structure"""
+# We have to pass a pointer to the cif_parse_options structure, not
+# the structure itself, of course.
+
 mutable struct cpo_ptr
     handle::Ptr{cif_parse_options}
 end
+
+#
+# Perhaps the following is no longer needed?
+#
 
 """Free C resources for parse options"""
 pos_destroy!(x::cpo_ptr) = begin
@@ -298,8 +336,10 @@ pos_destroy!(x::cpo_ptr) = begin
     ccall((:free,"libc"),Cvoid,(Ptr{cif_parse_options},),x.handle)
 end
 
-#== Cif walking functions
-==#
+# ***Cif walking functions***
+#
+# The following callback functions are passed to libcifapi to call
+# when each parsing event is detected.
 
 handle_cif_start(a,b)::Cint = begin
     #println("Cif started; nothing done")
@@ -311,6 +351,8 @@ handle_cif_end(a,b)::Cint = begin
     0
 end
 
+# When a block is commenced, a new non-nested block is created
+# and added on to the end of our current list of blocks.
 
 handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
@@ -323,6 +365,9 @@ handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     0
 end
 
+# When a block is finished, we remove all data names that have only
+# `missing` values, then add it to the full CIF and remove it from
+# our stack of blocks.
 
 handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
     # Remove missing values
@@ -340,6 +385,8 @@ handle_block_end(a::cif_container_tp_ptr,b)::Cint = begin
     0
 end
 
+# When a save frame is encountered the current block is converted into
+# a `FullBlock` and the new block added on to the `block_stack`.
 
 handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     blockname = get_block_code(a)
@@ -353,6 +400,8 @@ handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     0
 end
 
+# At the end of a frame, we remove all `missing` values, then add the frame to the
+# list of save frames of the next highest block on the stack
 
 handle_frame_end(a,b)::Cint = begin
     # Remove missing values
@@ -369,11 +418,14 @@ handle_frame_end(a,b)::Cint = begin
     0
 end
 
-
 handle_loop_start(a,b)::Cint = begin
     #println("Loop started")
     0
 end
+
+# At the end of a loop we remove any datanames that are composed only of missing
+# values. There is no need to do anything else as the values are already stored
+# as vectors separately.
 
 handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     if b.verbose
@@ -390,18 +442,18 @@ handle_loop_end(a::Ptr{cif_loop_tp},b)::Cint = begin
     0
 end
 
-
 handle_packet_start(a,b)::Cint = begin
     #println("Packet started; nothing done")
     0
 end
-
 
 handle_packet_end(a,b)::Cint = begin
     #println("Packet is finished")
     0
 end
 
+# Values are read in and converted to the appropriate type, then
+# appended to the list associated with the current dataname.
 
 handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     a_as_uchar = Uchar(a)
@@ -437,6 +489,8 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     return 0    
 end
 
+# This sets up the callbacks and configures the cifapi parser.
+
 default_options(s::String;verbose=false) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
@@ -467,25 +521,27 @@ default_options(s::String;verbose=false) = begin
     return p_opts
 end
 
-NativeCif{V}() where V = begin
-    return NativeCif(Dict{String,cif_container{V}}(),"")
-end
+"""
+NativeCif(s::AbstractString;verbose=false)
 
+Read in filename `s` as a CIF file. If `verbose` is true, print progress
+information during parsing.
+"""
 NativeCif(s::AbstractString;verbose=false) = begin
-    # get the full filename
+    ## get the full filename
     full = realpath(s)
     p_opts = default_options(full,verbose=verbose)
     result = cif_tp_ptr(p_opts)
-    # the real result is in our user data context
+    ## the real result is in our user data context
     return NativeCif(p_opts.user_data.actual_cif,full)
 end
 
-"""Given a filename, parse and return a CIF object according to the provided options.
-This is only tested with our walker functions, but will probably work for a
-CIFAPI cif"""
+# Given a filename, parse and return a CIF object according to the provided options.
+# We access the underlying file pointer in order to pass it to the C library, and
+# make sure to destroy the memory held by the C library afterwards.
 
 cif_tp_ptr(p_opts::cif_parse_options)=begin
-    # obtain an IOStream
+    ## obtain an IOStream
     filename = p_opts.user_data.filename
     f = open(filename,"r")
     fptr = Base.Libc.FILE(f)
@@ -496,13 +552,13 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     val=ccall((:cif_parse,"libcif"),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
     close(f)
     finalizer(cif_destroy!,dpp)
-    # Check for errors and destroy the CIF if necessary
+    ## Check for errors and destroy the CIF if necessary
     if val != 0
         finalize(dpp)
         error("File $filename load error: "* error_codes[val])
     end
-    #q = time_ns()
-    #println("$q: Created cif ptr:$dpp for file $s")
+    ##q = time_ns()
+    ##println("$q: Created cif ptr:$dpp for file $s")
     return dpp
 end
 

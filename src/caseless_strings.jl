@@ -55,3 +55,4 @@ end
 Base.haskey(d::Dict{CaselessString,Any},key) = haskey(d,lowercase(key)) 
 #
 Base.show(io::IO,c::CaselessString) = show(io,c.actual_string)
+Base.hash(c::CaselessString,h::UInt) = hash(lowercase(c.actual_string),h)

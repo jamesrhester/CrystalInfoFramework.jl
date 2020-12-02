@@ -1,7 +1,7 @@
 # CIF Dictionaries
 
 export get_names_in_cat,abstract_cif_dictionary,has_drel_methods
-export get_julia_type_name, get_dimensions, convert_to_julia
+export convert_to_julia
 export get_container_type
 
 abstract type abstract_cif_dictionary end
@@ -60,7 +60,7 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
         change_func = (x -> map(y-> if ismissing(y) || isnothing(y) y else parse(Complex{Float64},y) end,x))   #TODO: SU on values
     elseif julia_base_type in (String,AbstractString)
         change_func = (x -> map(y-> if ismissing(y) || isnothing(y) y else String(y) end,x))
-    elseif julia_base_type == Symbol("CaselessString")
+    elseif julia_base_type == :CaselessString
         change_func = (x -> map(y-> if ismissing(y) || isnothing(y) y else CaselessString(y) end,x))
     end
     if cont_type == "Single"
