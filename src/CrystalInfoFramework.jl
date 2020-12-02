@@ -1,10 +1,18 @@
 module CrystalInfoFramework
 using DataFrames
 using URIParser
-#= This module provides ways of interacting with a Crystallographic Information
- file using Julia.
-=#
 
+# *Crystallographic Information Framework*
+#
+# See iucr.org for specifications.
+#
+# This package provides methods for reading and writing
+# CIF files. A subpackage provides a data API that
+# allows any file to be interpreted according to the
+# CIF relational model.  This is used by CIF_dREL
+# (a separate package) to execute dREL code on any
+# dataset.
+#
 include("cif_errors.jl")
 include("libcifapi.jl")
 include("cif_base.jl")
@@ -13,5 +21,16 @@ include("caseless_strings.jl")
 include("ddlm_dictionary_ng.jl")
 include("cif_output.jl")
 include("ddl2_dictionary_ng.jl")
-#include("merge_dic.jl")
+
+module DataContainer
+
+using ..CrystalInfoFramework
+using DataFrames
+
+include("DataContainer/Types.jl")
+include("DataContainer/DataSource.jl")
+include("DataContainer/Relations.jl")
+
+end
+
 end

@@ -1,7 +1,6 @@
 # Test Data containers
 
-using DataContainer
-using CrystalInfoFramework
+using CrystalInfoFramework.DataContainer
 using Test
 
 # Test a plain CIF as data source
