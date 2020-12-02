@@ -1,3 +1,7 @@
+# *Definitions for Relations*
+
+# **Exports**
+
 export generate_index,generate_keys
 export get_key_datanames,get_value, get_all_datanames, get_name, current_row
 export get_category,has_category,first_packet, construct_category, get_data
@@ -11,6 +15,8 @@ get_key(row::Row) = begin
 end
 
 """
+get_value(r::Relation,k::Dict,name)
+
 Given a Julia dictionary `k` containing values of
 the keys, provide the corresponding value
 of dataname `name`. 
@@ -53,16 +59,12 @@ end
 
 Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 
-# == General Relational Containers == #
-
-#==
-
-A relational container may contain data covered by more than one
-dictionary. However, any given data source may only be described
-by a single dictionary. We store these together and disambiguate
-them using namespaces.
-
-==#
+# **General Relational Containers**
+#
+# A relational container may contain data covered by more than one
+# dictionary. However, any given data source may only be described
+# by a single dictionary. We store these together and disambiguate
+# them using namespaces.
 
 RelationalContainer(data,dict::abstract_cif_dictionary) = begin
     nspace = get_dic_namespace(dict)
@@ -87,7 +89,25 @@ select_namespace(r::RelationalContainer,s::String)
 Return a RelationalContainer with data items from namespace `s` only
 """
 select_namespace(r::RelationalContainer,s::AbstractString) = begin
-   RelationalContainer(Dict(s=>r.rawdata[s]),Dict(s=>r.cifdics[s])) 
+   RelationalContainer(Dict(s=>r.data[s]),Dict(s=>r.dicts[s])) 
+end
+
+"""
+find_namespace(r::AbstractRelationalContainer,s::AbstractString)
+
+Return the namespace in `r` that contains items from the category `s`.
+Raise an error if not found.
+"""
+find_namespace(r::AbstractRelationalContainer,s::AbstractString) = begin
+    n = get_namespaces(r)
+    if length(n) > 1
+        # Work out the namespace
+        n = filter(x->x in get_categories(get_dictionary(r,x)),n)
+        if length(n) != 1
+            throw(KeyError(s))
+        end
+    end
+    first(n)
 end
 
 """
@@ -95,16 +115,11 @@ get_category(r::RelationalContainer,s::String)
 
 Return a DDLmCategory described by `s` constructed from the contents of `r`
 """
-get_category(r::AbstractRelationalContainer,one_cat::String,nspace::String) = construct_category(r,one_cat,nspace)
+get_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace::String) = construct_category(r,one_cat,nspace)
 
-get_category(r::RelationalContainer,one_cat::String) = begin
-    if occursin('‡', one_cat)
-        nspace,realcat = split(one_cat,'‡')
-    else
-        nspace = get_dic_namespace(first(r.cifdics).second)
-        realcat = one_cat 
-    end
-    get_category(r,realcat,nspace)
+get_category(r::RelationalContainer,one_cat::AbstractString) = begin
+    n = find_namespace(r,one_cat)     
+    get_category(r,one_cat,n)
 end
 
 has_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace) = begin
@@ -116,47 +131,31 @@ has_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace) = be
     return false
 end
 
-has_category(r::AbstractRelationalContainer,one_cat::String) = begin
-    nspace = get_namespaces(r)[]
-    has_category(r,one_cat,nspace)
+has_category(r::AbstractRelationalContainer,one_cat::AbstractString) = begin
+    any(i->has_category(r,one_cat,i),get_namespaces(r))
 end
 
-has_category(r::RelationalContainer,one_cat::String) = begin
-    if occursin('‡', one_cat)
-        nspace,realcat = split(one_cat,'‡')
-    else
-        nspace = get_dic_namespace(first(r.cifdics).second)
-        realcat = one_cat 
-    end
-    has_category(r,realcat,nspace)
-end
-
-construct_category(r::RelationalContainer,one_cat::String) = begin
-    if occursin('‡', one_cat)
-        nspace,realcat = split(one_cat,'‡')
-    else
-        nspace = get_dic_namespace(first(r.cifdics).second)
-        realcat = one_cat 
-    end
+construct_category(r::RelationalContainer,one_cat::AbstractString) = begin
+    nspace = find_namespace(r,one_cat)
     construct_category(r,realcat,nspace)
 end
 
-construct_category(r::AbstractRelationalContainer,one_cat::String,nspace) = begin
+construct_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace) = begin
     small_r = select_namespace(r,nspace)
-    dict = get_dictionary(small_r)
+    dict = get_dictionary(r,nspace)
     cat_type = get_cat_class(dict,one_cat)
-    if is_set_category(dict,one_cat) return SetCategory(one_cat,get_data(small_r),dict)
+    if is_set_category(dict,one_cat) return SetCategory(one_cat,get_data(r),dict)
     elseif is_loop_category(dict,one_cat)
         all_names = get_keys_for_cat(dict,one_cat)
         if all(k -> haskey(get_data(small_r),k), all_names)
-            println("$one_cat is in relation")
-            return LoopCategory(one_cat,get_data(small_r),dict)
+            println("All keys for Loop category $one_cat are in relation")
+            return LoopCategory(one_cat,r,dict)
         end
     end
     if any(n-> haskey(get_data(small_r),n),get_names_in_cat(dict,one_cat))
         # A legacy loop category which is missing keys
         println("Legacy category $one_cat is present in relation")
-        return LegacyCategory(one_cat,small_r,dict)
+        return LegacyCategory(one_cat,r,dict)
     end
     return missing
 end
@@ -171,28 +170,17 @@ get_packets(s::SetCategory) = first_packet(s)
 get_packets(l::LoopCategory) = l
 get_packets(missing) = []
 
-# getindex can only have one argument. So we allow the namespace
-# to be prepended using a character unlikely to be present in a
-# dataname: ‡ . We carry this through to the other Base methods.
-
 Base.keys(r::RelationalContainer) = begin
-    if length(r.rawdata) == 1
+    if length(r.data) == 1
         return keys(get_data(r))
-    else
-        return Iterators.flatten((
-            string.(n*"‡",keys(get_data(r,n))) for n in keys(r.rawdata)))
     end
+    throw(error("Specify namespace for keys() of RelationalContainer"))
 end
 
 Base.haskey(r::AbstractRelationalContainer,k) = k in keys(r)
-Base.getindex(r::AbstractRelationalContainer,s) = begin
-    parts = split(s,"‡")
-    if length(parts)>1
-        get_data(r,parts[1])[parts[2]]
-    else
-        get_data(r)[s]
-    end
-end
+Base.haskey(r::AbstractRelationalContainer,k,n) = haskey(select_namespace(r,n),k)
+Base.getindex(r::AbstractRelationalContainer,s) = get_data(r)[s]
+Base.getindex(r::AbstractRelationalContainer,s,nspace) = get_data(r,nspace)[s]
 
 """
 
@@ -200,39 +188,35 @@ If a dictionary is requested and only one is present, we need
 not specify the namespace, simply taking the first one
 """
 get_dictionary(r::RelationalContainer) = begin
-    @assert length(r.cifdics) == 1
-    first(r.cifdics).second
+    @assert length(r.dicts) == 1
+    first(r.dicts).second
 end
 
-get_dictionary(r::RelationalContainer,nspace::String) = r.cifdics[nspace]
+get_dictionary(r::RelationalContainer,nspace::String) = r.dicts[nspace]
     
 get_data(r::RelationalContainer) = begin
-    @assert length(r.rawdata) == 1
-    first(r.rawdata).second
+    @assert length(r.data) == 1
+    first(r.data).second
 end
 
-get_data(r::RelationalContainer,nspace::AbstractString) = r.rawdata[nspace]
+get_data(r::RelationalContainer,nspace::AbstractString) = r.data[nspace]
 
 get_all_datanames(r::RelationalContainer) = keys(r)
 get_all_datanames(r::RelationalContainer,nspace::AbstractString) = keys(get_data(r,nspace))
-get_namespaces(r::RelationalContainer) = keys(r.cifdics)
-get_dicts(r::RelationalContainer) = r.cifdics
+get_namespaces(r::RelationalContainer) = keys(r.dicts)
+get_dicts(r::RelationalContainer) = r.dicts
 
-#== Relational Containers ==#
+# **Relational Containers**
 
 Base.show(io::IO,r::RelationalContainer) = begin
     println(io,"Relational container with data")
+    println(io,"Namespaces: $(keys(r.dicts))")
 end
 
 
-# == CifCategory == #
+# **CifCategory** #
 
-#== 
-
-CifCategories use a CIF dictionary to describe relations
-
-==#
-
+# CifCategories use a CIF dictionary to describe relations
 # implement the Relation interface
 
 """
@@ -263,6 +247,7 @@ get_category(c::CatPacket) = getfield(c,:source_cat)
 get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
 
 Base.iterate(c::CifCategory) = begin
+    if length(c) == 0 return nothing end
     r,s = iterate(1:length(c))
     return CatPacket(r,c),(1:length(c),s)
 end
@@ -367,6 +352,8 @@ Base.show(io::IO,s::SetCategory) = begin
 end
 
 """
+LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary)
+
 Construct a category from a data source and a dictionary. Type and alias information
 should be handled by the datasource.
 """
@@ -378,11 +365,12 @@ LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     internal_object_names = Symbol.(find_object(cifdic,a) for a in data_names)
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(((i,find_name(cifdic,catname,String(i))) for i in internal_object_names))
+    namespace = get_dic_namespace(cifdic)
     key_names = get_keys_for_cat(cifdic,catname)
     
     # Use unique as aliases might have produced multiple occurrences
-    
-    have_vals = unique(filter(k-> haskey(data,k) && !(k in key_names),data_names))
+    small_data = select_namespace(data,namespace)
+    have_vals = unique(filter(k-> haskey(small_data,k) && !(k in key_names),data_names))
 
     println("For $catname datasource has names $have_vals")
     key_names = [name_to_object[k] for k in key_names]
@@ -390,7 +378,7 @@ LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     child_cats = create_children(catname,data,cifdic)
     LoopCategory(catname,internal_object_names,key_names,data,
                  name_to_object,object_to_name, child_cats,
-                 cifdic)
+                 cifdic,namespace)
 
 end
 
@@ -411,14 +399,15 @@ LoopCategory(l::LegacyCategory,k) = begin
                  l.rawdata,
                  l.name_to_object,
                  l.object_to_name,[],
-                 l.dictionary)
+                 l.dictionary,
+                 l.namespace)
 end
 
-Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]]])
+Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]],d.namespace])
 Base.haskey(d::LoopCategory,n::Symbol) = begin
-    haskey(d.rawdata,get(d.object_to_name,n,"")) || any(x->haskey(d.rawdata,get(x.object_to_name,n,"")),d.child_categories)
+    haskey(d.rawdata,get(d.object_to_name,n,""),d.namespace) || any(x->haskey(d.rawdata,get(x.object_to_name,n,""),x.namespace),d.child_categories)
 end
-Base.haskey(d::LoopCategory,n::String) = haskey(d.rawdata,n)
+Base.haskey(d::LoopCategory,n::AbstractString) = haskey(d.rawdata,n,d.namespace)
 
 """
 Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
@@ -444,9 +433,9 @@ dataframe because of linked data names (not yet implemented).
 # categories after trying the parent category
 
 Base.getindex(d::LoopCategory,name::Symbol) = begin
-    if name in d.column_names return d.rawdata[d.object_to_name[name]] end
+    if name in d.column_names return d.rawdata[d.object_to_name[name],d.namespace] end
     for x in d.child_categories
-        if name in x.column_names return x.rawdata[x.object_to_name[name]] end
+        if name in x.column_names return x.rawdata[x.object_to_name[name],x.namespace] end
     end
 end
 
@@ -489,7 +478,7 @@ are used to look up the correct value
 get_value(d::LoopCategory,n::Int,colname::Symbol) = begin    
     if haskey(d.object_to_name,colname)
         aka = d.object_to_name[colname]
-        return d.rawdata[aka][n]
+        return d.rawdata[aka,d.namespace][n]
     end
     if length(d.child_categories) == 0 throw(KeyError(colname)) end
     # Handle the children recursively
@@ -507,13 +496,13 @@ get_value(d::LoopCategory,n::Int,colname::Symbol) = begin
     throw(KeyError(colname))
 end
 
-get_value(d::LoopCategory,n::Int,colname::String) = begin
+get_value(d::LoopCategory,n::Int,colname::AbstractString) = begin
     return get_value(d,n,d.name_to_object[colname])
 end
 
 # If we are given only a column name, we have to put all
 # of the values in
-get_value(d::LoopCategory,colname::String) = begin
+get_value(d::LoopCategory,colname::AbstractString) = begin
     println("WARNING: super inefficient column access")
     return [get_value(d,n,colname) for n in 1:length(d)]
 end
@@ -595,20 +584,22 @@ SetCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
     internal_object_names = Symbol.(find_object(cifdic,a) for a in data_names)
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(((i,find_name(cifdic,catname,String(i))) for i in internal_object_names))
-
+    n = get_dic_namespace(cifdic)
+    small_data = select_namespace(data,n)
     # Use unique as aliases might have produced multiple occurrences
     
-    present = unique(filter(k-> haskey(data,k),data_names))
+    present = unique(filter(k-> haskey(small_data,k),data_names))
     present = map(x->name_to_object[x],present)
     SetCategory(catname,internal_object_names,data,present,
-                            name_to_object,object_to_name,cifdic)
+                name_to_object,object_to_name,
+                cifdic,n)
 end
 
 get_dictionary(s::SetCategory) = s.dictionary
 get_name(s::SetCategory) = s.name
 get_object_names(s::SetCategory) = s.present
 Base.keys(s::SetCategory) = s.present
-Base.haskey(s::SetCategory,name::String) = name in (s.object_to_name[x] for x in keys(s))
+Base.haskey(s::SetCategory,name::AbstractString) = name in (s.object_to_name[x] for x in keys(s))
 
 get_value(s::SetCategory,i::Int,name::Symbol) = begin
     if i != 1
@@ -619,13 +610,13 @@ get_value(s::SetCategory,i::Int,name::Symbol) = begin
 end
 
 Base.getindex(s::SetCategory,name::Symbol) = begin
-    return s.rawdata[s.object_to_name[name]]
+    return s.rawdata[s.object_to_name[name],s.namespace]
 end
 
 Base.getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
 Base.length(s::SetCategory) = 1
 
-LegacyCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
+LegacyCategory(catname::AbstractString,data,cifdic::abstract_cif_dictionary) = begin
     #
     # Absorb dictionary information
     # 
@@ -633,16 +624,17 @@ LegacyCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
     internal_object_names = Symbol.(find_object(cifdic,a) for a in data_names)
     name_to_object = Dict(zip(data_names,internal_object_names))
     object_to_name = Dict(((i,find_name(cifdic,catname,String(i))) for i in internal_object_names))
-
+    n = get_dic_namespace(cifdic)
+    small_data = select_namespace(data,n)
     # The leaf values that will go into the data frame
     # Use unique as aliases might have produced multiple occurrences
     
-    have_vals = unique(filter(k-> haskey(data,k),data_names))
+    have_vals = unique(filter(k-> haskey(small_data,k),data_names))
 
     println("For $catname datasource has names $have_vals")
 
     LegacyCategory(catname,internal_object_names,data,
-                            name_to_object,object_to_name,cifdic)
+                            name_to_object,object_to_name,cifdic,n)
 end
 
 # Getindex by symbol is the only way to get at a column. We reserve
@@ -671,7 +663,7 @@ Base.haskey(l::LegacyCategory,k) = k in keys(l)
 Given the category name, return an array of loop categories that are children
 of the supplied category
 """
-create_children(name::String,data,cifdic) = begin
+create_children(name::AbstractString,data,cifdic) = begin
     child_names = get_child_categories(cifdic,name)
     return [LoopCategory(c,data,cifdic) for c in child_names]
 end
@@ -681,8 +673,9 @@ Create a DataFrame from a Loop Category. Child categories are ignored. If `canon
 is true, canonical names are used instead of the default object names
 """
 DataFrames.DataFrame(l::LoopCategory;canonical=false) = begin
+    nspace = l.namespace
     rawnames = [l.object_to_name[o] for o in l.column_names if haskey(l.rawdata,l.object_to_name[o])]
-    rawdata = [l.rawdata[r] for r in rawnames]
+    rawdata = [l.rawdata[r,nspace] for r in rawnames]
     if canonical
         DataFrames.DataFrame(rawdata,rawnames,copycols=false)
     else
@@ -692,8 +685,9 @@ DataFrames.DataFrame(l::LoopCategory;canonical=false) = begin
 end
 
 DataFrames.DataFrame(s::SetCategory;canonical=false) = begin
+    nspace = s.namespace
     rawnames = [s.object_to_name[o] for o in s.column_names if haskey(s.rawdata,s.object_to_name[o])]
-    rawdata = [s.rawdata[r] for r in rawnames]
+    rawdata = [s.rawdata[r,nspace] for r in rawnames]
     if canonical
         DataFrames.DataFrame(rawdata,rawnames,copycols=false)
     else
@@ -736,6 +730,8 @@ end ==#
             println("Adding a master_id to $tab")
             att_info[tab].master_id = dicname
         end
+        # master_id always lower case
+        att_info[tab].master_id = lowercase.(att_info[tab].master_id)
     end
     # make sure there is a head category
     h = find_head_category(att_info)
@@ -764,7 +760,7 @@ DDL2_Dictionary(ds,att_dic,dividers) = begin
         if has_category(ds,ac,"ddl2") println("We have category $ac") end
         catinfo = get_category(ds,ac,"ddl2")
         println("We have catinfo $catinfo")
-        if ismissing(catinfo) continue end
+        if ismissing(catinfo) || length(catinfo) == 0 continue end
         df = unique!(DataFrame(catinfo))
         att_info[Symbol(ac)] = df
     end

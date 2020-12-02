@@ -1,13 +1,10 @@
 
-"""
-# DataSources and Relational Data Sources
+# *DataSources and Relational Data Sources*
 
-A DataSource is a generic source of data that is capable
-only of providing an array of values and stating which
-values could be associated with which other values.
+# A DataSource is a generic source of data that is capable
+# only of providing an array of values indexed by name.
 
-"""
-
+# **Exports**
 export get_assoc_index, get_all_associated_indices
 export get_assoc_value, get_all_associated_values
 export get_namespaces
@@ -19,6 +16,7 @@ Return the designators for the namespaces from which the names used to
 access the data are drawn.
 """
 get_namespaces(x) = [""]
+select_namespace(x,s) = x
 
 """
 Return the index into `other_name` for position `index` of the array returned
@@ -66,7 +64,7 @@ get_all_associated_values(x,n,o) =
 # == Dict methods == #
 
 """
-A dictionary is a data source, assuming all elements are the same length
+A dictionary is a data source
 """
 DataSource(::AbstractDict) = IsDataSource()
 
@@ -196,6 +194,11 @@ A Cif NativeBlock is a data source. It implements the dictionary interface.
 """
 DataSource(::NativeBlock) = IsDataSource()
 
+#
+# NativeBlocks have no namespaces so we ignore if supplied
+#
+Base.getindex(x::NativeBlock,y::AbstractString,z::AbstractString) = x[y]
+
 """
 To use anything but NativeBlocks as DataSources we must make them into
 MultiDataSources, which means implementing the iterate_blocks method.
@@ -246,7 +249,7 @@ iterate_blocks(c::NativeCif,s) = begin
     return make_data_source(get_contents(c)[nxt]),(blocks,new_s)
 end
 
-# == TypedDataSource ==#
+# **TypedDataSource**
 
 get_dictionary(t::TypedDataSource) = t.dict
 get_datasource(t::TypedDataSource) = t.data
@@ -256,6 +259,10 @@ select_namespace(t::TypedDataSource,nspace) = begin
         throw(KeyError(t))
     end
     t
+end
+
+select_namespace(t::NamespacedTypedDataSource,nspace) = begin
+    t.data[nspace]
 end
 
 """
@@ -295,6 +302,12 @@ Base.getindex(t::TypedDataSource,s::AbstractString) = begin
         end
     end
     actual_type = convert_to_julia(refdict,s,raw_val)
+end
+
+Base.getindex(t::TypedDataSource,s,n) = t[s]  #no namespaces
+
+Base.getindex(t::NamespacedTypedDataSource,s::AbstractString,n::AbstractString) = begin
+    select_namespace(t,n)[s]
 end
 
 Base.get(t::TypedDataSource,s::AbstractString,default) = begin
