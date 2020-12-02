@@ -84,6 +84,8 @@ real_from_meas(value::String) = begin
     return parse(Float64,value)
 end
 
+real_from_meas(value::Missing) = missing
+
 Range(v::String) = begin
     lower,upper = split(v,":")
     parse(Number,lower),parse(Number,upper)

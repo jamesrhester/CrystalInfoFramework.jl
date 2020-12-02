@@ -422,8 +422,9 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
     current_val = getproperty(cp,Symbol(object_name))
     print("Indexing $dataname using $current_val to get")
-    # Now index into the information
-    indexlist = dict[dataname][:enumeration_default][!,:index]
+    # Now index into the information. ddl.dic states that this is of type 'Code'
+    # so we apply the CaselessString constructor
+    indexlist = CaselessString.(dict[dataname][:enumeration_default][!,:index])
     pos = indexin([current_val],indexlist)
     if pos[1] == nothing return missing end
     return dict[dataname][:enumeration_default][!,:value][pos[1]]
