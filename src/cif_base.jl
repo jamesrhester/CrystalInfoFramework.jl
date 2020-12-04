@@ -3,10 +3,14 @@
 #
 # **Exports**
 
-export CifValue,Cif,Block
+export CifValue,Cif,Block,CifBlock
 export CifContainer, NestedCifContainer
 export get_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!
+
+# Base methods that we add to
+import Base:keys,getindex,setindex!,length,haskey,iterate,get
+import Base:delete!,show,first
 
 #  **CIF values**
 #
@@ -14,7 +18,10 @@ export get_loop, eachrow, add_to_loop!, create_loop!
 # "tables" and lists.
 
 """
-The syntactical type of data held in a CIF file
+The syntactical type of data held in a CIF file. A value is of type `String`,
+`Vector{CifValue}`, `Dict{String,CifValue}`, `Missing` or `Nothing`. In all
+cases the values returned for a given data name are in an 
+`Array{CifValue,1}`. 
 """
 const CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
 Base.nameof(CifValue) = Symbol("Cif Value")
@@ -47,7 +54,7 @@ function get_data_values end
 """
     get_loop_names(b::CifContainer)
 
-Return all data names as an array of arrays, where names are grouped by the loop
+Return all looped data names as an array of arrays, where names are grouped by the loop
 in which they occur.
 """
 function get_loop_names end
@@ -72,44 +79,75 @@ get_loop(b::CifContainer,s) = begin
     return df
 end
 
-Base.length(c::CifContainer) = length(keys(c))
-Base.keys(b::CifContainer) = keys(get_data_values(b))
-Base.haskey(b::CifContainer,s::String) = haskey(get_data_values(b),lowercase(s))
-Base.iterate(b::CifContainer) = iterate(get_data_values(b))
-Base.iterate(b::CifContainer,s) = iterate(get_data_values(b),s)
-Base.getindex(b::CifContainer,s::String) = get_data_values(b)[lowercase(s)]
-Base.get(b::CifContainer,s::String,a) = get(get_data_values(b),lowercase(s),a)
+length(c::CifContainer) = length(keys(c))
+
+"""
+    keys(b::CifContainer)
+
+All data names in `b`
+"""
+keys(b::CifContainer) = keys(get_data_values(b))
+
+"""
+    haskey(b::CifContainer,s::String)
+
+Returns `true` if `b` contains a value for case-insensitive data name `s`
+"""
+haskey(b::CifContainer,s::String) = haskey(get_data_values(b),lowercase(s))
+
+"""
+    iterate(b::CifContainer)
+    
+Iterate over all data names in `b`.
+"""
+iterate(b::CifContainer) = iterate(get_data_values(b))
+iterate(b::CifContainer,s) = iterate(get_data_values(b),s)
+
+"""
+    getindex(b::CifContainer,s::String)
+
+`b[s]` returns all values for case-insensitive data name `s` in 
+`b` as an `Array{CifValue,1}`
+"""
+getindex(b::CifContainer,s::String) = get_data_values(b)[lowercase(s)]
+
+"""
+    get(b::CifContainer,s::String,a)
+
+Return `b[s]`. If `s` is missing, return `a`. `s` is case-insensitive.
+"""
+get(b::CifContainer,s::String,a) = get(get_data_values(b),lowercase(s),a)
 
 """
     getindex(b::CifContainer,s::Dict)
 
-Return the set of values in `b` corresponding to the key
-values provided in `s`. The keys of `s` must
-be datanames found in `b`. A DataFrame is returned.
+Return the set of values in `b` corresponding to the data name values
+provided in `s`. The keys of `s` must be datanames found in `b`. A
+DataFrame is returned. The keys of `s` are case-insensitive.  
 """
-Base.getindex(b::CifContainer,s::Dict) = begin
+getindex(b::CifContainer,s::Dict) = begin
     l = get_loop(b,first(s).first)
     for (k,v) in s
-        l = l[l[!,Symbol(k)] .== v, :]
+        l = l[l[!,Symbol(lowercase(k))] .== v, :]
     end
     l
 end
 
 """
-setindex!(b::CifContainer,v,s)
+    setindex!(b::CifContainer,v,s)
 
 Set the value of `s` in `b` to `v`
 """
-Base.setindex!(b::CifContainer,v,s) = begin
+setindex!(b::CifContainer,v,s) = begin
     get_data_values(b)[lowercase(s)]=v
 end
 
 """
-delete!(b::CifContainer,s)
+    delete!(b::CifContainer,s)
 
 Remove the value of `s` from `b`
 """
-Base.delete!(b::CifContainer,s) = begin
+delete!(b::CifContainer,s) = begin
     delete!(get_data_values(b),lowercase(s))
 end
 
@@ -226,7 +264,8 @@ end
     add_to_loop!(b::CifContainer, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
-be present and have the same length as other values in the loop.
+be present (e.g. by calling `b[tgt]=values`) and have the same length as other 
+values in the loop.
 """
 add_to_loop!(b::CifContainer, tgt, newname) = begin
     loop_id = filter(l -> tgt in l, get_loop_names(b))
@@ -246,8 +285,9 @@ end
 """
     create_loop!(b::CifContainer,names::Array{String,1})
 
-Create a loop in ``b`` containing the datanames in ``names``.  Datanames assigned to
-other loops are silently transferred to the new loop. All data attached to ``names`` 
+Create a loop in `b` from the datanames in `names`.  Datanames 
+previously assigned to
+other loops are transferred to the new loop. All data attached to `names` 
 should have the same length.
 """
 create_loop!(b::CifContainer,names::Array{String,1}) = begin
@@ -282,16 +322,61 @@ Cif{V}() where V = begin
     return Cif(Dict{String,CifContainer{V}}(),"")
 end
 
-Base.keys(n::Cif) = keys(n.contents)
-Base.first(n::Cif) = first(n.contents)
-Base.length(n::Cif) = length(n.contents)
-Base.haskey(n::Cif,s) = haskey(n.contents,s)
-Base.getindex(n::Cif,s) = n.contents[s]
-Base.setindex!(c::Cif,v,s) = begin
+"""
+    keys(c::Cif)
+
+The names of all blocks in `c`, not including any save frames.
+"""
+keys(n::Cif) = keys(n.contents)
+
+"""
+    first(c::Cif)
+
+The first block in `c`, which may not be the first block that
+appears in the physical file.  This is useful when only one
+block is present.
+"""
+first(n::Cif) = first(n.contents)
+
+"""
+    length(c::Cif)
+
+The number of blocks in `n`.
+"""
+length(n::Cif) = length(n.contents)
+
+"""
+    haskey(c::Cif,name)
+
+Whether `c` has a block named `name`.
+"""
+haskey(n::Cif,s) = haskey(n.contents,s)
+
+"""
+    getindex(c::Cif,n)
+
+`c[n]` returns the block named `n` in `c`.
+"""
+getindex(n::Cif,s) = n.contents[s]
+
+"""
+    setindex!(c::Cif,v,n)
+
+`c[n] = s` sets block `n` to `v` in `c`.
+"""
+setindex!(c::Cif,v,s) = begin
     c.contents[s]=v
 end
 
-Base.show(io::IO,::MIME"text/plain",c::Cif) = begin
+"""
+    show(io::IO,::MIME"text/plain",c::Cif)
+
+Display a text representation of `c` to `io`. This
+text representation is not guaranteed to be syntactically
+correct CIF. To display `c` as a CIF file, use
+`::MIME"text/cif"`.
+"""
+show(io::IO,::MIME"text/plain",c::Cif) = begin
     for k in keys(c)
         write(io,"data_$k\n")
         show(io,c[k])
@@ -304,9 +389,9 @@ get_source_file(n::Cif) = n.original_file
 # Obtaining save frames.
 
 """
-get_frames(f::CifBlock{V})
+    get_frames(f::CifBlock{V})
 
-Return all nested CIF containers in `f` as a `Cif{V}` object.
+Return all nested CIF containers in `f` as a `Cif` object.
 """
 get_frames(f::CifBlock{V}) where V = Cif{V}(f.save_frames,get_source_file(f))
 
@@ -542,7 +627,7 @@ default_options(s::String;verbose=false) = begin
 end
 
 """
-Cif(s::AbstractString;verbose=false)
+    Cif(s::AbstractString;verbose=false)
 
 Read in filename `s` as a CIF file. If `verbose` is true, print progress
 information during parsing.
