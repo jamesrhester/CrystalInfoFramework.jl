@@ -5,3 +5,7 @@ makedocs(sitename="CrystalInfoFramework documentation",
 				   prettyurls = get(ENV,"CI",nothing) == "true"
 				   )
 	  )
+
+deploydocs(
+    repo = "github.com/jamesrhester/CrystalInfoFramework.jl.git",
+)
