@@ -4,7 +4,7 @@
 # **Exports**
 
 export CifValue,Cif,Block
-export cif_container, nested_cif_container
+export CifContainer, NestedCifContainer
 export get_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!
 
@@ -24,28 +24,28 @@ Base.nameof(CifValue) = Symbol("Cif Value")
 # CIF containers hold collections of CIF values, indexed by strings.
 
 """
-A `cif_container` holds a series of one-dimensional arrays indexed by strings, and the name of a
+A `CifContainer` holds a series of one-dimensional arrays indexed by strings, and the name of a
 source of the data. Arrays are organised into groups, called "loops". Subtypes should
 implement `get_source_file` and `get_data_values`.
 """
-abstract type cif_container{V} <: AbstractDict{String,V} end
+abstract type CifContainer{V} <: AbstractDict{String,V} end
 
 """
-    get_source_file(c::cif_container)
+    get_source_file(c::CifContainer)
 
 The (possibly empty) name of the source for the data in the container.
 """
 function get_source_file end
 
 """
-    get_data_values(c::cif_container)
+    get_data_values(c::CifContainer)
 
 A `Dict{String,V}` of 1D array-valued items.
 """
 function get_data_values end
 
 """
-    get_loop_names(b::cif_container)
+    get_loop_names(b::CifContainer)
 
 Return all data names as an array of arrays, where names are grouped by the loop
 in which they occur.
@@ -53,12 +53,12 @@ in which they occur.
 function get_loop_names end
 
 """
-    get_loop(b::cif_container,s)
+    get_loop(b::CifContainer,s)
 
 A `DataFrame` built from data items in the same loop as `s`. If no data are available,
 an empty `DataFrame` is returned.
 """
-get_loop(b::cif_container,s) = begin
+get_loop(b::CifContainer,s) = begin
     loop_names = [l for l in get_loop_names(b) if s in l]
     # Construct a DataFrame
     df = DataFrame()
@@ -72,22 +72,22 @@ get_loop(b::cif_container,s) = begin
     return df
 end
 
-Base.length(c::cif_container) = length(keys(c))
-Base.keys(b::cif_container) = keys(get_data_values(b))
-Base.haskey(b::cif_container,s::String) = haskey(get_data_values(b),lowercase(s))
-Base.iterate(b::cif_container) = iterate(get_data_values(b))
-Base.iterate(b::cif_container,s) = iterate(get_data_values(b),s)
-Base.getindex(b::cif_container,s::String) = get_data_values(b)[lowercase(s)]
-Base.get(b::cif_container,s::String,a) = get(get_data_values(b),lowercase(s),a)
+Base.length(c::CifContainer) = length(keys(c))
+Base.keys(b::CifContainer) = keys(get_data_values(b))
+Base.haskey(b::CifContainer,s::String) = haskey(get_data_values(b),lowercase(s))
+Base.iterate(b::CifContainer) = iterate(get_data_values(b))
+Base.iterate(b::CifContainer,s) = iterate(get_data_values(b),s)
+Base.getindex(b::CifContainer,s::String) = get_data_values(b)[lowercase(s)]
+Base.get(b::CifContainer,s::String,a) = get(get_data_values(b),lowercase(s),a)
 
 """
-    getindex(b::cif_container,s::Dict)
+    getindex(b::CifContainer,s::Dict)
 
 Return the set of values in `b` corresponding to the key
 values provided in `s`. The keys of `s` must
 be datanames found in `b`. A DataFrame is returned.
 """
-Base.getindex(b::cif_container,s::Dict) = begin
+Base.getindex(b::CifContainer,s::Dict) = begin
     l = get_loop(b,first(s).first)
     for (k,v) in s
         l = l[l[!,Symbol(k)] .== v, :]
@@ -96,20 +96,20 @@ Base.getindex(b::cif_container,s::Dict) = begin
 end
 
 """
-setindex!(b::cif_container,v,s)
+setindex!(b::CifContainer,v,s)
 
 Set the value of `s` in `b` to `v`
 """
-Base.setindex!(b::cif_container,v,s) = begin
+Base.setindex!(b::CifContainer,v,s) = begin
     get_data_values(b)[lowercase(s)]=v
 end
 
 """
-delete!(b::cif_container,s)
+delete!(b::CifContainer,s)
 
 Remove the value of `s` from `b`
 """
-Base.delete!(b::cif_container,s) = begin
+Base.delete!(b::CifContainer,s) = begin
     delete!(get_data_values(b),lowercase(s))
 end
 
@@ -123,16 +123,16 @@ end
 A CIF container with nested blocks (save frames). Data names in the
 nested block are hidden.
 """
-abstract type nested_cif_container{V} <: cif_container{V} end
+abstract type NestedCifContainer{V} <: CifContainer{V} end
 
 """
-    get_frames(c::nested_cif_container)
+    get_frames(c::NestedCifContainer)
 
 Return all nested containers in `c`. 
 """
 function get_frames end
 
-# Two types of concrete `cif_container`s are available: `Block`,
+# Two types of concrete `CifContainer`s are available: `Block`,
 # which is not nested, and `CifBlock` which may contain nested
 # containers. Loops are represented as lists of the datanames that are
 # in the same loop. All data values are stored separately as lists
@@ -141,7 +141,7 @@ function get_frames end
 """
 A CIF data block or save frame containing no nested save frames.
 """
-mutable struct Block{V} <: cif_container{V}
+mutable struct Block{V} <: CifContainer{V}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
     original_file::String
@@ -154,15 +154,15 @@ end
 """
 A CIF block potentially containing save frames.
 """
-mutable struct CifBlock{V} <: nested_cif_container{V}
-    save_frames::Dict{String,cif_container{V}}
+mutable struct CifBlock{V} <: NestedCifContainer{V}
+    save_frames::Dict{String,CifContainer{V}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
     original_file::String
 end
 
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
-CifBlock(n::Block{V}) where V = CifBlock(Dict{String,cif_container{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
+CifBlock(n::Block{V}) where V = CifBlock(Dict{String,CifContainer{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
 CifBlock(f::CifBlock) = f
 
 # And a simple access API
@@ -182,7 +182,7 @@ get_source_file(f::CifBlock) = f.original_file
 # **Collections of CIF containers**
 #
 # A CIF file is a `CifCollection`. Indexing produces a
-# `cif_container`.  There are no CIF Values held at the top level.
+# `CifContainer`.  There are no CIF Values held at the top level.
 
 """
 A collection of CIF containers indexed by strings
@@ -200,7 +200,7 @@ end
 
 # Show displays a quasi-CIF for informational purposes
 
-Base.show(io::IO,::MIME"text/plain",c::cif_container) = begin
+Base.show(io::IO,::MIME"text/plain",c::CifContainer) = begin
     write(io,"\n")
     key_vals = setdiff(collect(keys(c)),get_loop_names(c))
     for k in key_vals
@@ -215,7 +215,7 @@ Base.show(io::IO,::MIME"text/plain",c::cif_container) = begin
     end
 end
 
-Base.show(io::IO,::MIME"text/plain",b::nested_cif_container) = begin
+Base.show(io::IO,::MIME"text/plain",b::NestedCifContainer) = begin
     # first output the save frames
     show(io,get_frames(b))
     show(io,Block(b))
@@ -223,12 +223,12 @@ end
 
 
 """
-    add_to_loop!(b::cif_container, tgt, newname)
+    add_to_loop!(b::CifContainer, tgt, newname)
 
 Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
 be present and have the same length as other values in the loop.
 """
-add_to_loop!(b::cif_container, tgt, newname) = begin
+add_to_loop!(b::CifContainer, tgt, newname) = begin
     loop_id = filter(l -> tgt in l, get_loop_names(b))
     if length(loop_id) != 1
         throw(error("No single unique loop containing dataname $tgt"))
@@ -244,13 +244,13 @@ add_to_loop!(b::cif_container, tgt, newname) = begin
 end
 
 """
-    create_loop!(b::cif_container,names::Array{String,1})
+    create_loop!(b::CifContainer,names::Array{String,1})
 
 Create a loop in ``b`` containing the datanames in ``names``.  Datanames assigned to
 other loops are silently transferred to the new loop. All data attached to ``names`` 
 should have the same length.
 """
-create_loop!(b::cif_container,names::Array{String,1}) = begin
+create_loop!(b::CifContainer,names::Array{String,1}) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) != 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
@@ -270,16 +270,16 @@ end
 # routines. Each of the component blocks is indexed by a string.
 #
 """
-A CIF file consisting of a collection of `cif_container` indexed by String and
+A CIF file consisting of a collection of `CifContainer` indexed by String and
 recording the source of the collection.
 """
 struct Cif{V} <: CifCollection{V}
-    contents::Dict{String,cif_container{V}}
+    contents::Dict{String,CifContainer{V}}
     original_file::String
 end
 
 Cif{V}() where V = begin
-    return Cif(Dict{String,cif_container{V}}(),"")
+    return Cif(Dict{String,CifContainer{V}}(),"")
 end
 
 Base.keys(n::Cif) = keys(n.contents)
@@ -322,8 +322,8 @@ get_frames(f::CifBlock{V}) where V = Cif{V}(f.save_frames,get_source_file(f))
 # verbose information.
 
 mutable struct cif_builder_context
-    actual_cif::Dict{String,cif_container{CifValue}}
-    block_stack::Array{cif_container{CifValue}}
+    actual_cif::Dict{String,CifContainer{CifValue}}
+    block_stack::Array{CifContainer{CifValue}}
     filename::String
     verbose::Bool
 end
@@ -536,7 +536,7 @@ default_options(s::String;verbose=false) = begin
                               handle_item_c,
                               )
     starting_cif = Dict()
-    context = cif_builder_context(Dict(),cif_container[],s,verbose)
+    context = cif_builder_context(Dict(),CifContainer[],s,verbose)
     p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end

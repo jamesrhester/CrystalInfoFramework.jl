@@ -207,14 +207,14 @@ enclosing block taken as a separate block.  In this view it is
 possible to associate items in separate save frames. However, these
 potential associations are excluded if necessary by dictionaries. 
 """
-iterate_blocks(c::nested_cif_container) = begin
+iterate_blocks(c::NestedCifContainer) = begin
     # main block then saves
     saves = collect(keys(get_frames(c)))
     #println("Returning iterator over $(typeof(c)), length $(length(saves))")
     return Block(c),saves
 end
 
-iterate_blocks(c::nested_cif_container,s) = begin
+iterate_blocks(c::NestedCifContainer,s) = begin
     #println("Next iteration over $(typeof(c)), length $(length(s)) left")
     if length(s) == 0
         println("Finished iteration")

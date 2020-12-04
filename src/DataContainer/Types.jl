@@ -63,7 +63,7 @@ end
 
 struct TypedDataSource <: DataSource
     data
-    dict::abstract_cif_dictionary
+    dict::AbstractCifDictionary
 end
 
 # ***With namespaces***
@@ -135,7 +135,7 @@ abstract type AbstractRelationalContainer <: NamespacedDataSource end
 
 struct RelationalContainer <: AbstractRelationalContainer
     data::Dict{String,Any}    #usually TypedDataSource
-    dicts::Dict{String,abstract_cif_dictionary}
+    dicts::Dict{String,AbstractCifDictionary}
 end
 
 # == Cif Categories == #
@@ -170,7 +170,7 @@ struct LegacyCategory <: CifCategory
     rawdata
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
-    dictionary::abstract_cif_dictionary
+    dictionary::AbstractCifDictionary
     namespace::String
 end
 
@@ -214,7 +214,7 @@ struct LoopCategory <: CifCategory
     name_to_object::Dict{String,Symbol}
     object_to_name::Dict{Symbol,String}
     child_categories::Array{LoopCategory,1}
-    dictionary::abstract_cif_dictionary
+    dictionary::AbstractCifDictionary
     namespace::String
 end
 

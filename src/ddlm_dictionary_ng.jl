@@ -48,7 +48,7 @@ import Base.show
 A DDLm Dictionary holds information about data names including
 executable methods for deriving missing values.
 """
-struct DDLm_Dictionary <: abstract_cif_dictionary
+struct DDLm_Dictionary <: AbstractCifDictionary
     block::Dict{Symbol,GroupedDataFrame}
     func_defs::Dict{String,Function}
     func_text::Dict{String,Expr} #unevaluated Julia code

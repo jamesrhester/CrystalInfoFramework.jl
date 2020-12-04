@@ -1,6 +1,6 @@
 # **CIF Dictionaries
 
-export get_names_in_cat,abstract_cif_dictionary,has_drel_methods
+export get_names_in_cat,AbstractCifDictionary,has_drel_methods
 export convert_to_julia
 export get_container_type
 
@@ -8,9 +8,9 @@ export get_container_type
 A dictionary providing type and other information about a series
 of data names.
 """
-abstract type abstract_cif_dictionary end
+abstract type AbstractCifDictionary end
 
-Base.length(d::abstract_cif_dictionary) = begin
+Base.length(d::AbstractCifDictionary) = begin
     return length(keys(d))
 end
 
@@ -20,16 +20,16 @@ end
 Does `d` include methods written in dREL for derivation of data
 values?
 """
-has_drel_methods(d::abstract_cif_dictionary) = true
+has_drel_methods(d::AbstractCifDictionary) = true
 
 """
-    get_names_in_cat(d::abstract_cif_dictionary,catname;aliases=false,only_items=true)
+    get_names_in_cat(d::AbstractCifDictionary,catname;aliases=false,only_items=true)
 
 Return a list of all names in `catname`, as defined in `d`. If `aliases`, include any
 declared aliases of the name. If `only_items` is false, return child categories as
 well.
 """
-get_names_in_cat(d::abstract_cif_dictionary,catname;aliases=false,only_items=true) = begin
+get_names_in_cat(d::AbstractCifDictionary,catname;aliases=false,only_items=true) = begin
     all_objs  = get_objs_in_cat(d,catname)
     canonical_names = [find_name(d,catname,x) for x in all_objs]
     if only_items filter!(x->!is_category(d,x),canonical_names) end

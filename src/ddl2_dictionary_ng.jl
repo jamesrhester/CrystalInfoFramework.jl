@@ -6,7 +6,7 @@
 #
 export DDL2_Dictionary,as_data
 
-struct DDL2_Dictionary <: abstract_cif_dictionary
+struct DDL2_Dictionary <: AbstractCifDictionary
     block::Dict{Symbol,DataFrame}
     func_defs::Dict{String,Function}
     func_text::Dict{String,Expr} #unevaluated Julia code

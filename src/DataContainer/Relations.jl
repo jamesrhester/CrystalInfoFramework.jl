@@ -66,7 +66,7 @@ Base.getproperty(r::Row,obj::Symbol) = get_value(r,obj)
 # by a single dictionary. We store these together and disambiguate
 # them using namespaces.
 
-RelationalContainer(data,dict::abstract_cif_dictionary) = begin
+RelationalContainer(data,dict::AbstractCifDictionary) = begin
     nspace = get_dic_namespace(dict)
     RelationalContainer(Dict(nspace=>data),Dict(nspace=>dict))
 end
@@ -223,7 +223,7 @@ end
 A mapping is a (src,tgt,name) tuple, but
 the source is always this category
 """
-get_mappings(d::abstract_cif_dictionary,cat::String) = begin
+get_mappings(d::AbstractCifDictionary,cat::String) = begin
     objs = get_objs_in_cat(d,cat)
     links = get_linked_names_in_cat(d,cat)
     link_objs = [d[l]["_name.object_id"] for l in links]
@@ -352,12 +352,12 @@ Base.show(io::IO,s::SetCategory) = begin
 end
 
 """
-LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary)
+LoopCategory(catname::String,data,cifdic::AbstractCifDictionary)
 
 Construct a category from a data source and a dictionary. Type and alias information
 should be handled by the datasource.
 """
-LoopCategory(catname::String,data,cifdic::abstract_cif_dictionary) = begin
+LoopCategory(catname::String,data,cifdic::AbstractCifDictionary) = begin
     #
     # Absorb dictionary information
     # 
@@ -616,7 +616,7 @@ end
 Base.getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
 Base.length(s::SetCategory) = 1
 
-LegacyCategory(catname::AbstractString,data,cifdic::abstract_cif_dictionary) = begin
+LegacyCategory(catname::AbstractString,data,cifdic::AbstractCifDictionary) = begin
     #
     # Absorb dictionary information
     # 
