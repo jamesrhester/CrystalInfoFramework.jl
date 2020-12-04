@@ -190,17 +190,17 @@ get_all_associated_indices(x::MultiDataSource,name,other_name) = begin
 end
 
 """
-A Cif NativeBlock is a data source. It implements the dictionary interface.
+A Cif Block is a data source. It implements the dictionary interface.
 """
-DataSource(::NativeBlock) = IsDataSource()
+DataSource(::Block) = IsDataSource()
 
 #
 # NativeBlocks have no namespaces so we ignore if supplied
 #
-Base.getindex(x::NativeBlock,y::AbstractString,z::AbstractString) = x[y]
+Base.getindex(x::Block,y::AbstractString,z::AbstractString) = x[y]
 
 """
-To use anything but NativeBlocks as DataSources we must make them into
+To use anything but Blocks as DataSources we must make them into
 MultiDataSources, which means implementing the iterate_blocks method.
 The blocks in a cif_container are all of the save frames, and the
 enclosing block taken as a separate block.  In this view it is
@@ -211,7 +211,7 @@ iterate_blocks(c::nested_cif_container) = begin
     # main block then saves
     saves = collect(keys(get_frames(c)))
     #println("Returning iterator over $(typeof(c)), length $(length(saves))")
-    return NativeBlock(c),saves
+    return Block(c),saves
 end
 
 iterate_blocks(c::nested_cif_container,s) = begin
@@ -230,16 +230,16 @@ A CifFile is a MultiDataSource. We have to create concrete types as
 indexing is defined differently.
 """
 
-iterate_blocks(c::NativeCif) = begin
+iterate_blocks(c::Cif) = begin
     blocks = keys(get_contents(c))
     n = Base.iterate(blocks)
     if n == nothing return nothing end
     nxt,s = n
-    println("Iterating NativeCif of length $(length(blocks))")
+    println("Iterating Cif of length $(length(blocks))")
     return make_data_source(get_contents(c)[nxt]),(blocks,s)
 end
 
-iterate_blocks(c::NativeCif,s) = begin
+iterate_blocks(c::Cif,s) = begin
     blocks,nk = s
     n = Base.iterate(blocks,nk)
     if n == nothing
@@ -339,7 +339,7 @@ Base.keys(t::TypedDataSource) = begin
     true_keys = lowercase.(collect(keys(get_datasource(t))))
     dict = get_dictionary(t)
     dnames = [d for d in keys(dict) if lowercase(d) in true_keys]
-    return unique!([translate_alias(dict,n) for n in dnames])
+    return unique!([find_name(dict,n) for n in dnames])
 end
 
 """

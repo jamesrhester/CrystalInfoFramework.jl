@@ -1,25 +1,19 @@
 # **Working with libcifapi**
 
-# Note that the earlier methods define types and provide functions 
-# that interact directly with the libcif C API. The minimum required
-# are defined here, plus some no longer used destructors. Comprehensive
-# functions for working with a CIF held within the C API have been
-# removed.
-#
-# The types defined here should mimic the layout expected by libcifapi.
-#
+# CIFs are transferred into Julia using the CIFAPI streaming facilities.
+# No interface functions are provided for accessing full CIFs.
 
 import Base.Libc:FILE
 
 keep_alive = Any[]   #to stop GC freeing memory
 
 """
-This represents the opaque cifapi cif_tp type.
+This represents the opaque cifapi `cif_tp` type.
 """
 mutable struct cif_tp
 end
 
-"""A pointer to a cif_tp type managed by C"""
+"""A pointer to a `cif_tp` type managed by C"""
 mutable struct cif_tp_ptr
     handle::Ptr{cif_tp}
 end
@@ -36,6 +30,10 @@ cif_destroy!(x) =  begin
     end
 end
 
+"""
+`cif_handler_tp` holds pointers to functions to be called when
+specific CIF structures are encountered during parsing.
+"""
 struct cif_handler_tp
     cif_start::Ptr{Nothing}
     cif_end::Ptr{Nothing}
@@ -50,26 +48,28 @@ struct cif_handler_tp
     handle_item::Ptr{Nothing}
 end
 
-#==
-Data blocks
-==#
+#
+# **Data blocks
+#
 
-"""An opaque type representing a CIF block"""
+"""
+An opaque type representing a CIF block
+"""
 mutable struct cif_container_tp   #cif_block_tp in libcif
 end
 
-"""A pointer to a CIF block or save frame, set by libcif"""
+"""
+A pointer to a CIF block or save frame, set by libcif
+"""
 mutable struct cif_container_tp_ptr
     handle::Ptr{cif_container_tp}  # *cif_block_tp
 end
 
-container_destroy!(cb::cif_container_tp_ptr) =  begin
-    #error_string = "Finalizing cif block ptr $cb"
-    #t = @task println(error_string)
-    #schedule(t)
-    ccall((:cif_container_free,"libcif"),Cvoid,(Ptr{cif_container_tp},),cb.handle)
-end
+"""
+    get_block_code(b::cif_container_tp_ptr)
 
+Return the block code of the referenced container as a string
+"""
 get_block_code(b::cif_container_tp_ptr) = begin
     s = Uchar(0)
     val = ccall((:cif_container_get_code,"libcif"),Cint,(cif_container_tp_ptr,Ptr{Cvoid}),b,Ref(s))
@@ -79,29 +79,26 @@ get_block_code(b::cif_container_tp_ptr) = begin
     make_jl_string(s)
 end
 
+"""
+    keys(c::cif_tp_ptr)
+
+Return all data block names from the referenced CIF file
+"""
 Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
 
 # **CIF values**
 
-"""The general value type of a CIF file"""
+"""
+The type of data value in a CIF file
+"""
 mutable struct cif_value_tp
 end
 
+"""
+A pointer to a data value in a CIF file
+"""
 mutable struct cif_value_tp_ptr
     handle::Ptr{cif_value_tp}
-end
-
-# Do we have to finalize this? Yes indeedy.
-
-value_free!(x::cif_value_tp_ptr) = begin
-    #error_string = "Finalizing cif block ptr $cb"
-    #t = @task println(error_string)
-    #schedule(t)
-    #q = time_ns()
-    #error_string = "$q: Fly, be free $x"
-    #t = @task println(error_string)
-    #schedule(t)
-    ccall((:cif_value_free,"libcif"),Cvoid,(Ptr{cif_value_tp},),x.handle)
 end
 
 # All values returned by libcifapi have a string representation.
@@ -119,6 +116,11 @@ end
 # Classify the type. For numbers and strings we leave alone, so that the string
 # retrieval above can use the pointer.
 
+"""
+    get_syntactical_type(t::cif_value_tp_ptr)
+
+Determine the syntactical type of the data value.
+"""
 get_syntactical_type(t::cif_value_tp_ptr) = begin
     val_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),t.handle)
     if val_type == 0 || val_type == 1 return typeof(t)
@@ -137,11 +139,12 @@ end
 mutable struct cif_loop_tp_ptr
     handle::Ptr{cif_loop_tp}
 end
-                
-loop_free!(cl::cif_loop_tp_ptr) = begin
-    ccall((:cif_loop_free,"libcif"),Cvoid,(Ptr{cif_loop_tp},),cl.handle)
-end
 
+"""
+    keys(l::Ptr{cif_loop_tp})
+
+List the data names in C data structure `l` corresponding to a CIF loop
+"""
 Base.keys(l::Ptr{cif_loop_tp}) = begin
     ukeys = Uchar_list(0)
     val = ccall((:cif_loop_get_names,"libcif"),Cint,(Ptr{cif_loop_tp},Ptr{Cvoid}),l,Ref(ukeys))
@@ -236,6 +239,7 @@ cif_table(cv::cif_value_tp_ptr) = begin
 end
 
 # The pointer passed to us should point to a table
+
 Base.keys(ct::cif_value_tp_ptr) = begin
     ukeys = Uchar_list(0)
     #q = time_ns()
@@ -270,7 +274,8 @@ Base.keys(ct::cif_value_tp_ptr) = begin
     key_list = make_jl_string.(ukey_list)
 end
 
-# Access the value through the C library
+# Access a CIF data value through the C library
+
 Base.getindex(ct::cif_value_tp_ptr,key::AbstractString) = begin
     ukey = transcode(UInt16,key)
     append!(ukey,0)
@@ -286,19 +291,25 @@ Base.getindex(ct::cif_value_tp_ptr,key::AbstractString) = begin
     return new_element
 end
 
-"""The type external Unicode strings from libicu"""
+"""
+The type of external Unicode strings from libicu
+"""
 mutable struct Uchar
     string::Ptr{UInt16}
 end
 
-"""A list of strings"""
+"""
+A list of Unicode strings
+"""
 mutable struct Uchar_list
     strings::Ptr{Uchar}
 end
 
 # **Utility routines**
 
-"""Utility routine to get the length of a C null-terminated array"""
+"""
+Obtain the length of a C null-terminated array `s`.
+"""
 get_c_length(s::Ptr,max=-1) = begin
     # Now loop over the values we have
     n = 1
@@ -317,7 +328,9 @@ end
 # we segfault if "own" is true. Why is that, and can
 # we fix it
 
-"""Turning an ICU string into a Jula string"""
+"""
+Turn an ICU string into a Jula string
+"""
 make_jl_string(s::Uchar) = begin
     n = get_c_length(s.string,-1)  # short for testing
     icu_string = unsafe_wrap(Array{UInt16,1},s.string,n,own=false)

@@ -1,25 +1,29 @@
-# CIF Dictionaries
+# **CIF Dictionaries
 
 export get_names_in_cat,abstract_cif_dictionary,has_drel_methods
 export convert_to_julia
 export get_container_type
 
+"""
+A dictionary providing type and other information about a series
+of data names.
+"""
 abstract type abstract_cif_dictionary end
-
-# Methods that should be instantiated by concrete types
-
-Base.keys(d::abstract_cif_dictionary) = begin
-    error("Keys function should be defined for $(typeof(d))")
-end
 
 Base.length(d::abstract_cif_dictionary) = begin
     return length(keys(d))
 end
 
+"""
+    has_drel_methods(d)
+
+Does `d` include methods written in dREL for derivation of data
+values?
+"""
 has_drel_methods(d::abstract_cif_dictionary) = true
 
 """
-get_names_in_cat(d::abstract_cif_dictionary,catname;aliases=false,only_items=true)
+    get_names_in_cat(d::abstract_cif_dictionary,catname;aliases=false,only_items=true)
 
 Return a list of all names in `catname`, as defined in `d`. If `aliases`, include any
 declared aliases of the name. If `only_items` is false, return child categories as
@@ -38,14 +42,13 @@ get_names_in_cat(d::abstract_cif_dictionary,catname;aliases=false,only_items=tru
     return canonical_names
 end
 
+"""
+    convert_to_julia(cdic,cat,obj,value::Array)
 
-"""Convert to the julia type for a given category, object and String value.
-This is clearly insufficient as it only handles one level of arrays.
-
-The value is assumed to be an array containing string values of the particular 
-dataname, which is as usually returned by the CIF readers, even for single values.
-
-All functions should return missing and nothing as is.
+Convert String elements of array `value` to the appropriate Julia type 
+using information in `cdic` for given `category` and `object`, unless
+value is `missing` or `nothing`, which are returned unchanged.
+This only handles one level of arrays.
 """
 convert_to_julia(cdic,cat,obj,value::Array) = begin
     julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
@@ -71,10 +74,23 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     end
 end
 
+"""
+    convert_to_julia(cdic,dataname,value)
+
+Convert String elements of array `value` to the appropriate Julia type
+using information in `cdic` for `dataname`, unless value is `missing`
+or `nothing`, which are returned unchanged.  This only handles one
+level of arrays.  
+"""
 convert_to_julia(cdic,dataname::AbstractString,value) = begin
     return convert_to_julia(cdic,find_category(cdic,dataname),find_object(cdic,dataname),value)
 end
 
+"""
+    real_from_meas(value::String)
+
+Remove optionally attached su from `value` with form `dd(ee)` and return as a `Float64`.
+"""
 real_from_meas(value::String) = begin
     #println("Getting real value from $value")
     if '(' in value

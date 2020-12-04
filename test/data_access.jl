@@ -47,7 +47,7 @@ end
     end
     @test vals == ["a"]
     # test loop lookup
-    p = lookup_loop(b,Dict("_col2"=>"v3","_col3"=>"12.5(2)"))
+    p = b[Dict("_col2"=>"v3","_col3"=>"12.5(2)")]
     @test size(p,1) == 1
     @test p[!,"_col1"][1] == "3"
     # create a new loop

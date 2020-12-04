@@ -161,7 +161,7 @@ create_nspace_data() = begin
         close(s)
     end
     sdic = DDLm_Dictionary("second.dic")
-    sdata = first(NativeCif("second.cif")).second
+    sdata = first(Cif("second.cif")).second
     tdata = TypedDataSource(data,cdic)
     sdata = TypedDataSource(sdata,sdic)
     RelationalContainer([tdata,sdata])

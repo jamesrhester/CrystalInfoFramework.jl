@@ -1,14 +1,13 @@
-# Routines for outputting CIF values
+# **Routines for outputting CIF values
 
 export format_for_cif
 
 """
-`format_for_cif(val)`
+    format_for_cif(val)
 
-Return a text string suitably delimited ready for output in
-a CIF2 file. Will not handle pathological cases and does not
-yet use the prefixing and line length protocols. No check of
-content for correctness (yet).
+Return `val` formatted as a text string for output in
+a CIF2 file. May not handle pathological cases and does not
+yet use the prefixing and line length protocols.
 """
 format_for_cif(val::AbstractString) = begin
     if '\n' in val
@@ -155,9 +154,12 @@ format_for_cif(df::DataFrame;catname=nothing) = begin
 end
 
 """
-Show one dictionary definition. `info_dic` contains
-data frames containing relevant information. `implicits`
-is a list of category.column names that should not be
+    show_one_def(io,def_name,info_dic;implicits=[])
+
+Convert one dictionary definition for `def_name` to text. 
+`info_dic` is a dictionary of `DataFrame`s for each DDL
+category appearing in the definition. `implicits`
+is a list of `category.column` names that should not be
 printed. No underscore appears before the category
 name.
 """
@@ -172,6 +174,13 @@ show_one_def(io,def_name,info_dic;implicits=[]) = begin
 end
 
 # We can skip defaults
+
+"""
+    show_set(io,cat,df;implicits=[])
+
+Format the contents of single-row DataFrame `df` as a series
+of key-value pairs in CIF syntax.
+"""
 show_set(io,cat,df;implicits=[]) = begin
     colnames = sort!(propertynames(df))
     for cl in colnames
@@ -184,6 +193,12 @@ show_set(io,cat,df;implicits=[]) = begin
     end
 end
 
+"""
+    show_loop(io,cat,df;implicits=[])
+
+Format the contents of multi-row DataFrame `df` as a CIF loop.
+ If `cat.col` appears in `implicits` then `col` is not output.
+"""
 show_loop(io,cat,df;implicits=[]) = begin
     if nrow(df) == 0 return end
     rej_names = filter(x->split(x,".")[1]==cat,implicits)

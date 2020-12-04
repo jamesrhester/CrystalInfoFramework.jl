@@ -1,13 +1,16 @@
 
-#== Caseless strings
-
-We need caseless strings for the dictionaries, in order to allow
-caseless comparisons.
-
-==#
+# **Caseless strings
+#
+# We need caseless strings for the dictionaries, in order to allow
+# caseless comparisons.
+#
+#
 
 export CaselessString
 
+"""
+A string which ignores case
+"""
 struct CaselessString <: AbstractString
     actual_string::String
 end
@@ -41,8 +44,8 @@ Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
 Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
 Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
 
-#== A caseless string should match both upper and lower case
-==#
+#== A caseless string should match both upper and lower case ==#
+
 Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
     for (k,v) in d
         if lowercase(k) == lowercase(key)

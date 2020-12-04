@@ -19,9 +19,14 @@ include("cif_base.jl")
 include("cif_dic.jl")
 include("caseless_strings.jl")
 include("ddlm_dictionary_ng.jl")
-include("cif_output.jl")
 include("ddl2_dictionary_ng.jl")
+include("cif_output.jl")
 
+"""
+module DataContainer defines simple and complex
+collections of tables (relations) for use with
+CIF dictionaries.
+"""
 module DataContainer
 
 using ..CrystalInfoFramework

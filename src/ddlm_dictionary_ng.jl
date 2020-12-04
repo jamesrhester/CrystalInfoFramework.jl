@@ -1,24 +1,22 @@
-# Next generation: reads the dictionary as a database the way
-# the PDB intended
+# **DDLm Dictionaries
 #
-#==
-The following semantics are important for DDLm dictionaries:
-(1) Importation. A DDLm dictionary can import parts of definitions,
-or complete dictionaries in order to describe the whole semantic space
-(2) Parent-child. An object name may be referenced as if it were
-part of the parent category; so if <c> is a child of <p>, and <q> is
-an object in <c> (that is, "_c.q" is the dataname), then "p.q" refers
-to the same item as "c.q" in dREL methods. It is not the case that
-"_p.q" is a defined dataname.  The code here therefore implements only
-the methods needed to find parents and children. 
+#
+# The following semantics are important for DDLm dictionaries:
+# (1) Importation. A DDLm dictionary can import parts of definitions,
+# or complete dictionaries in order to describe the whole semantic space
+# (2) Parent-child. An object name may be referenced as if it were
+# part of the parent category; so if <c> is a child of <p>, and <q> is
+# an object in <c> (that is, "_c.q" is the dataname), then "p.q" refers
+# to the same item as "c.q" in dREL methods. It is not the case that
+# "_p.q" is a defined dataname.  The code here therefore implements only
+# the methods needed to find parents and children. 
+#
+# Namespaces: data names in the dictionary may be assigned to a particular
+# namespace.
+#
+# A reference dictionary may be supplied containing the definitions of the
+# DDLm attributes. A default reference dictionary is supplied.
 
-Namespaces: data names in the dictionary may be assigned to a particular
-namespace.
-
-A reference dictionary may be supplied containing the definitions of the
-DDLm attributes. A default reference dictionary is supplied.
-
-==#
 using Printf
 
 export DDLm_Dictionary
@@ -46,8 +44,10 @@ export find_head_category,add_head_category!
 export get_julia_type_name,get_dimensions
 import Base.show
 
-const ddlm_std_ref = joinpath(@__DIR__,"ddl.dic")
-
+"""
+A DDLm Dictionary holds information about data names including
+executable methods for deriving missing values.
+"""
 struct DDLm_Dictionary <: abstract_cif_dictionary
     block::Dict{Symbol,GroupedDataFrame}
     func_defs::Dict{String,Function}
@@ -57,16 +57,16 @@ struct DDLm_Dictionary <: abstract_cif_dictionary
     namespace::String
 end
 
-DDLm_Dictionary(c::NativeCif) = begin
+DDLm_Dictionary(c::Cif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
     return DDLm_Dictionary(first(c).second)
 end
 
-DDLm_Dictionary(a::String;verbose=false) = DDLm_Dictionary(NativeCif(a,verbose=verbose))
+DDLm_Dictionary(a::String;verbose=false) = DDLm_Dictionary(Cif(a,verbose=verbose))
 
-DDLm_Dictionary(b::FullBlock) = begin
+DDLm_Dictionary(b::CifBlock) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -113,9 +113,11 @@ DDLm_Dictionary(b::FullBlock) = begin
 end
 
 """
-Construct a dictionary when provided with a collection of data frames indexed
-by symbols. The symbols are DDLm attribute categories, and the dataframe columns
-are the object_ids of the DDLm attributes of that category.
+    DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace)
+
+The symbol keys in `attr_dict` are DDLm attribute categories, 
+and the columns in the indexed `DataFrame`s are the object_ids 
+of the DDLm attributes of that category.
 """
 DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
     # Apply default values if not a template dictionary
@@ -169,6 +171,7 @@ Base.delete!(d::DDLm_Dictionary,k::String) = begin
 end
 
 # `k` is assumed to be already lower case
+
 filter_on_name(d::Dict{Symbol,GroupedDataFrame},k) = begin
     info_dict = Dict{Symbol,DataFrame}()
     for cat in keys(d)
@@ -190,6 +193,7 @@ filter_on_name(d::Dict{Symbol,DataFrame},k) = begin
 end
 
 get_dic_name(d::DDLm_Dictionary) = parent(d[:dictionary])[!,:title][]
+
 get_dic_namespace(d::DDLm_Dictionary) = begin
     if :namespace in propertynames(d[:dictionary])
         d[:dictionary][!,:namespace][]
@@ -198,6 +202,12 @@ get_dic_namespace(d::DDLm_Dictionary) = begin
     end
 end
 
+"""
+    list_aliases(d::DDLm_Dictionary,name;include_self=false)
+
+List aliases of `name` listed in `d`. If not `include_self`, remove
+`name` from the returned list.
+"""
 list_aliases(d::DDLm_Dictionary,name;include_self=false) = begin
     result = d[name][:definition][:,:id]
     alias_block = get(d[name],:alias,nothing)
@@ -208,7 +218,15 @@ list_aliases(d::DDLm_Dictionary,name;include_self=false) = begin
     return result
 end
 
-translate_alias(d::DDLm_Dictionary,name) = begin
+
+"""
+    find_name(d::DDLm_Dictionary,name)
+
+Find the canonical name for `name` in `d`. If `name` is not
+present, return `name` unchanged. If accessed in cat/obj format, search also child
+categories. Note that the head category may not have a category associated with it.
+"""
+find_name(d::DDLm_Dictionary,name) =  begin
     lname = lowercase(name)
     # A template etc. dictionary has no defs
     if !haskey(d.block,:definition) return lname end
@@ -221,11 +239,12 @@ translate_alias(d::DDLm_Dictionary,name) = begin
 end
 
 """
-Find the canonical name for `name`. If accessed in cat/obj format, search also child
-categories. Note that the head category may not have a category associated with it.
-"""
-find_name(d::DDLm_Dictionary,name) = translate_alias(d,name)
+    find_name(d::DDLm_Dictionary,cat,obj)
 
+Find the canonical name referenced by `cat.obj` in `d`, searching also child
+categories according to DDLm semantics. Note that the head category may not 
+have a category associated with it.
+"""
 find_name(d::DDLm_Dictionary,cat,obj) = begin
     catcol = d[:name][!,:category_id]
     selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),catcol)
@@ -244,12 +263,47 @@ find_name(d::DDLm_Dictionary,cat,obj) = begin
     throw(KeyError("$cat/$obj"))
 end
 
+"""
+    find_category(d::DDLm_Dictionary,dataname)
+
+Find the category of `dataname` by looking up `d`.
+"""
 find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
+
+"""
+    find_object(d::DDLm_Dictionary,dataname)
+
+Find the `object_id` of `dataname` by looking up `d`.
+"""
 find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:object_id][])
+
+"""
+    is_category(d::DDLm_Dictionary,name)
+
+Return true if `name` is a category according to `d`.
+"""
 is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope][] == "Category" : false
+
+"""
+    get_categories(d)
+
+List all categories defined in DDLm Dictionary `d`
+"""
 get_categories(d) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+
+"""
+    get_cat_class(d,catname)
+
+The DDLm category class of `catname` as defined in DDLm Dictionary `d`
+"""
 get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
 
+"""
+    is_set_category(d::DDLm_Dictionary,catname)
+
+Return true if `catname` is declared as a Set category. If `d` is a `Reference` dictionary defining
+DDLm attributes themselves, only the `dictionary` category is a Set category.
+"""
 is_set_category(d::DDLm_Dictionary,catname) = begin
     cat_decl = get_cat_class(d,catname)
     dic_type = d[:dictionary].class[]
@@ -258,6 +312,13 @@ is_set_category(d::DDLm_Dictionary,catname) = begin
     return false
 end
 
+"""
+    is_loop_category(d::DDLm_Dictionary,catname)
+
+Return true if `catname` is declared as a Loop category. For
+`Reference` dictionaries describing the DDLm attributes themselves,
+all categories except `dictionary` are treated as Loop categories.
+"""
 is_loop_category(d::DDLm_Dictionary,catname) = begin
     cat_decl = get_cat_class(d,catname)
     dic_type = d[:dictionary].class[]
@@ -266,16 +327,23 @@ is_loop_category(d::DDLm_Dictionary,catname) = begin
     return cat_decl == "Loop"
 end
 
+"""
+    get_objs_in_cat(d::DDLm_Dictionary,catname)
+
+List all object_ids defined for `catname` in `d`.
+"""
 get_objs_in_cat(d::DDLm_Dictionary,cat) = begin
     temp = d[:name][!,:category_id]
     selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),temp)
     lowercase.(d[:name][selector,:object_id])
 end
 
+"""
+    get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false)
 
-# Dictionary 'Set' categories are really loop categories with the definition id as the
-# key data name
-
+List all category key data names for `cat` listed in `d`. If `aliases`, include alternative names
+for the key data names.
+"""
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
     loop_keys = lowercase.(d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name])
     key_aliases = []
@@ -288,13 +356,18 @@ get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
     return key_aliases
 end
 
+"""
+    get_linked_names_in_cat(d::DDLm_Dictionary,cat)
+
+List all data names in `cat` that are children of other data names.
+"""
 get_linked_names_in_cat(d::DDLm_Dictionary,cat) = begin
     names = [n for n in get_names_in_cat(c,cat) if length(get(c[n][:name],:linked_item_id,[])) == 1]
     [n for n in names if get(c[n][:type],:purpose,["Datum"])[] != "SU"]
 end
 
 """
-get_linked_name(d::DDLm_Dictionary,name) = begin
+    get_linked_name(d::DDLm_Dictionary,name) = begin
 
 Return any name linked to `name` that is not a SU, returning `name` if none found
 """
@@ -308,11 +381,10 @@ get_linked_name(d::DDLm_Dictionary,name) = begin
 end
 
 """
-get_set_categories(d::DDLm_Dictionary)
+    get_set_categories(d::DDLm_Dictionary)
 
-Return all categories that may only have one row. Note that a 'Set' category for a 
-dictionary definition file can take multiple rows when separate definitions are
-concatenated.
+Return all categories that may only have one row. For Reference dictionaries defining
+DDLm attributes, only `dictionary` is considered a Set category.
 """
 get_set_categories(d::DDLm_Dictionary) = begin
     if d[:dictionary].class[] == "Instance"
@@ -322,6 +394,12 @@ get_set_categories(d::DDLm_Dictionary) = begin
     end
 end
 
+"""
+    get_loop_categories(d::DDLm_Dictionary)
+
+Return all categories that may have multiple rows. For Reference dictionaries defining
+DDLm attributes, only `dictionary` is not a Loop category.
+"""
 get_loop_categories(d::DDLm_Dictionary) = begin
     if d[:dictionary].class[] == "Instance"
         lowercase.(d[:definition][d[:definition][!,:class] .== "Loop",:id])
@@ -330,6 +408,14 @@ get_loop_categories(d::DDLm_Dictionary) = begin
     end
 end
 
+# ***Dictionary functions***
+
+"""
+    get_dict_funcs(d::DDLm_Dictionary)
+
+Return `(func_catname, all_funcs)`, where `func_catname` is the single category of class `Functions`
+in `d`, and `all_funcs` is a list of all object_ids for that category.
+"""
 get_dict_funcs(d::DDLm_Dictionary) = begin
     func_cat = d[:definition][d[:definition][!,:class] .== "Functions",:id]
     func_catname = nothing
@@ -342,32 +428,45 @@ get_dict_funcs(d::DDLm_Dictionary) = begin
     return func_catname,all_funcs
 end
 
+"""
+    get_parent_category(d::DDLm_Dictionary,child)
+
+Find the parent category of `child` according to `d`.
+"""
 get_parent_category(d::DDLm_Dictionary,child) = begin
     lowercase(d[child][:name][!,:category_id][])
 end
 
+"""
+    get_child_categories(d::DDLm_Dictionary,parent)
+
+Find the child categories of `parent` according to `d`.
+"""
 get_child_categories(d::DDLm_Dictionary,parent) = begin
     [c for c in get_categories(d) if get_parent_category(d,c) == lowercase(parent)]
 end
 
+"""
+    get_single_keyname(d::DDLm_Dictionary,c)
+
+Return the `object_id` of the single key data name of category `c`.
+An error is raised if there is not precisely one key data name for `c`.
+"""
 get_single_keyname(d::DDLm_Dictionary,c) = begin
     keys = get_keys_for_cat(d,c)
     if length(keys) == 0
         error("Category $c has no keys defined")
     end
-    if length(keys) == 1
-        obj = keys[]
-    else
-        alternate = get(d[c][:category],:key_id,[])
-        if length(alternate) == 0
-            error("Category $c has no primitive key")
-        end
-        obj = alternate[]
+    if length(keys) > 1
+        error("Category $c has more than one key")
     end
+    obj = keys[]
     d[obj][:name][!,:object_id][]
 end
 
 """
+    get_single_key_cats(d::DDLm_Dictionary)
+
 Return a list (category,keyname) for all categories that have
 a single key, where that key is not a child key of another
 category. This latter case corresponds to a split single
@@ -382,8 +481,10 @@ get_single_key_cats(d::DDLm_Dictionary) = begin
 end
 
 """
-Find the ultimately-linked dataname, if there is one. Protect against
-simple self-referential loops.
+    get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString)
+
+Find the ultimately-linked dataname for `dataname`, returning `dataname`
+if there are no links.
 """
 get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString) = begin
     if haskey(d,dataname)
@@ -396,23 +497,34 @@ get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString) = begin
     return dataname
 end
 
-get_default(b::DDLm_Dictionary,s) = begin
-    info = get(b[s],:enumeration,missing)
+"""
+    get_default(d::DDLm_Dictionary,s)
+
+Return the default value for `s` or `missing` if none defined. 
+"""
+get_default(d::DDLm_Dictionary,s) = begin
+    info = get(d[s],:enumeration,missing)
     if !ismissing(info)
         info = get(info,:default,[missing])[]
     end
     return info
 end
 
-#==   Lookup 
+#   ***Default lookup 
+#
+# A default value may be tabulated, and some other value in the
+# current packet is used to index into the table. `cp` is an
+# object with symbolic properties corresponding to the
+# items in a category.
+#
 
-A default value may be tabulated, and some other value in the
-current packet is used to index into the table. `cp` is an
-object with symbolic properties corresponding to the
-items in a category.
+"""
+    lookup_default(dict::DDLm_Dictionary,dataname::String,cp)
 
-==#
-
+Index into any default lookup table defined in `dict` for `dataname` using an index value from
+`cp`. `cp` must have a property name as specified by `def_index_id` in the definition of 
+`dataname` such that `cp.<def_index_id>` returns a single value
+"""
 lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     definition = dict[dataname][:enumeration]
     index_name = :def_index_id in propertynames(definition) ? definition[!,:def_index_id][] : missing
@@ -430,9 +542,14 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     return dict[dataname][:enumeration_default][!,:value][pos[1]]
 end
 
-# Methods for setting and retrieving evaluated functions
-#== Extract the dREL text from the dictionary, if any
-==#
+# ***Methods for setting and retrieving evaluated functions
+
+"""
+    load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String)
+
+Return the text of a method found in the definition of `dataname` in `dict`. The
+method must have purpose `meth_type`.
+"""
 load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String) =  begin
     full_def = dict[dataname]
     func_text = full_def[:method]
@@ -449,18 +566,20 @@ load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String) =  begi
 end
 
 """
-Remove all methods from the dictionary. This will stop any
-automatic derivation taking place.
+    remove_methods!(dict::DDLm_Dictionary)
+
+Remove all methods from the `dict`. This will stop any
+further automatic derivation taking place.
 """
 remove_methods!(dict::DDLm_Dictionary) = begin
     dict.block[:method] = groupby(DataFrame([[]],[:master_id]),:master_id)
 end
-"""
-as_data(d::DDLm_Dictionary)
 
-Return an object `o` accessible using 
-`o[attribute]` where `attribute`
-is a ddlm attribute.
+"""
+    as_data(d::DDLm_Dictionary)
+
+Create an object `o` from `d` such that `o[attribute]` provides data for `attribute`
+as an array of Strings. 
 """
 as_data(d::DDLm_Dictionary) = begin
     output = Dict{String,Any}()
@@ -472,14 +591,36 @@ as_data(d::DDLm_Dictionary) = begin
     return output
 end
 
+"""
+    set_func!(d::DDLm_Dictionary,func_name::String,func_text::Expr,func_code)
+
+Store compiled code `func_code` created from `func_text` under `func_name` in `d`.
+"""
 set_func!(d::DDLm_Dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
-    println("All funcs: $(keys(d.func_defs))")
+    #println("All funcs: $(keys(d.func_defs))")
 end
 
+"""
+    get_func(d::DDLm_Dictionary,func_name::String)
+
+Retrieve the compiled code stored for `func_name` in `d`.
+"""
 get_func(d::DDLm_Dictionary,func_name::String) = d.func_defs[func_name]
+
+"""
+    get_func_text(d::DDLm_Dictionary,func_name::String)
+
+Retrieve the text stored for `func_name` in `d`.
+"""
 get_func_text(d::DDLm_Dictionary,func_name::String) = d.func_text[func_name]
+
+"""
+    has_func(d::DDLm_Dictionary,func_name::String)
+
+Return `true` if code is available for `func_name` in `d`
+"""
 has_func(d::DDLm_Dictionary,func_name::String) = begin
     try
         d.func_defs[func_name]
@@ -490,21 +631,58 @@ has_func(d::DDLm_Dictionary,func_name::String) = begin
 end
 
 # Methods for setting and retrieving definition functions
+"""
+    has_default_methods(d::DDLm_Dictionary)
+
+Return true if `d` contains methods for calculating default values
+"""
 has_default_methods(d::DDLm_Dictionary) = true
+
+"""
+    has_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String)
+
+Return true if `d` contains compiled code for calculating default values of attribute `ddlm_attr` in
+data name definition `func_name`
+"""
 has_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = haskey(d.def_meths,(func_name,ddlm_attr))
+
+"""
+    get_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String)
+
+Return compiled code for calculating default values of attribute `ddlm_attr` in
+data name definition `func_name` contained in dictionary `d`.
+"""
 get_def_meth(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = d.def_meths[(func_name,ddlm_attr)]
+
+"""
+    get_def_meth_txt(d::DDLm_Dictionary,func_name::String,ddlm_attr::String)
+
+Return text of code for calculating default values of attribute `ddlm_attr` in
+data name definition `func_name` contained in dictionary `d`.
+"""
 get_def_meth_txt(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = d.def_meths_text[(func_name,ddlm_attr)]
 
+"""
+    set_func!(d::DDLm_Dictionary,func_name::String,ddlm_attr::String,func_text::Expr,func_code)
+
+Store compiled code `func_code` for calculating 
+"""
 set_func!(d::DDLm_Dictionary,func_name::String,ddlm_attr::String,func_text::Expr,func_code) = begin
     d.def_meths[(func_name,ddlm_attr)] = func_code
     d.def_meths_text[(func_name,ddlm_attr)] = func_text
 end
 
+"""
+    get_parent_name(d::DDLm_Dictionary,name)
+
+Get the category to which `name` belongs.
+"""
 get_parent_name(d::DDLm_Dictionary,name) = begin
     d[name][:name][!,:category_id][]
 end
 
 """
+
 Update the appropriate table of `all_dict_info` with
 the contents of `new_info`, filling in implicit values
 with column `extra_name` with value `extra_value`
@@ -531,12 +709,10 @@ update_row!(all_dict_info,new_vals,extra_name,extra_value) = begin
 end
 
 """
-find_head_category(ds)
+    find_head_category(df::DataFrame)
 
-Find the category that is at the top of the category tree.
-`df` is essentially the `:name` category as a DataFrame. If
-`definition.class == Head` returns a unique value that is
-preferred.
+Find the category that is at the top of the category tree by following object->category
+links.
 """
 find_head_category(df::DataFrame) = begin
     # get first and follow it up
@@ -545,13 +721,20 @@ find_head_category(df::DataFrame) = begin
     while true
         some_cat = lowercase.(df[lowercase.(df[!,:object_id]) .== some_cat,:category_id])
         if length(some_cat) == 0 || some_cat[] == old_cat break end
-        println("$old_cat -> $some_cat")
+        #println("$old_cat -> $some_cat")
         old_cat = some_cat[]
     end
-    println("head category is $old_cat")
+    #println("head category is $old_cat")
     return old_cat
 end
 
+"""
+    find_head_category(df::Dict{Symbol,DataFrame})
+
+Find the category that is at the top of the category tree by searching for a
+`Head` category in `df[:definition]`, or else following `category->object`
+links in `df[:name]`
+"""
 find_head_category(df::Dict) = begin
     if haskey(df,:definition)
         explicit_head = df[:definition][df[:definition].class .== "Head",:master_id]
@@ -564,6 +747,11 @@ find_head_category(df::Dict) = begin
     find_head_category(df[:name])
 end
 
+"""
+    find_head_category(df::DDLm_Dictionary)
+
+Find the category that is at the top of the category tree of `d`.
+"""
 find_head_category(df::DDLm_Dictionary) = begin
     explicit_head = df[:definition][df[:definition].class .== "Head",:master_id]
     if length(explicit_head) == 1
@@ -575,8 +763,10 @@ find_head_category(df::DDLm_Dictionary) = begin
 end
 
 """
-Find categories that are at the top level of the dictionary. `ref_dic` is a DDLm
-attribute dictionary. 
+    find_top_level_cats(ref_dic::DDLm_Dictionary)
+
+Find categories that should appear in the data block of a dictionary, as defined
+by DDLm reference dictionary `ref_dic`.
 """
 find_top_level_cats(ref_dic::DDLm_Dictionary) = begin
     domain = ref_dic[:dictionary_valid]
@@ -586,14 +776,14 @@ find_top_level_cats(ref_dic::DDLm_Dictionary) = begin
             append!(acceptable,onerow.attributes)
         end
     end
-    println("All possibles: $acceptable")
+    #println("All possibles: $acceptable")
     unique!(map(x->find_category(ref_dic,x),acceptable))
 end
 
 """
-add_head_category!(df)
+    add_head_category!(df)
 
-Add a missing head category to the DataFrame dictionary `df`
+Add a missing head category to the DataFrame representation of a dictionary `df`
 """
 add_head_category!(df,head_name) = begin
     hn = lowercase(head_name)
@@ -606,6 +796,9 @@ add_head_category!(df,head_name) = begin
     update_row!(df,new_info,"master_id",hn)
 end
 
+"""
+All DDLm categories.
+"""
 const ddlm_categories = [
             "ALIAS",
             "CATEGORY",
@@ -630,15 +823,11 @@ const ddlm_categories = [
             "UNITS"
 ]
 
-#== Resolve imports
-This routine will substitute all _import.get statements with the imported dictionary. Generally
-the only reason that you would not do this is if you are editing the dictionary rather than
-using it.
-==#
 
-#== Turn a possibly relative URL into an absolute one. Will probably fail with pathological
-URLs containing colons early on ==#
-
+"""
+Turn a possibly relative URL into an absolute one. Will probably fail with pathological
+URLs containing colons early on
+"""
 fix_url(s::String,parent::String) = begin
     if s[1]=='/'
         return "file://"*s
@@ -650,6 +839,11 @@ fix_url(s::String,parent::String) = begin
     return s
 end
 
+"""
+    resolve_imports!(d::Dict{Symbol,DataFrame},original_file)
+
+Replace all `_import.get` statements with the contents of the imported dictionary.
+"""
 resolve_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     if !haskey(d,:import) return d end
     resolve_templated_imports!(d,original_file)
@@ -681,7 +875,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
         import_table = one_row.get
         for one_entry in import_table
             import_def = missing
-            println("one import instruction: $one_entry")
+#           println("one import instruction: $one_entry")
     (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
@@ -714,25 +908,25 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             #println("Already present for $definition:")
             #println("$prior_contents")
 
-#==
-Merging each category. There are two cases where the category
-already exists in the importing block:
-
-(1) Single-row category ("Set").
-A single-row category may have only particular columns
-specified in the import frame, with the remainder expected
-to remain untouched.  We update the import information with
-the current information in the importing block. This occurs
-when both importing and importee have no more than one row
-
-(2) Multi-row category. ("Loop")
-If either importer or importee have more than one row in the
-category, the category is entirely replaced by the contents
-of the imported block.
-
-If the category does not exist at all, the imported block
-can simply be appended.
-==#
+#
+# Merging each category. There are two cases where the category
+# already exists in the importing block:
+#
+# (1) Single-row category ("Set").
+# A single-row category may have only particular columns
+# specified in the import frame, with the remainder expected
+# to remain untouched.  We update the import information with
+# the current information in the importing block. This occurs
+# when both importing and importee have no more than one row
+#
+# (2) Multi-row category. ("Loop")
+# If either importer or importee have more than one row in the
+# category, the category is entirely replaced by the contents
+# of the imported block.
+#
+# If the category does not exist at all, the imported block
+# can simply be appended.
+#
             for k in keys(import_def)
                 if nrow(import_def[k])==0 continue end
                 # drop old master id
@@ -740,13 +934,13 @@ can simply be appended.
                 #println("Processing $k for $definition")
                 select!(import_def[k],Not(:master_id))
                 if haskey(prior_contents,k) && nrow(prior_contents[k]) > 0
-                    println("$k already present for $definition")
-                    println("intersecting $(propertynames(prior_contents[k])) , $(propertynames(import_def[k]))")
+#                    println("$k already present for $definition")
+#                    println("intersecting $(propertynames(prior_contents[k])) , $(propertynames(import_def[k]))")
                     dupls = intersect(propertynames(prior_contents[k]),propertynames(import_def[k]))
                     filter!(x->!(all(ismissing,prior_contents[k][!,x])) && !(all(ismissing,import_def[k][!,x])),dupls)
                     import_def[k][!,:master_id] .= definition
                     if length(dupls) > 0
-                        println("For $k handling duplicate defs $dupls")
+#                       println("For $k handling duplicate defs $dupls")
                         if if_dupl == "Exit"
                             throw(error("Keys $dupls duplicated when importing from $block at $location in category $k"))
                         end
@@ -761,13 +955,13 @@ can simply be appended.
                             end
                         end
                     else
-                        println("imports were $(import_def[k])\n, updating with $(prior_contents[k])...")
+#                       println("imports were $(import_def[k])\n, updating with $(prior_contents[k])...")
                         for n in propertynames(prior_contents[k])
                             if !all(ismissing,prior_contents[k][!,n])
                                 import_def[k][!,n] .= prior_contents[k][!,n]
                             end
                         end
-                        println("imports now $(import_def[k])")
+#                       println("imports now $(import_def[k])")
                     end
                 end
                 import_def[k][!,:master_id] .= definition
@@ -783,15 +977,15 @@ can simply be appended.
     return d
 end
 
-#== 
-A full import of Head into Head will add all definitions from the imported dictionary,
-and in addition will reparent all children of the imported Head category to the new
-Head category.  We first merge the two sets of save frames, and then fix the parent category
-of any definitions that had the old head category as parent. Note that the NativeCif
-object passed to us is just the save frames from a dictionary.
-
-The importing Head category is given a category of "." (nothing).
-==#
+# 
+#A full import of Head into Head will add all definitions from the imported dictionary,
+#and in addition will reparent all children of the imported Head category to the new
+#Head category.  We first merge the two sets of save frames, and then fix the parent category
+#of any definitions that had the old head category as parent. Note that the Cif
+#object passed to us is just the save frames from a dictionary.
+#
+#The importing Head category is given a category of "." (nothing).
+#
 
 resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     original_dir = dirname(original_file)
@@ -848,6 +1042,9 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     return d
 end
 
+"""
+Default values for DDLm attributes
+"""
 const ddlm_defaults = Dict(
 (:definition,:class)=>"Datum",
 (:definition,:scope)=>"Item",
@@ -870,7 +1067,7 @@ const ddlm_defaults = Dict(
 )
 
 """
-enter_defaults(d)
+    enter_defaults(d)
 
 Replace any missing values with the defaults for that value. The column type
 is changed.
@@ -883,7 +1080,7 @@ enter_defaults(d) = begin
     end
 end
 
-# == Reference dictionaries
+# **Reference dictionaries
 
 # Reference dictionaries should include information about 'master_id', but
 # this is absent from the surface of a DDLm dictionary. We add back in all of
@@ -895,7 +1092,12 @@ end
 
 # `ref_dict` is a dictionary used for reference to obtain the list of global
 # categories
-#
+
+"""
+extra_reference!(t::Dict{Symbol,DataFrame})
+
+Add identifier for definition data block to all relevant DDLm categories
+"""
 extra_reference!(t::Dict{Symbol,DataFrame}) = begin
     # add category key information
     cats = get_categories(t)
@@ -938,8 +1140,12 @@ extra_reference!(t::Dict{Symbol,DataFrame}) = begin
 end
 
 
-# Output
 
+"""
+    show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary)
+
+Output `ddlm_dic` in CIF format.
+"""
 show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     dicname = ddlm_dic[:dictionary].title[]
     write(io,"#\\#CIF_2.0\n")
@@ -983,12 +1189,9 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
     end
 end
 
-#==
-The dREL type machinery. Defined that take a string
-as input and return an object of the appropriate type
-==#
-
-#== Type annotation ==#
+"""
+Mapping of DDLm types to Julia types
+"""
 const type_mapping = Dict( "Text" => String,        
                            "Code" => Symbol("CaselessString"),                                                
                            "Name" => String,        
@@ -1014,6 +1217,12 @@ const type_mapping = Dict( "Text" => String,
                            )
 
 #TODO: Handle implied types
+
+"""
+    get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString)
+
+Find the Julia type corresponding to `cat.obj` in `cdic`
+"""
 get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString) = begin
     if obj == "master_id" return AbstractString,"Single" end
     definition = cdic[find_name(cdic,cat,obj)]
@@ -1029,6 +1238,11 @@ end
 # The first dimension in Julia is number of rows, then number
 # of columns. This is the opposite to dREL
 
+"""
+    get_dimensions(cdic::DDLm_Dictionary,cat,obj)
+
+Get dimensions for `cat.obj` in Julia order (row,column,...)
+"""
 get_dimensions(cdic::DDLm_Dictionary,cat,obj) = begin
     definition = cdic[find_name(cdic,cat,obj)][:type]
     dims = :dimension in propertynames(definition) ? definition[!,:dimension][] : "[]"
@@ -1042,6 +1256,11 @@ get_dimensions(cdic::DDLm_Dictionary,cat,obj) = begin
     return final
 end
 
+"""
+    get_container_type(cdic::DDLm_Dictionary,dataname)
+
+Return the DDLm container type for `dataname` according to `cdic`.
+"""
 get_container_type(cdic::DDLm_Dictionary,dataname) = begin
     return cdic[dataname][:type][!,:container][]
 end

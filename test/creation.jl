@@ -6,19 +6,19 @@ testdir = @__DIR__
 @testset "Test simple CIF creation and destruction" begin
 
 @test begin
-    p = NativeCif(joinpath(testdir,"simple_data.cif"))
+    p = Cif(joinpath(testdir,"simple_data.cif"))
     b = p["simple_data"]
     t = b["_numb_su"]
     true
 end
 
 @test begin
-    p=NativeCif{CifValue}()
+    p=Cif{CifValue}()
     true    #if we succeed we are happy
 end
 
 @test begin
-    p=NativeCif(joinpath(testdir,"simple_data.cif"))
+    p=Cif(joinpath(testdir,"simple_data.cif"))
     true #if we succeed we are happy
 end
 

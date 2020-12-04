@@ -10,12 +10,12 @@ const multi_block_test_file = "cif_img_1.7.11.dic"
 const core_dic = "cif_core.dic"
 
 prepare_files() = begin
-    c = NativeCif(cif_test_file)
+    c = Cif(cif_test_file)
     b = first(c).second
 end
 
 prepare_blocks() = begin
-    c = MultiDataSource(NativeCif(multi_block_test_file))
+    c = MultiDataSource(Cif(multi_block_test_file))
 end
 
 prepare_sources() = begin

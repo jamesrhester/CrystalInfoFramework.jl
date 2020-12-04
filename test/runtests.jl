@@ -5,7 +5,7 @@ using DataFrames
 
 # This just sets up access to a particular block
 prepare_block(filename,blockname) = begin
-    t = NativeCif(joinpath(@__DIR__,filename))
+    t = Cif(joinpath(@__DIR__,filename))
     b = t[blockname]
 end
 

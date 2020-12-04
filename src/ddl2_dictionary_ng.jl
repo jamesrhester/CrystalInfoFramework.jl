@@ -13,16 +13,16 @@ struct DDL2_Dictionary <: abstract_cif_dictionary
     parent_lookup::Dict{String,String}
 end
 
-DDL2_Dictionary(c::NativeCif) = begin
+DDL2_Dictionary(c::Cif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
     return DDL2_Dictionary(first(c).second,lowercase(first(keys(c))))
 end
 
-DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(NativeCif(a,verbose=verbose))
+DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(Cif(a,verbose=verbose))
 
-DDL2_Dictionary(b::FullBlock,blockname::AbstractString) = begin
+DDL2_Dictionary(b::CifBlock,blockname::AbstractString) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # loop over all blocks, storing information
     defs = get_frames(b)
