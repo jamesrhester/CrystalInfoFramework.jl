@@ -15,38 +15,31 @@ struct CaselessString <: AbstractString
     actual_string::String
 end
 
-# == CaselessString == #
-
-Base.:(==)(a::CaselessString,b::AbstractString) = begin
-    lowercase(a.actual_string) == lowercase(b)
-end
-
-Base.:(==)(a::AbstractString,b::CaselessString) = begin
-    lowercase(a) == lowercase(b.actual_string)
-end
-
 Base.:(==)(a::CaselessString,b::CaselessString) = lowercase(a)==lowercase(b)
 Base.:(==)(a::SubString{CaselessString},b::SubString{CaselessString}) = lowercase(a)==lowercase(b)
 
-#== the following don't work, for now we have explicit types 
-Base.:(==)(a::AbstractString,b::SubString{T} where {T}) = a == T(b)
+# == CaselessString == #
 
-Base.:(==)(a::SubString{T} where {T},b::AbstractString) = T(a) == b
-==#
+Base.lowercase(a::CaselessString) = lowercase(a.actual_string)
+Base.uppercase(a::CaselessString) = uppercase(a.actual_string)
 
-Base.:(==)(a::SubString{CaselessString},b::AbstractString) = CaselessString(a) == b
-Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = CaselessString(b) == a
-Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = a == CaselessString(b)
+Base.:(==)(a::CaselessString,b::AbstractString) = lowercase(a) == lowercase(b)
+Base.:(==)(a::AbstractString,b::CaselessString) = lowercase(a) == lowercase(b)
+Base.:(==)(a::SubString{CaselessString},b::AbstractString) = lowercase(a) == lowercase(b)
+Base.:(==)(a::SubString{CaselessString},b::CaselessString) = lowercase(a) == lowercase(b)
+Base.:(==)(a::AbstractString,b::SubString{CaselessString}) = lowercase(a) == lowercase(b)
+Base.:(==)(a::CaselessString,b::SubString{CaselessString}) = lowercase(a) == lowercase(b)
 
 Base.iterate(c::CaselessString) = iterate(c.actual_string)
 Base.iterate(c::CaselessString,s::Integer) = iterate(c.actual_string,s)
 Base.ncodeunits(c::CaselessString) = ncodeunits(c.actual_string)
 Base.isvalid(c::CaselessString,i::Integer) = isvalid(c.actual_string,i)
 Base.codeunit(c::CaselessString) = codeunit(c.actual_string)
+Base.show(io::IO,c::CaselessString) = show(io,c.actual_string)
 
 #== A caseless string should match both upper and lower case ==#
 
-Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
+Base.getindex(d::Dict{String,V} where V,key::Union{CaselessString,SubString{CaselessString}}) = begin
     for (k,v) in d
         if lowercase(k) == lowercase(key)
             return v
@@ -55,7 +48,6 @@ Base.getindex(d::Dict{String,Any},key::SubString{CaselessString}) = begin
     KeyError("$key not found")
 end
 
-Base.haskey(d::Dict{CaselessString,Any},key) = haskey(d,lowercase(key)) 
+Base.haskey(d::Dict{CaselessString,V} where V,key) = lowercase(key) in keys(d) 
 #
-Base.show(io::IO,c::CaselessString) = show(io,c.actual_string)
 Base.hash(c::CaselessString,h::UInt) = hash(lowercase(c.actual_string),h)
