@@ -25,6 +25,11 @@ Apart from installing Julia, you will need the C library
 [cifapi](https://github.com/COMCIFS/cif_api) installed in a standard
 place on your system.
 
+## Documentation
+
+Detailed documentation is becoming progressively available 
+[here](https://jamesrhester.github.io/CrystalInfoFramework.jl/dev)
+
 ## Getting started
 
 Type ``Cif`` is like a ``Dict{String,Block}``. A
