@@ -27,13 +27,12 @@ place on your system.
 
 ## Getting started
 
-Type ``NativeCif`` is like a ``Dict{String,NativeBlock}``. A
-``NativeBlock`` works like a ``Dict{String,Array{Any,1}}``.  All returned
+Type ``Cif`` is like a ``Dict{String,Block}``. A
+``Block`` works like a ``Dict{String,Array{Any,1}}``.  All returned
 values are Arrays, **even if the data name appears as a key-value
-pair in the file**. Primitive values are always Strings, unless a DDLm dictionary
-has been assigned to the ``NativeBlock``, in which case types are
-converted before return. In this case CIF2 Tables become julia ``Dict``
-types, and CIF2 lists are julia ``Array`` types.
+pair in the file**. Primitive values are always Strings. 
+CIF2 Tables become julia ``Dict`` types, and CIF2 lists are julia 
+``Array`` types.
 
 Even in the presence of a dictionary, DDLm Set category values are
 returned as 1-element Arrays. **This may change in the future**
@@ -47,7 +46,7 @@ returning a one-element ``Array{String,1}``:
 
 julia> using CrystalInfoFramework
 
-julia> nc = NativeCif("my_cif.cif")
+julia> nc = Cif("my_cif.cif")
 ...
 julia> my_block = nc["only_block"]  #could also use first(nc).second
 ...
@@ -56,21 +55,7 @@ julia> l = my_block["_cell.length_a"]
  "11.520(12)"
 ```
 
-To use dictionary type information, assign a dictionary to a block.
-
-```julia
-julia> my_dict = Cifdic("cif_core.dic")
-...
-julia> bd = assign_dictionary(my_block,my_dict)
-julia> l = bd["_cell.length_a"]
-1-element Array{Float64,1}:
- 11.52
-julia> l = bd["_cell_length_a"] #understand aliases
-1-element Array{Float64,1}:
- 11.52
-```
-
-``get_loop``, returns a DataFrame object that can be manipulated using the 
+``get_loop`` returns a ``DataFrame`` object that can be manipulated using the 
 methods of that package, most obviously, ``eachrow`` to iterate over the
 packets in a loop:
 
@@ -83,26 +68,9 @@ julia> for r in eachrow(l)
 end
 ```
 
-If a dictionary has been assigned, columns are labelled by their
-``object_id``, not the full name:
-
-```julia
-julia> l = get_loop(bd,"_atom_site.label")
-...
-julia> for r in eachrow(l)
-       println("$(r[Symbol("fract_x")])")
-       end
-0.5505
-0.4009
-0.2501
-0.417
-...
-```
-
 ### Updating
 
-Values are added in the same way as for a normal dictionary.  No value
-type checking is performed even if a dictionary has been assigned.
+Values are added in the same way as for a normal dictionary.
 
 ```julia
 my_block["_new_item"] = [1,2,3]
@@ -119,18 +87,44 @@ add_to_loop(my_block,"_old_item","_new_item")
 The number of values in the array assigned to ``_new_item`` must match
 the length of the loop - this is checked.
 
+## Dictionaries and DataSources
+
+CIF dictionaries are created by passing the dictionary file name to
+``DDLm_Dictionary`` or ``DDL2_Dictionary``.
+
+## DataSources
+
+A ``DataSource`` is any data source returning an array of values when
+supplied with a string.  A CIF ``Block`` conforms to this specification.
+These are defined in submodule ``CrystalInfoFramework.DataContainer``.
+
+A CIF dictionary can be used to obtain data with correct Julia type from
+a ``DataSource`` that uses data names defined in the dictionary by 
+creating a ``TypedDataSource``:
+
+```julia
+julia> using CrystalInfoFramework.DataContainer
+julia> my_dict = DDLm_Dictionary("cif_core.dic")
+julia> bd = TypedDataSource(my_block,my_dict)
+julia> l = bd["_cell.length_a"]
+1-element Array{Float64,1}:
+ 11.52
+julia> l = bd["_cell_length_a"] #understand aliases
+1-element Array{Float64,1}:
+ 11.52
+```
+
 ### Writing
 
-There is currently no support for output of ``NativeCif`` (or any other) types. 
-Contributions welcome.
+Currently, `show(io::IO,::MIME"text/cif",d::DDLm_Dictionary)` produces
+a correctly-formatted dictionary. Similar output for plain CIF files is
+almost ready.
 
 ## Architecture
 
 The C cifapi library is used for parsing into native Julia structures. An
 earlier version visible in the git history used cifapi for all interactions,
 but the limitation to one loop traversal at a time was too restrictive.
-
-A datablock with a dictionary assigned is a separate type.
 
 ## Further information
 
