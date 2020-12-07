@@ -1139,56 +1139,6 @@ extra_reference!(t::Dict{Symbol,DataFrame}) = begin
     unique!(t[:description])
 end
 
-
-
-"""
-    show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary)
-
-Output `ddlm_dic` in CIF format.
-"""
-show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
-    dicname = ddlm_dic[:dictionary].title[]
-    write(io,"#\\#CIF_2.0\n")
-    write(io,"""
-##############################################################
-#
-#        $dicname (DDLm)
-#
-##############################################################\n""")
-    write(io,"data_$dicname\n")
-    top_level = ddlm_dic[:dictionary]
-    show_set(io,"dictionary",top_level)
-    # And the unlooped top-level stuff
-    top_level = ddlm_dic[dicname]
-    for c in keys(top_level)
-        if c == :dictionary continue end
-        if nrow(top_level[c]) == 1
-            show_set(io,String(c),top_level[c])
-        end
-    end
-    # Now for the rest
-    head = find_head_category(ddlm_dic)
-    show_one_def(io,head,ddlm_dic[head])
-    all_cats = sort!(get_categories(ddlm_dic))
-    for one_cat in all_cats
-        if one_cat == head continue end
-        cat_info = ddlm_dic[one_cat]
-        show_one_def(io,one_cat,cat_info)
-        items = get_names_in_cat(ddlm_dic,one_cat)
-        for one_item in items
-            show_one_def(io,one_item,ddlm_dic[one_item])
-        end
-    end
-    # And the looped top-level stuff
-    top_level = ddlm_dic[dicname]
-    for c in keys(top_level)
-        if c == :dictionary continue end
-        if nrow(top_level[c]) > 1
-            show_loop(io,String(c),top_level[c])
-        end
-    end
-end
-
 """
 Mapping of DDLm types to Julia types
 """

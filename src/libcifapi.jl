@@ -79,13 +79,6 @@ get_block_code(b::cif_container_tp_ptr) = begin
     make_jl_string(s)
 end
 
-"""
-    keys(c::cif_tp_ptr)
-
-Return all data block names from the referenced CIF file
-"""
-Base.keys(c::cif_tp_ptr) = get_block_code.(values(c))
-
 # **CIF values**
 
 """

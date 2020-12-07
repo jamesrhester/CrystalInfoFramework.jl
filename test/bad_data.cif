@@ -1,0 +1,7 @@
+# A non-conformant file to check error detection
+data_okblockname
+_item1 235
+_item2 "Gooood morning"
+_repeated "this is the first time"
+_repeated "this is the second time"
+

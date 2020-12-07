@@ -1,10 +1,12 @@
 #\#CIF_2.0
+# Test nested lists and tables in lists and tables
 
 data_tl_data
 
 _import.get [{"file":. "block":? "mode":"Contents"}
              {"a":1 "b":2 "c":whatever}
+             [1,2,3,4,5]
              ]
              
-_list_in_table {"a":[1 2 3 4] "q":[a b c d]}
+_list_in_table {"a":[1 2 3 4] "q":[a b c d] "r":{"a":2 "b":3 "c":4}}
 

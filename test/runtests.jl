@@ -11,9 +11,10 @@ end
 
 include("creation.jl")
 include("data_access.jl")
-include("save_frames.jl")
-include("dictionaries.jl")
+#include("save_frames.jl")
+#include("dictionaries.jl")
+#include("output.jl")
 
 # Test DataContainers
 
-include("dc_base.jl")
+#include("dc_base.jl")

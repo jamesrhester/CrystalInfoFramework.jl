@@ -61,5 +61,3 @@ const error_codes = Dict(   0 =>     "no error",
   139 => "encountered a text block used as a table key",
   140 => "a null table key was encountered",
   141 => "a line of a prefixed text field body omitted the prefix")
-
-print_cif_error(code) = println(error_codes[code])

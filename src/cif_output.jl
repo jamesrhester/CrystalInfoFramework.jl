@@ -5,13 +5,32 @@ export format_for_cif
 """
     format_for_cif(val)
 
-Return `val` formatted as a text string for output in
-a CIF2 file. May not handle pathological cases and does not
-yet use the prefixing and line length protocols.
+Format the provided value for output in a CIF2
+file. Generally CIF1 and CIF2 syntaxes are
+identical for non-text values.  CIF2 syntax
+is preferred where the result is also conformant
+CIF1 syntax with the same meaning.
 """
-format_for_cif(val::AbstractString) = begin
+function format_for_cif end
+
+"""
+    format_for_cif(val::AbstractString;cif1=false)
+
+Return `val` formatted as a text string for output in
+a CIF2 file.  Line folding and prefixing is not used.
+
+If `cif1`, triple-quoted strings
+will never be output, but output will fail if the
+supplied string contains the "\n;" digraph.  For `cif1`,
+non-ASCII code points in `val` are output despite
+this being a violation of the CIF1 standard.
+"""
+format_for_cif(val::AbstractString;cif1=false) = begin
     if '\n' in val
         if occursin("\n;",val)
+            if cif1
+                throw(error("$val cannot be formatted using CIF1 syntax"))
+            end
             if occursin("'''",val)
                 delimiter = "\"\"\""
             else
@@ -50,7 +69,6 @@ format_for_cif(val::Integer) = begin
     return "$val"
 end
 
-# TODO: take account of SU and truncate
 format_for_cif(val::Float64) = begin
     return "$val"
 end
@@ -207,3 +225,125 @@ show_loop(io,cat,df;implicits=[]) = begin
     imp_reg = Regex("$(join(rej_names,"|^"))")
     write(io,format_for_cif(df[!,Not(imp_reg)];catname=cat))
 end       
+
+"""
+    show(io::IO,::MIME"text/cif",c::Cif)
+
+Write the contents of `c` as a CIF file to `io`.
+"""
+show(io::IO,::MIME"text/cif",c::Cif) = begin
+    for k in keys(c)
+        write(io,"data_$k\n")
+        show(io,MIME("text/cif"),c[k])
+    end
+end
+
+Base.show(io::IO,::MIME"text/cif",c::CifContainer) = begin
+    write(io,"\n")
+    key_vals = setdiff(collect(keys(c)),get_loop_names(c)...)
+    for k in key_vals
+        item = format_for_cif(first(c[k]))
+        write(io,"$k\t$item\n")
+    end
+    
+    # now go through the loops
+    for one_loop in get_loop_names(c)
+        a_loop = get_loop(c,first(one_loop))
+        write(io,format_for_cif(a_loop))
+    end
+end
+
+Base.show(io::IO,::MIME"text/cif",b::NestedCifContainer) = begin
+    # first output the save frames
+    show(io,get_frames(b))
+    show(io,Block(b))
+end
+     
+"""
+    show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary)
+
+Output `ddlm_dic` in CIF format.
+"""
+show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary) = begin
+    dicname = ddlm_dic[:dictionary].title[]
+    write(io,"#\\#CIF_2.0\n")
+    write(io,"""
+##############################################################
+#
+#        $dicname (DDLm)
+#
+##############################################################\n""")
+    write(io,"data_$dicname\n")
+    top_level = ddlm_dic[:dictionary]
+    show_set(io,"dictionary",top_level)
+    # And the unlooped top-level stuff
+    top_level = ddlm_dic[dicname]
+    for c in keys(top_level)
+        if c == :dictionary continue end
+        if nrow(top_level[c]) == 1
+            show_set(io,String(c),top_level[c])
+        end
+    end
+    # Now for the rest
+    head = find_head_category(ddlm_dic)
+    show_one_def(io,head,ddlm_dic[head])
+    all_cats = sort!(get_categories(ddlm_dic))
+    for one_cat in all_cats
+        if one_cat == head continue end
+        cat_info = ddlm_dic[one_cat]
+        show_one_def(io,one_cat,cat_info)
+        items = get_names_in_cat(ddlm_dic,one_cat)
+        for one_item in items
+            show_one_def(io,one_item,ddlm_dic[one_item])
+        end
+    end
+    # And the looped top-level stuff
+    top_level = ddlm_dic[dicname]
+    for c in keys(top_level)
+        if c == :dictionary continue end
+        if nrow(top_level[c]) > 1
+            show_loop(io,String(c),top_level[c])
+        end
+    end
+end
+
+     
+#
+# **Output**
+#
+# DDL2 makes use of implicit values based on the block name. We
+# ignore any columns contained in the 'implicit' const.
+#
+
+show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
+    dicname = ddl2_dic[:dictionary].title[]
+    write(io,"#")
+    write(io,"""
+##############################################################
+#
+#        $dicname (DDL2)
+#
+##############################################################\n""")
+    write(io,"data_$dicname\n")
+    implicit_info = get_implicit_list()
+    top_level = ddl2_dic[:datablock]
+    show_set(io,"datablock",top_level,implicits=implicit_info)
+    top_level = ddl2_dic[:dictionary]
+    show_set(io,"dictionary",top_level,implicits=implicit_info)
+    # Now for the rest
+    all_cats = sort(get_categories(ddl2_dic))
+    for one_cat in all_cats
+        cat_info = ddl2_dic[one_cat]
+        show_one_def(io,one_cat,cat_info,implicits=implicit_info)
+        items = get_names_in_cat(ddl2_dic,one_cat)
+        for one_item in items
+            show_one_def(io,one_item,ddl2_dic[one_item],implicits=implicit_info)
+        end
+    end
+    # And the looped top-level stuff
+    for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history]
+        if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
+            show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info)
+        end
+    end
+end

@@ -259,7 +259,6 @@ Base.show(io::IO,::MIME"text/plain",b::NestedCifContainer) = begin
     show(io,Block(b))
 end
 
-
 """
     add_to_loop!(b::CifContainer, tgt, newname)
 
@@ -659,7 +658,7 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     ## Check for errors and destroy the CIF if necessary
     if val != 0
         finalize(dpp)
-        error("File $filename load error: "* error_codes[val])
+        throw(error("File $filename load error: "* error_codes[val]))
     end
     ##q = time_ns()
     ##println("$q: Created cif ptr:$dpp for file $s")

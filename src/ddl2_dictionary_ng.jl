@@ -404,46 +404,6 @@ end
 get_container_type(cdic::DDL2_Dictionary,dataname) = "Single"
 
 #
-# **Output**
-#
-# DDL2 makes use of implicit values based on the block name. We
-# ignore any columns contained in the 'implicit' const above.
-#
-
-show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
-    dicname = ddl2_dic[:dictionary].title[]
-    write(io,"#")
-    write(io,"""
-##############################################################
-#
-#        $dicname (DDL2)
-#
-##############################################################\n""")
-    write(io,"data_$dicname\n")
-    implicit_info = get_implicit_list()
-    top_level = ddl2_dic[:datablock]
-    show_set(io,"datablock",top_level,implicits=implicit_info)
-    top_level = ddl2_dic[:dictionary]
-    show_set(io,"dictionary",top_level,implicits=implicit_info)
-    # Now for the rest
-    all_cats = sort(get_categories(ddl2_dic))
-    for one_cat in all_cats
-        cat_info = ddl2_dic[one_cat]
-        show_one_def(io,one_cat,cat_info,implicits=implicit_info)
-        items = get_names_in_cat(ddl2_dic,one_cat)
-        for one_item in items
-            show_one_def(io,one_item,ddl2_dic[one_item],implicits=implicit_info)
-        end
-    end
-    # And the looped top-level stuff
-    for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history]
-        if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
-            show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info)
-        end
-    end
-end
-
-#
 # We always want item.name to be printed.
 #
 get_implicit_list() = begin
