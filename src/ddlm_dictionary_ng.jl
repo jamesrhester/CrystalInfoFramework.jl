@@ -848,7 +848,8 @@ resolve_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     if !haskey(d,:import) return d end
     resolve_templated_imports!(d,original_file)
     new_c = resolve_full_imports!(d,original_file)
-    # do we need to remove import commands?
+    # remove all imports
+    delete!(d,:import)
     return d
 end
 

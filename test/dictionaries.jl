@@ -19,6 +19,7 @@ end
     t = prepare_system()
     @test "_audit_conform.dict_name" in get_names_in_cat(t,"audit_conform")
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
+    @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
 end
 
 @testset "Importation" begin
@@ -50,4 +51,27 @@ end
     load_func_text(t,"item_description","Evaluation")
     @test occursin("with e as enumeration",load_func_text(t,"_item_default.value","Evaluation"))
     @test occursin("loop d as description",load_func_text(t,"item_description","Evaluation"))
+end
+
+# Really just a syntax check at the moment.
+@testset "Writing dictionaries" begin
+    t = prepare_system()
+    testout = open("testout.dic","w")
+    show(testout,MIME("text/cif"),t)
+    close(testout)
+    new_t = DDLm_Dictionary("testout.dic")
+    @test t["_atom_site_moment.Cartn"][:definition][!,:update][] == new_t["_atom_site_moment.Cartn"][:definition][!,:update][]
+    #
+    t = DDL2_Dictionary("cif_img_1.7.11.dic")
+    testout = open("testout.dic","w")
+    show(testout,MIME("text/cif"),t)
+    close(testout)
+    new_t = DDL2_Dictionary("testout.dic")
+    @test t["_array_element_size.array_id"][:item][!,:category_id] == new_t["_array_element_size.array_id"][:item][!,:category_id]
+end
+
+@testset "Dictionary -> Julia type mapping" begin
+    t = prepare_system()
+    @test CrystalInfoFramework.convert_to_julia(t,"atom_site_Fourier_wave_vector","q1_coeff",["2"]) == [2]
+    @test CrystalInfoFramework.convert_to_julia(t,"atom_site_moment","cartn",[["1.2","0.3","-0.5"]]) == [[1.2,0.3,-0.5]]
 end

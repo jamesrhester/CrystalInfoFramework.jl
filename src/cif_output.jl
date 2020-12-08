@@ -51,13 +51,17 @@ format_for_cif(val::AbstractString;cif1=false) = begin
                 delimiter = "\n;"
             elseif length(val) == 0
                 delimiter = "'"
-            elseif first(val) == "_"
+            elseif first(val) == '_'
                 delimiter = "'"
             else
-                q = match(r"\w+",String(val))
-                if !isnothing(q) && q.match == val delimiter = ""
+                q = match(r"^data|^save|^global|^loop",String(val))
+                if !isnothing(q) delimiter = "'"
                 else
-                    delimiter = "'"
+                    q = match(r"\w+",String(val))
+                    if !isnothing(q) && q.match == val delimiter = ""
+                    else
+                        delimiter = "'"
+                    end
                 end
             end
         end
@@ -65,11 +69,7 @@ format_for_cif(val::AbstractString;cif1=false) = begin
     return delimiter*val*delimiter
 end
 
-format_for_cif(val::Integer) = begin
-    return "$val"
-end
-
-format_for_cif(val::Float64) = begin
+format_for_cif(val::Real) = begin
     return "$val"
 end
 
@@ -107,7 +107,7 @@ format_for_cif(val::Dict) = begin
     write(outstring,"{")
     line_pos = 1
     for (k,v) in val
-        mini_val = "$k:$(format_for_cif(v))"
+        mini_val = "'$k':$(format_for_cif(v))"
         if '\n' in mini_val
             line_pos = length(mini_val) - findlast(isequal('\n'),mini_val) + 1
             write(outstring, mini_val)
