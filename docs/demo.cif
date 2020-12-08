@@ -1,0 +1,38 @@
+#\#CIF_2.0
+data_saly2_all_aniso
+
+_chemical_formula.sum                 'C7 H6 O3'
+_chemical_formula.weight               132.07
+
+_symmetry.cell_setting                 monoclinic
+_symmetry.space_group_name_H-M         P_1_21/a_1
+_symmetry.space_group_name_Hall        -p_2yab
+
+_cell.length_a                         11.520(12)
+_cell.length_b                         11.210(11)
+_cell.length_c                         4.920(5)
+_cell.angle_alpha                      90.00000
+_cell.angle_beta                       90.8331(5)
+_cell.angle_gamma                      90.00000
+_cell.volume                           635.3(11)
+_cell.formula_units_Z                  4
+
+loop_
+_atom_site.label
+_atom_site.fract_x
+_atom_site.fract_y
+_atom_site.fract_z
+_atom_site.U_iso_or_equiv
+_atom_site.adp_type
+_atom_site.occupancy
+
+  o1  .5505(5)  .6374(5)  .1605(11)  .035(3)  Uani   1.00000 
+  o2  .4009(5)  .5162(5)  .2290(11)  .033(3)  Uani   1.00000 
+  o3  .2501(5)  .5707(5)  .6014(13)  .043(4)  Uani   1.00000
+  c1  .4170(7)  .6930(8)  .4954(15)  .029(4)  Uani   1.00000
+  c2  .3145(7)  .6704(8)  .6425(16)  .031(5)  Uani   1.00000 
+  c3  .2789(8)  .7488(8)  .8378(17)  .040(5)  Uani   1.00000 
+  c4  .3417(9)  .8529(8)  .8859(18)  .045(6)  Uani   1.00000 
+  c5  .4445(9)  .8778(9)  .7425(18)  .045(6)  Uani   1.00000
+  c6  .4797(8)  .7975(8)  .5487(17)  .038(5)  Uani   1.00000 
+  c7  .4549(7)  .6092(7)  .2873(16)  .029(4)  Uani   1.00000 

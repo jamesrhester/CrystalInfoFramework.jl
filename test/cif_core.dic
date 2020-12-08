@@ -19662,7 +19662,6 @@ _definition.id                          '_atom_site.label'
 loop_
   _alias.definition_id
          '_atom_site_label'  
-         '_atom_site.id' 
 _import.get [{'save':atom_site_label  'file':templ_attr.cif}]
 _name.category_id                       atom_site
 _name.object_id                         label

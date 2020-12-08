@@ -104,5 +104,5 @@ real_from_meas(value::Missing) = missing
 
 Range(v::String) = begin
     lower,upper = split(v,":")
-    parse(Number,lower),parse(Number,upper)
+    parse(Int32,lower),parse(Int32,upper)
 end

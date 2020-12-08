@@ -349,7 +349,7 @@ get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
     key_aliases = []
     if aliases
         for k in loop_keys
-            append!(key_aliases,list_aliases(cat,k))
+            append!(key_aliases,list_aliases(d,k))
         end
     end
     append!(key_aliases,loop_keys)
@@ -362,8 +362,8 @@ end
 List all data names in `cat` that are children of other data names.
 """
 get_linked_names_in_cat(d::DDLm_Dictionary,cat) = begin
-    names = [n for n in get_names_in_cat(c,cat) if length(get(c[n][:name],:linked_item_id,[])) == 1]
-    [n for n in names if get(c[n][:type],:purpose,["Datum"])[] != "SU"]
+    names = [n for n in get_names_in_cat(d,cat) if d[n][:name][!,:linked_item_id][] != nothing]
+    [n for n in names if d[n][:type][!,:purpose][] != "SU"]
 end
 
 """
@@ -474,10 +474,11 @@ category.
 """
 get_single_key_cats(d::DDLm_Dictionary) = begin
     candidates = get_loop_categories(d)
-    ck = (c for c in candidates if length(get_keys_for_cat(d,c))==1)
-    keynames = ((r,d[r][:category_key][!,:name][]) for r in result)
-    keynames = ( k for k in keynames if length(get(d[k[2]][:name],:linked_item_id,[])) == 0)
-    return keynames
+    k = [(c,get_keys_for_cat(d,c)[]) for c in candidates if length(get_keys_for_cat(d,c)) == 1]
+    filter!(k) do x
+        linkval = d[x[2]][:name][!,:linked_item_id][]
+        linkval == nothing || linkval == x[2]
+    end
 end
 
 """
@@ -489,9 +490,11 @@ if there are no links.
 get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString) = begin
     if haskey(d,dataname)
         #println("Searching for ultimate value of $dataname")
-        if :linked_item_id in names(d[dataname][:name]) &&
-            d[dataname][:name][:linked_item_id][] != dataname
-            return get_ultimate_link(d,d[dataname][:name][:linked_item_id][])
+        if :linked_item_id in propertynames(d[dataname][:name])
+            linkval = d[dataname][:name][!,:linked_item_id][]
+            if linkval != dataname && linkval != nothing
+                return get_ultimate_link(d,linkval)
+            end
         end
     end
     return dataname
@@ -503,11 +506,11 @@ end
 Return the default value for `s` or `missing` if none defined. 
 """
 get_default(d::DDLm_Dictionary,s) = begin
-    info = get(d[s],:enumeration,missing)
-    if !ismissing(info)
-        info = get(info,:default,[missing])[]
+    info = d[s][:enumeration]
+    if :default in propertynames(info)
+        return info[!,:default][]
     end
-    return info
+    return missing
 end
 
 #   ***Default lookup 
@@ -531,7 +534,7 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     if ismissing(index_name) return missing end
     object_name = find_object(dict,index_name)
     # Note non-deriving form of getproperty
-    println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
+    # println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
     current_val = getproperty(cp,Symbol(object_name))
     print("Indexing $dataname using $current_val to get")
     # Now index into the information. ddl.dic states that this is of type 'Code'
@@ -665,7 +668,8 @@ get_def_meth_txt(d::DDLm_Dictionary,func_name::String,ddlm_attr::String) = d.def
 """
     set_func!(d::DDLm_Dictionary,func_name::String,ddlm_attr::String,func_text::Expr,func_code)
 
-Store compiled code `func_code` for calculating 
+Store compiled code `func_code` for calculating the default value of `ddlm_attr` for definition
+`func_name`. The uncompiled version is provided in `func_text`.
 """
 set_func!(d::DDLm_Dictionary,func_name::String,ddlm_attr::String,func_text::Expr,func_code) = begin
     d.def_meths[(func_name,ddlm_attr)] = func_code
@@ -716,16 +720,25 @@ links.
 """
 find_head_category(df::DataFrame) = begin
     # get first and follow it up
-    some_cat = lowercase(df.category_id[1])
-    old_cat = some_cat
+    old_cat = lowercase(df.category_id[1])
+    even_older_cat = old_cat
+    new_cat = old_cat
     while true
-        some_cat = lowercase.(df[lowercase.(df[!,:object_id]) .== some_cat,:category_id])
-        if length(some_cat) == 0 || some_cat[] == old_cat break end
-        #println("$old_cat -> $some_cat")
-        old_cat = some_cat[]
+        new_cat = lowercase.(df[lowercase.(df[!,:object_id]) .== old_cat,:category_id])
+        if length(new_cat) == 0 #old_cat is not a thing
+            new_cat = even_older_cat
+            break
+        end
+        if new_cat[] == old_cat #pointing to self, that'll do
+            new_cat = new_cat[]
+            break
+        end
+        println("$old_cat -> $new_cat")
+        even_older_cat = old_cat
+        old_cat = new_cat[]
     end
     #println("head category is $old_cat")
-    return old_cat
+    return new_cat
 end
 
 """

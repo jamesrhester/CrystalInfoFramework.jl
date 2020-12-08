@@ -20,6 +20,43 @@ end
     @test "_audit_conform.dict_name" in get_names_in_cat(t,"audit_conform")
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
     @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
+    # Test child names
+    t = DDLm_Dictionary("cif_core.dic")
+    @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
+    @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label"])
+    @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
+    @test "cell" in get_set_categories(t)
+    @test "geom_bond" in get_loop_categories(t)
+    @test get_single_keyname(t,"atom_site") == "label"
+    @test_throws Exception get_single_keyname(t,"geom_bond")
+    @test ("atom_site","_atom_site.label") in get_single_key_cats(t)
+    @test get_ultimate_link(t,"_geom_bond.atom_site_label_1") == "_atom_site.label"
+    @test get_default(t,"_geom_angle.publ_flag") == "no"
+    @test ismissing(get_default(t,"_space_group_symop.T")) 
+    @test get_dimensions(t,"model_site","adp_eigen_system") == [4,3]
+    @test CrystalInfoFramework.get_container_type(t,"_model_site.adp_eigen_system") == "Array"
+    @test find_head_category(t[:name]) == "cif_core"
+    struct dummy_packet
+        symbol::CaselessString
+    end
+    @test lookup_default(t,"_atom_type.atomic_mass",dummy_packet("Ag")) == "107.868"
+    @test "radius_contact" in as_data(t)["_name.object_id"]
+end
+
+@testset "Function-related tests for DDLm" begin
+    t = DDLm_Dictionary("cif_core.dic")
+    ff = get_dict_funcs(t)
+    @test ff[1] == "function"
+    @test "atomtype" in ff[2]
+    one_meth = """_atom_type.radius_contact =  _atom_type.radius_bond + 1.25"""
+    @test strip(load_func_text(t,"_atom_type.radius_contact","Evaluation")) == strip(one_meth)
+    set_func!(t,"myfunc",:(x->x+2),eval(:(x->x+2)))
+    @test occursin("x + 2","$(get_func_text(t,"myfunc"))")
+    @test get_func(t,"myfunc")(2) == 4
+    # default methods
+    set_func!(t,"myattrfunc","_units.code",:(x -> "radians"),eval(:(x->"radians")))
+    @test occursin("radians","$(get_def_meth_txt(t,"myattrfunc","_units.code"))")
+    @test get_def_meth(t,"myattrfunc","_units.code")("whatever") == "radians"
 end
 
 @testset "Importation" begin
@@ -38,6 +75,7 @@ end
     @test "master_id" in get_objs_in_cat(t,"enumeration_set")
     @test "_units.master_id" in get_keys_for_cat(t,"units")
     @test get_linked_name(t,"_method.master_id") == "_definition.master_id"
+    @test "dictionary_audit" in CrystalInfoFramework.find_top_level_cats(t)
 end
 
 @testset "DDL2 dictionaries" begin
@@ -74,4 +112,5 @@ end
     t = prepare_system()
     @test CrystalInfoFramework.convert_to_julia(t,"atom_site_Fourier_wave_vector","q1_coeff",["2"]) == [2]
     @test CrystalInfoFramework.convert_to_julia(t,"atom_site_moment","cartn",[["1.2","0.3","-0.5"]]) == [[1.2,0.3,-0.5]]
+    @test CrystalInfoFramework.Range("5:7") == (5,7)
 end
