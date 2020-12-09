@@ -21,7 +21,7 @@ using Printf
 
 export DDLm_Dictionary
 export find_category,get_categories,get_set_categories
-export translate_alias,list_aliases
+export list_aliases
 export find_object,find_name
 export get_single_key_cats
 export get_linked_names_in_cat,get_keys_for_cat

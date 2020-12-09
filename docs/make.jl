@@ -4,7 +4,12 @@ makedocs(sitename="CrystalInfoFramework documentation",
 	  format = Documenter.HTML(
 				   prettyurls = get(ENV,"CI",nothing) == "true"
 				   ),
-          #doctest = :fix
+         pages = [
+             "Overview" => "index.md",
+             "Guide" => "tutorial.md",
+             "API" => "api.md"
+             ]
+             #doctest = :fix
 	  )
 
 deploydocs(

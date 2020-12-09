@@ -59,6 +59,20 @@ end
     @test get_def_meth(t,"myattrfunc","_units.code")("whatever") == "radians"
 end
 
+@testset "Function-related tests for DDL2" begin
+    t = DDL2_Dictionary(joinpath(@__DIR__,"ddl2_with_methods.dic"))
+    ff = get_dict_funcs(t)
+    @test ff[1] == nothing
+    @test length(ff[2]) == 0
+    one_meth = "item.category_id = name[item.name].category_id"
+    @test strip(load_func_text(t,"_item.category_id","Evaluation")) == strip(one_meth)
+    set_func!(t,"myfunc",:(x->x+2),eval(:(x->x+2)))
+    @test occursin("x + 2","$(get_func_text(t,"myfunc"))")
+    @test get_func(t,"myfunc")(2) == 4
+    @test occursin("with e as enumeration",load_func_text(t,"_item_default.value","Evaluation"))
+    @test occursin("loop d as description",load_func_text(t,"item_description","Evaluation"))
+end
+
 @testset "Importation" begin
     ud = prepare_system()
     @test String(ud["_atom_site_rotation.label"][:name][!,:linked_item_id][]) == "_atom_site.label"
@@ -85,10 +99,19 @@ end
     @test get_keys_for_cat(t,"sub_category") == ["_sub_category.id"]
     @test "_dictionary_history.update" in get_names_in_cat(t,"dictionary_history")
     @test "revision" in get_objs_in_cat(t,"dictionary_history")
-    load_func_text(t,"_item_default.value","Evaluation")
-    load_func_text(t,"item_description","Evaluation")
-    @test occursin("with e as enumeration",load_func_text(t,"_item_default.value","Evaluation"))
-    @test occursin("loop d as description",load_func_text(t,"item_description","Evaluation"))
+    @test get_dic_name(t) == "mmcif_ddl.dic"
+    @test get_dic_namespace(t) == "ddl2"
+    t = DDL2_Dictionary("cif_img_1.7.11.dic")
+    @test list_aliases(t,"_diffrn_detector.details") == ["_diffrn_detector_details"]
+    @test length(intersect(list_aliases(t,"_diffrn_detector.details",include_self=true),
+                           ["_diffrn_detector_details","_diffrn_detector.details"])) == 2
+    @test find_name(t,"_diffrn_detector_details") == "_diffrn_detector.details"
+    @test find_name(t,"_diffrn_measurement.device") == "_diffrn_measurement.device"
+    @test get_parent_name(t,"_diffrn_measurement_axis.measurement_device") == "_diffrn_measurement.device"
+    @test "detector bins" in as_data(t)["_item_enumeration.detail"]
+    @test get_julia_type_name(t,"axis","type") == (:CaselessString,"Single")
+    @test get_julia_type_name(t,"array_element_size","size") == (Float64,"Single")
+    @test get_default(t,"_axis.type") == "general"
 end
 
 # Really just a syntax check at the moment.

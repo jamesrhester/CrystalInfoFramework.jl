@@ -4,7 +4,7 @@
 # Next generation: reads the dictionary as a database the way
 # the PDB intended, and split on '.' for cat/obj
 #
-export DDL2_Dictionary,as_data
+export DDL2_Dictionary,as_data,get_parent_name
 
 struct DDL2_Dictionary <: AbstractCifDictionary
     block::Dict{Symbol,DataFrame}
@@ -110,7 +110,6 @@ end
 
 # If a symbol is passed we access the block directly.
 Base.getindex(d::DDL2_Dictionary,k::Symbol) = getindex(d.block,k)
-Base.get(d::DDL2_Dictionary,k::Symbol,default) = get(d.block,k,default)
 
 get_dic_name(d::DDL2_Dictionary) = d.block[:dictionary][:title][]
 get_dic_namespace(d::DDL2_Dictionary) = "ddl2"  #single namespace
@@ -169,17 +168,17 @@ list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
     return result
 end
 
-# No aliases supported for this one
-translate_alias(d::DDL2_Dictionary,name) = begin
-    return name
-end
-
 """
 Find the canonical name for `name`. For DDL2 this is not implemented,
 that is, aliases are not recognised.
 """
 find_name(d::DDL2_Dictionary,name) = begin
-    return name
+    lname = lowercase(name)
+    if lname in lowercase.(d[:item][!,:name]) return lname end
+    if !haskey(d.block,:item_aliases) return lname end
+    potentials = d[:item_aliases][lowercase.(d[:item_aliases][!,:alias_name]) .== lname,:name]
+    if length(potentials) == 1 return potentials[] end
+    KeyError(name)
 end
 
 find_name(d::DDL2_Dictionary,cat,obj) = begin
@@ -390,13 +389,25 @@ end
 # Methods for setting and retrieving definition functions
 has_default_methods(d::DDL2_Dictionary) = false
 
+"""
+Type mappings for DDL2. A subset of DDL2 types can be mapped
+to Julia types. This table maps the type codes, and there is
+a fallback to caseless/caseful strings. Note that this relies
+on consistent type naming across all DDL2 dictionaries.
+"""
+const ddl2_type_mapping = Dict( "text" => String,
+                                 "int" => Integer,
+                                 "float" => Float64
+                                 )
+
 get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractString) = begin
     definition = cdic[find_name(cdic,cat,obj)]
     type_index = definition[:item_type][!,:code][]
     all_types = cdic[:item_type_list]
     type_base = all_types[all_types[!,:code] .== type_index,:primitive_code][]
-    # only strings...
-    # println("DDL2 type for $cat/$obj is $type_base")
+    if type_index in keys(ddl2_type_mapping)
+        return ddl2_type_mapping[type_index],"Single"
+    end
     if type_base != "uchar" return String,"Single" end
     return Symbol("CaselessString"),"Single"
 end
