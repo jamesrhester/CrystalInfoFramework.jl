@@ -195,17 +195,14 @@ A Cif Block is a data source. It implements the dictionary interface.
 DataSource(::Block) = IsDataSource()
 
 #
-# NativeBlocks have no namespaces so we ignore if supplied
+# Blocks have no namespaces so we ignore if supplied
 #
 Base.getindex(x::Block,y::AbstractString,z::AbstractString) = x[y]
 
 """
-To use anything but Blocks as DataSources we must make them into
-MultiDataSources, which means implementing the iterate_blocks method.
-The blocks in a cif_container are all of the save frames, and the
-enclosing block taken as a separate block.  In this view it is
-possible to associate items in separate save frames. However, these
-potential associations are excluded if necessary by dictionaries. 
+    iterate_blocks(c::NestedCifContainer)
+
+Iterate over all save frames and the enclosing block.
 """
 iterate_blocks(c::NestedCifContainer) = begin
     # main block then saves
@@ -226,8 +223,9 @@ iterate_blocks(c::NestedCifContainer,s) = begin
 end
 
 """
-A CifFile is a MultiDataSource. We have to create concrete types as
-indexing is defined differently.
+    iterate_blocks(c::Cif)
+
+Iterate over each of the blocks contained in a CIF file.
 """
 
 iterate_blocks(c::Cif) = begin

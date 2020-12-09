@@ -45,14 +45,19 @@ end
 """
     convert_to_julia(cdic,cat,obj,value::Array)
 
-Convert String elements of array `value` to the appropriate Julia type 
+Convert elements of array `value` to the appropriate Julia type 
 using information in `cdic` for given `category` and `object`, unless
 value is `missing` or `nothing`, which are returned unchanged.
-This only handles one level of arrays.
+This only handles one level of arrays. `value` must be either an
+`Array{CifValue,1}` (usually `Array{String,}`) or of the correct type
+already.
 """
 convert_to_julia(cdic,cat,obj,value::Array) = begin
     julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
     if typeof(value) == Array{julia_base_type,1} return value end
+    if !(eltype(value) <: CifValue)
+        throw(error("Unable to convert values of type $(eltype(value))"))
+    end
     change_func = (x->x)
     #println("Julia type for $cat/$obj is $julia_base_type, converting $value")
     if julia_base_type == Integer

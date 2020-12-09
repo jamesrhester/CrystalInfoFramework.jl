@@ -165,3 +165,33 @@ assume that the `DataSource` values are `String`s that can be
 directly parsed by the Julia `parse` method. In the future this
 will become a `DataSource`-specific operation to allow binary
 formats to be handled.
+
+### Creating new DataSources
+
+A file format can be used with CIF dictionaries if:
+
+1. It returns an `Array` of values when provided with a data name defined
+in the dictionary
+
+2. `Array`s returned for data names from the same CIF category have
+corresponding values at the same position in the array - that is, they
+line up correctly if presented as columns in a table.
+
+At a minimum, the following methods should work with the `DataSource`: 
+`getindex`, `haskey`.
+
+If the `DataSource` `mds` can be modelled as a collection of
+`DataSource`s, `iterate_blocks` should also be defined to iterate over
+the constituent `DataSource`s. `MultiDataSource(mds)` will then create
+a `DataSource` where values returned for any data names defined in the
+constituent blocks are automatically aligned. Such `MultiDataSource`
+objects can be built to form hierarchies.
+
+#### Types
+
+A `TypedDataSource` consists of a `DataSource` and a CIF dictionary.
+Values returned from a `TypedDataSource` are in the appropriate
+Julia type as specified by the dictionary. Where a `DataSource`
+returns pure text, that text is converted to the appropriate
+type using Julia's `parse`.  
+

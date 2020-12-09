@@ -602,7 +602,6 @@ Store compiled code `func_code` created from `func_text` under `func_name` in `d
 set_func!(d::DDLm_Dictionary,func_name::String,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
-    #println("All funcs: $(keys(d.func_defs))")
 end
 
 """

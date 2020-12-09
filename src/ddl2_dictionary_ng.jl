@@ -336,7 +336,6 @@ end
 set_func!(d::DDL2_Dictionary,func_name::AbstractString,func_text::Expr,func_code) = begin
     d.func_defs[func_name] = func_code
     d.func_text[func_name] = func_text
-    println("All funcs: $(keys(d.func_defs))")
 end
 
 get_func(d::DDL2_Dictionary,func_name::AbstractString) = d.func_defs[func_name]
@@ -367,7 +366,6 @@ load_func_text(dict::DDL2_Dictionary,dataname::AbstractString,meth_type::String)
     if meth_type != "Evaluation" return "" end
     full_def = dict[dataname]
     meth_text = ""
-    println("Full def: $full_def")
     if haskey(full_def,:item_methods)
         for one_row in eachrow(full_def[:item_methods])
             target = dict[:method_list][dict[:method_list].id .== one_row.method_id,:]

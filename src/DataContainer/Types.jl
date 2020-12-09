@@ -20,13 +20,19 @@ export CifCategory, LegacyCategory, SetCategory, LoopCategory
 # We implement DataSources as traits to allow them to be
 # grafted onto other file formats.
 
+"""
+A `DataSource`, when provided with a string referring to a data name
+from a namespace known to the data source, returns an array of values
+that are either `Native` (already Julia types) or `Text` (requiring
+interpretation to create Julia types).
+"""
 abstract type DataSource end
 struct IsDataSource <: DataSource end
 struct IsNotDataSource <: DataSource end
 
 DataSource(::Type) = IsNotDataSource()
 
-abstract type NamespacedDataSource end
+abstract type NamespacedDataSource <: DataSource end
 
 # **Combined data sources**
 #
@@ -84,41 +90,6 @@ end
 abstract type Relation end
 abstract type Row end
 
-get_name(r::Relation) = throw(error("Not implemented"))
-
-"""
-Iterate over the identifier for the relation
-"""
-Base.iterate(r::Relation)::Row = throw(error("Not implemented"))
-
-Base.iterate(r::Relation,s)::Row = throw(error("Not implemented"))
-
-"""
-Return all known mappings from a Relation
-"""
-get_mappings(r::Relation) = begin
-    throw(error("Not implemented"))
-end
-
-"""
-get_key_datanames returns a list of columns for the relation that, combined,
-form the key. Column names must be symbols to allow rows to be selected using
-other value types.
-"""
-get_key_datanames(r::Relation) = begin
-    throw(error("Not implemented"))
-end
-
-get_category(r::Row) = throw(error("Not implemented"))
-
-"""
-Given an opaque row returned by iterator,
-provide the value that it maps to for mapname
-"""
-get_value(row::Row,mapname) = begin
-    throw(error("Not implemented"))
-end
-
 # A RelationalContainer models a system of interconnected tables conforming
 # the relational model, with an eye on the functional representation and
 # category theory.   Dictionaries are used to establish inter-category links
@@ -134,7 +105,7 @@ end
 abstract type AbstractRelationalContainer <: NamespacedDataSource end
 
 struct RelationalContainer <: AbstractRelationalContainer
-    data::Dict{String,Any}    #usually TypedDataSource
+    data::Dict{String,Any}    #usually values are TypedDataSource
     dicts::Dict{String,AbstractCifDictionary}
 end
 
