@@ -8,7 +8,7 @@ To open CIF file `demo.cif`, and read `_cell.length_a` from block `saly2_all_ani
 
 ```jldoctest nick1
 
-using CrystalInfoFramework
+using CrystalInfoFramework, DataFrames
 
 nc = Cif("demo.cif")
 my_block = nc["saly2_all_aniso"]  #could also use first(nc).second
@@ -115,8 +115,8 @@ d = DDLm_Dictionary("cif_core.dic")
 
 ### DataSources
 
-CIF dictionaries can be used with any `DataSource`, providing that
-that datasource recognises the data names defined in the dictionary.
+CIF dictionaries can be used with any `DataSource`, providing
+that the datasource recognises the data names defined in the dictionary.
 
 A `DataSource` is any data source returning an array of values when
 supplied with a string.  A CIF `Block` conforms to this
@@ -161,26 +161,24 @@ l = bd["_cell_length_a"] #no period in name
 where `_cell_length_a` is the old form of the data name.
 
 Currently transformations from `DataSource` values to Julia values
-assume that the `DataSource` values are `String`s that can be
-directly parsed by the Julia `parse` method. In the future this
-will become a `DataSource`-specific operation to allow binary
-formats to be handled.
+assume that the `DataSource` values are either already of the correct
+type, or are `String`s that can be directly parsed by the Julia
+`parse` method.
 
-### Creating new DataSources
+#### Creating new DataSources
 
 A file format can be used with CIF dictionaries if:
 
-1. It returns an `Array` of values when provided with a data name defined
-in the dictionary
-
-2. `Array`s returned for data names from the same CIF category have
-corresponding values at the same position in the array - that is, they
-line up correctly if presented as columns in a table.
+1. It returns an `Array` of values when provided with a data name defined in the dictionary
+2. `Array`s returned for data names from the same CIF category have corresponding values at the same position in the array - that is, they line up correctly if presented as columns in a table.
 
 At a minimum, the following methods should work with the `DataSource`: 
 `getindex`, `haskey`.
 
-If the `DataSource` `mds` can be modelled as a collection of
+If the above are true of your type, then it is sufficient to define
+`DataSource(::MyType) = IsDataSource()` to make it available.
+
+If a `DataSource` `mds` can instead be modelled as a collection of
 `DataSource`s, `iterate_blocks` should also be defined to iterate over
 the constituent `DataSource`s. `MultiDataSource(mds)` will then create
 a `DataSource` where values returned for any data names defined in the
@@ -190,8 +188,135 @@ objects can be built to form hierarchies.
 #### Types
 
 A `TypedDataSource` consists of a `DataSource` and a CIF dictionary.
-Values returned from a `TypedDataSource` are in the appropriate
-Julia type as specified by the dictionary. Where a `DataSource`
-returns pure text, that text is converted to the appropriate
-type using Julia's `parse`.  
 
+Values returned from a `TypedDataSource` are of the appropriate
+Julia type as specified by the dictionary *if* the underlying 
+`DataSource` returns `String` values formatted in a way that Julia `parse`
+can understand.  Otherwise, the `DataSource` is responsible
+for returning the appropriate Julia type. Future improvements
+may add user-defined transformations if that proves necesssary.
+
+A `NamespacedTypedDataSource` includes data from multiple namespaces.
+Correctly-typed data for a particular namespace can then be obtained by 
+`select_namespace(t::NamespacedTypedDataSource,nspace)`.
+
+## Cif Categories from DataSources
+
+A CIF category (a 'Relation' in the relational model) can be constructed
+from a `DataSource`, a CIF dictionary, and the CIF name of the category:
+
+```jldoctest nick1
+as = LoopCategory("atom_site",my_block,my_dict)
+
+# output
+
+Category atom_site Length 10
+10×7 DataFrame. Omitted printing of 2 columns
+│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
+│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
+├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
+│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
+│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
+│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
+│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
+│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
+│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
+│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
+│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
+│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
+│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
+
+```
+
+where a category is either a `LoopCategory`, with one or more rows, or
+a `SetCategory`, which is restricted to a single row. Alternatively,
+a `TypedDataSource` can be used, in which case the dictionary used by
+the `TypedDataSource` is also used for category construction.
+
+```jldoctest nick1
+as = LoopCategory("atom_site",bd)
+
+# output
+
+Category atom_site Length 10
+10×7 DataFrame. Omitted printing of 2 columns
+│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
+│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
+├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
+│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
+│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
+│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
+│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
+│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
+│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
+│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
+│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
+│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
+│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
+
+```
+
+`getindex` for CIF categories uses the indexing value as the *key value*
+for looking up a row in the category:
+
+```jldoctest nick1
+one_row = as["o1"]
+one_row.fract_x
+
+# output
+
+".5505(5)"
+
+```
+
+If a category key consists multiple data names, a `Dict{Symbol,V}` should
+be provided as the indexing value, where `Symbol` is the `object_id` of
+the particular data name forming part of the key.
+
+A category can be iterated over as usual, with the value of each dataname
+for each row available as a property:
+
+```jldoctest nick1
+for one_row in as
+    println("$(one_row.label) $(one_row.fract_x) $(one_row.fract_y) $(one_row.fract_z)")
+end
+
+# output
+
+o1 .5505(5) .6374(5) .1605(11)
+o2 .4009(5) .5162(5) .2290(11)
+o3 .2501(5) .5707(5) .6014(13)
+c1 .4170(7) .6930(8) .4954(15)
+c2 .3145(7) .6704(8) .6425(16)
+c3 .2789(8) .7488(8) .8378(17)
+c4 .3417(9) .8529(8) .8859(18)
+c5 .4445(9) .8778(9) .7425(18)
+c6 .4797(8) .7975(8) .5487(17)
+c7 .4549(7) .6092(7) .2873(16)
+
+```
+
+If you prefer the `DataFrame` tools for working with tables, `DataFrame(c::CifCategory)`
+creates a `DataFrame`:
+
+```jldoctest nick1
+DataFrame(as)
+
+# output
+
+10×7 DataFrame. Omitted printing of 2 columns
+│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
+│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
+├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
+│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
+│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
+│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
+│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
+│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
+│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
+│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
+│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
+│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
+│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
+
+```

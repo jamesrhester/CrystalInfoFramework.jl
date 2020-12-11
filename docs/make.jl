@@ -1,4 +1,5 @@
 using Documenter, CrystalInfoFramework
+using CrystalInfoFramework.DataContainer
 
 makedocs(sitename="CrystalInfoFramework documentation",
 	  format = Documenter.HTML(
@@ -8,8 +9,8 @@ makedocs(sitename="CrystalInfoFramework documentation",
              "Overview" => "index.md",
              "Guide" => "tutorial.md",
              "API" => "api.md"
-             ]
-             #doctest = :fix
+             ],
+         #doctest = :fix
 	  )
 
 deploydocs(

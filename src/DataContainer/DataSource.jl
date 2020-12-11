@@ -269,7 +269,7 @@ getindex(t::TypedDataSource,s::String)
 The correctly-typed value for dataname `s` in `t` is returned, including
 searching for dataname aliases and providing a default value if defined.
 """
-Base.getindex(t::TypedDataSource,s::AbstractString) = begin
+getindex(t::TypedDataSource,s::AbstractString) = begin
     # go through all aliases
     refdict = get_dictionary(t)
     ds = get_datasource(t)
@@ -317,10 +317,10 @@ Base.get(t::TypedDataSource,s::AbstractString,default) = begin
 end
 
 
-Base.iterate(t::TypedDataSource) = iterate(get_datasource(t))
-Base.iterate(t::TypedDataSource,s) = iterate(get_datasource(t),s)
+iterate(t::TypedDataSource) = iterate(get_datasource(t))
+iterate(t::TypedDataSource,s) = iterate(get_datasource(t),s)
 
-Base.haskey(t::TypedDataSource,s::AbstractString) = begin
+haskey(t::TypedDataSource,s::AbstractString) = begin
     actual_data = get_datasource(t)
     # go through all aliases
     ref_dic = get_dictionary(t)

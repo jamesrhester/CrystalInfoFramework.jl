@@ -57,6 +57,11 @@ struct DDLm_Dictionary <: AbstractCifDictionary
     namespace::String
 end
 
+"""
+    DDLm_Dictionary(c::Cif)
+
+Create a `DDLm_Dictionary` from `c`.
+"""
 DDLm_Dictionary(c::Cif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
@@ -64,6 +69,12 @@ DDLm_Dictionary(c::Cif) = begin
     return DDLm_Dictionary(first(c).second)
 end
 
+"""
+    DDLm_Dictionary(a::String;verbose=false)
+
+Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
+extra debugging information during reading.
+"""
 DDLm_Dictionary(a::String;verbose=false) = DDLm_Dictionary(Cif(a,verbose=verbose))
 
 DDLm_Dictionary(b::CifBlock) = begin
@@ -135,7 +146,13 @@ DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
     DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace)
 end
 
-Base.keys(d::DDLm_Dictionary) = begin
+"""
+    keys(d::DDLm_Dictionary)
+
+Return a list of datanames defined by the dictionary, including
+any aliases.
+"""
+keys(d::DDLm_Dictionary) = begin
     native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))
     extra = []
     if haskey(d.block,:alias)
@@ -144,24 +161,29 @@ Base.keys(d::DDLm_Dictionary) = begin
     return Iterators.flatten((native,extra))
 end
 
-Base.haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
+haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
 
-# Obtain all information about definition `k`
-Base.getindex(d::DDLm_Dictionary,k) = begin
+"""
+    getindex(d::DDLm_Dictionary,k)
+
+d[k] returns the  definition for data name `k` as a `Dict{Symbol,DataFrame}`
+where `Symbol` is the attribute category (e.g. `:name`).
+"""
+getindex(d::DDLm_Dictionary,k) = begin
     canonical_name = find_name(d,k)
     return filter_on_name(d.block,canonical_name)
 end
 
 # If a symbol is passed we access the block directly.
-Base.getindex(d::DDLm_Dictionary,k::Symbol) = parent(getindex(d.block,k)) #not a grouped data frame
-Base.get(d::DDLm_Dictionary,k::Symbol,default) = parent(get(d.block,k,default))
+getindex(d::DDLm_Dictionary,k::Symbol) = parent(getindex(d.block,k)) #not a grouped data frame
+get(d::DDLm_Dictionary,k::Symbol,default) = parent(get(d.block,k,default))
 
 """
 delete!(d::DDLm_Dictionary,k::String)
 
-Remove all information associated with dataname `k`
+Remove all information from `d` associated with dataname `k`
 """
-Base.delete!(d::DDLm_Dictionary,k::String) = begin
+delete!(d::DDLm_Dictionary,k::String) = begin
     canonical_name = find_name(d,k)
     for cat in keys(d.block)
         delete!(parent(d.block[cat]),parent(d.block[cat])[!,:master_id] .== canonical_name)
@@ -194,6 +216,12 @@ end
 
 get_dic_name(d::DDLm_Dictionary) = parent(d[:dictionary])[!,:title][]
 
+"""
+    get_dic_namespace(d::DDLm_Dictionary)
+
+Return the namespace declared by the dictionary, or
+`ddlm` if none present.
+"""
 get_dic_namespace(d::DDLm_Dictionary) = begin
     if :namespace in propertynames(d[:dictionary])
         d[:dictionary][!,:namespace][]
@@ -285,11 +313,11 @@ Return true if `name` is a category according to `d`.
 is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope][] == "Category" : false
 
 """
-    get_categories(d)
+    get_categories(d::DDLm_Dictionary)
 
 List all categories defined in DDLm Dictionary `d`
 """
-get_categories(d) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
 
 """
     get_cat_class(d,catname)
@@ -525,7 +553,7 @@ end
     lookup_default(dict::DDLm_Dictionary,dataname::String,cp)
 
 Index into any default lookup table defined in `dict` for `dataname` using an index value from
-`cp`. `cp` must have a property name as specified by `def_index_id` in the definition of 
+`cp`. `cp` is any object with a property name as specified by `def_index_id` in the definition of 
 `dataname` such that `cp.<def_index_id>` returns a single value
 """
 lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin

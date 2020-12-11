@@ -315,6 +315,11 @@ end
 # ignore any columns contained in the 'implicit' const.
 #
 
+"""
+    show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
+
+Output `ddl2_dic` in CIF format.
+"""
 show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     dicname = ddl2_dic[:dictionary].title[]
     write(io,"#")

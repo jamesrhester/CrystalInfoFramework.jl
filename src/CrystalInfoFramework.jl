@@ -2,6 +2,17 @@ module CrystalInfoFramework
 using DataFrames
 using URIParser
 
+# **Exports**
+
+export CifValue,Cif,Block,CifBlock
+export CifContainer, NestedCifContainer
+export get_frames,get_contents
+export get_loop, eachrow, add_to_loop!, create_loop!
+
+# Base methods that we add to
+import Base:keys,getindex,setindex!,length,haskey,iterate,get
+import Base:delete!,show,first
+
 # *Crystallographic Information Framework*
 #
 # See iucr.org for specifications.
@@ -31,6 +42,9 @@ module DataContainer
 
 using ..CrystalInfoFramework
 using DataFrames
+
+import Base: haskey,getindex,keys,show,iterate,length
+import Base: isless
 
 include("DataContainer/Types.jl")
 include("DataContainer/DataSource.jl")

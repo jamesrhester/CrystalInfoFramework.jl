@@ -6,6 +6,11 @@
 #
 export DDL2_Dictionary,as_data,get_parent_name
 
+"""
+    DDL2_Dictionary
+
+The type of DDL2 dictionaries.
+"""
 struct DDL2_Dictionary <: AbstractCifDictionary
     block::Dict{Symbol,DataFrame}
     func_defs::Dict{String,Function}
@@ -13,6 +18,11 @@ struct DDL2_Dictionary <: AbstractCifDictionary
     parent_lookup::Dict{String,String}
 end
 
+"""
+    DDL2_Dictionary(c::Cif)
+
+Create a DDL2_Dictionary from `c`.
+"""
 DDL2_Dictionary(c::Cif) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
@@ -20,6 +30,12 @@ DDL2_Dictionary(c::Cif) = begin
     return DDL2_Dictionary(first(c).second,lowercase(first(keys(c))))
 end
 
+"""
+    DDL2_Dictionary(a::String;verbose=false)
+
+Create a `DDL2_Dictionary` given filename `a`. `verbose = true` will print
+extra debugging information during reading.
+"""
 DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(Cif(a,verbose=verbose))
 
 DDL2_Dictionary(b::CifBlock,blockname::AbstractString) = begin
@@ -88,12 +104,24 @@ DDL2_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
 end
 
 # Methods needed for creating DDLm Loop categories
+"""
+    keys(d::DDL2_Dictionary)
 
-Base.keys(d::DDL2_Dictionary) = Iterators.flatten((d.block[:item][!,:name],d.block[:category][!,:id]))
-Base.haskey(d::DDL2_Dictionary,k::String) = k in keys(d)
+Return a list of datanames defined by the dictionary, including
+any aliases.
+"""
+keys(d::DDL2_Dictionary) = Iterators.flatten((d.block[:item][!,:name],d.block[:category][!,:id]))
+haskey(d::DDL2_Dictionary,k::String) = k in keys(d)
 
 # Obtain all information about item `k` or category `k`
-Base.getindex(d::DDL2_Dictionary,k) = begin
+
+"""
+    getindex(d::DDL2_Dictionary,k)
+
+d[k] returns the  definition for data name `k` as a `Dict{Symbol,DataFrame}`
+where `Symbol` is the attribute category (e.g. `:item_name`).
+"""
+getindex(d::DDL2_Dictionary,k) = begin
     lk = lowercase(k)
     info_dict = Dict{Symbol,DataFrame}()
     if '.' in k search_space = children_of_item else search_space = children_of_category end
@@ -109,9 +137,10 @@ Base.getindex(d::DDL2_Dictionary,k) = begin
 end
 
 # If a symbol is passed we access the block directly.
-Base.getindex(d::DDL2_Dictionary,k::Symbol) = getindex(d.block,k)
+getindex(d::DDL2_Dictionary,k::Symbol) = getindex(d.block,k)
 
 get_dic_name(d::DDL2_Dictionary) = d.block[:dictionary][:title][]
+
 get_dic_namespace(d::DDL2_Dictionary) = "ddl2"  #single namespace
 
 find_category(d::DDL2_Dictionary,dataname) = begin
@@ -130,10 +159,20 @@ find_object(d::DDL2_Dictionary,dataname) = begin
     return nothing
 end
 
+"""
+    get_categories(d::DDL2_Dictionary)
+
+List all categories defined in `d`
+"""
 get_categories(d::DDL2_Dictionary) = d.block[:category][!,:id]
 get_set_categories(d::DDL2_Dictionary) = []
 get_loop_categories(d::DDL2_Dictionary) = get_categories(d)
 
+"""
+    get_keys_for_cat(d::DDL2_Dictionary,cat)
+
+List all category key data names for `cat` listed in `d`.
+"""
 get_keys_for_cat(d::DDL2_Dictionary,catname::String) = begin
     d[catname][:category_key][!,:name]
 end
@@ -148,6 +187,11 @@ get_objs_in_cat(d::DDL2_Dictionary,catname) = begin
     unique!(d.block[:item][d.block[:item].category_id .== catname,:__object_id])
 end
 
+"""
+    get_default(d::DDL2_Dictionary,dataname)
+
+Return the default value for `dataname` or `missing` if none defined. 
+"""
 get_default(d::DDL2_Dictionary,dataname) = begin
     info = d[dataname]
     if haskey(info,:item_default) && :value in propertynames(info[:item_default])

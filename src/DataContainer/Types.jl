@@ -64,9 +64,13 @@ end
 
 # **Typed data source**
 #
-# A data source with an associated dictionary processes types and aliases.
-#
 
+"""
+    TypedDataSource(data,dictionary)
+
+A `TypedDataSource` is a `DataSource` that returns items of with the correct type
+and aliases resolved, as specified in the associated CIF dictionary.
+"""
 struct TypedDataSource <: DataSource
     data
     dict::AbstractCifDictionary

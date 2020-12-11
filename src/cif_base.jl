@@ -1,16 +1,6 @@
 #
 # *Basic operations on CIF*
 #
-# **Exports**
-
-export CifValue,Cif,Block,CifBlock
-export CifContainer, NestedCifContainer
-export get_frames,get_contents
-export get_loop, eachrow, add_to_loop!, create_loop!
-
-# Base methods that we add to
-import Base:keys,getindex,setindex!,length,haskey,iterate,get
-import Base:delete!,show,first
 
 #  **CIF values**
 #
@@ -93,7 +83,7 @@ keys(b::CifContainer) = keys(get_data_values(b))
 
 Returns `true` if `b` contains a value for case-insensitive data name `s`
 """
-haskey(b::CifContainer,s::String) = haskey(get_data_values(b),lowercase(s))
+haskey(b::CifContainer{V} where V,s::String) = haskey(get_data_values(b),lowercase(s))
 
 """
     iterate(b::CifContainer)

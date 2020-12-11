@@ -111,9 +111,10 @@ find_namespace(r::AbstractRelationalContainer,s::AbstractString) = begin
 end
 
 """
-get_category(r::RelationalContainer,s::String)
+get_category(r::RelationalContainer,s::String,nspace::String)
 
-Return a DDLmCategory described by `s` constructed from the contents of `r`
+Return a DDLmCategory described by `s` in namespace `nspace` constructed 
+from the contents of `r`
 """
 get_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace::String) = construct_category(r,one_cat,nspace)
 
@@ -170,22 +171,22 @@ get_packets(s::SetCategory) = first_packet(s)
 get_packets(l::LoopCategory) = l
 get_packets(missing) = []
 
-Base.keys(r::RelationalContainer) = begin
+keys(r::RelationalContainer) = begin
     if length(r.data) == 1
         return keys(get_data(r))
     end
     throw(error("Specify namespace for keys() of RelationalContainer"))
 end
 
-Base.haskey(r::AbstractRelationalContainer,k) = k in keys(r)
-Base.haskey(r::AbstractRelationalContainer,k,n) = haskey(select_namespace(r,n),k)
-Base.getindex(r::AbstractRelationalContainer,s) = get_data(r)[s]
-Base.getindex(r::AbstractRelationalContainer,s,nspace) = get_data(r,nspace)[s]
+haskey(r::AbstractRelationalContainer,k) = k in keys(r)
+haskey(r::AbstractRelationalContainer,k,n) = haskey(select_namespace(r,n),k)
+getindex(r::AbstractRelationalContainer,s) = get_data(r)[s]
+getindex(r::AbstractRelationalContainer,s,nspace) = get_data(r,nspace)[s]
 
 """
+    get_dictionary(r::RelationalContainer)
 
-If a dictionary is requested and only one is present, we need
-not specify the namespace, simply taking the first one
+Return the dictionary describing `r`.
 """
 get_dictionary(r::RelationalContainer) = begin
     @assert length(r.dicts) == 1
@@ -208,7 +209,7 @@ get_dicts(r::RelationalContainer) = r.dicts
 
 # **Relational Containers**
 
-Base.show(io::IO,r::RelationalContainer) = begin
+show(io::IO,r::RelationalContainer) = begin
     println(io,"Relational container with data")
     println(io,"Namespaces: $(keys(r.dicts))")
 end
@@ -246,7 +247,7 @@ CatPacket(c::CifCategory,keydict) = get_row(c,keydict)
 get_category(c::CatPacket) = getfield(c,:source_cat)
 get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
 
-Base.iterate(c::CifCategory) = begin
+iterate(c::CifCategory) = begin
     if length(c) == 0 return nothing end
     r,s = iterate(1:length(c))
     return CatPacket(r,c),(1:length(c),s)
@@ -254,7 +255,7 @@ end
 
 # Cache the final value at the end of the iteration,
 # as our packets may have updated the data frame.
-Base.iterate(c::CifCategory,ci) = begin
+iterate(c::CifCategory,ci) = begin
     er,s = ci
     next = iterate(er,s)
     if next == nothing
@@ -266,7 +267,7 @@ Base.iterate(c::CifCategory,ci) = begin
     return CatPacket(r,c),(er,s)
 end
 
-Base.length(c::CifCategory) = error("length undefined for $(typeof(c))")
+length(c::CifCategory) = error("length undefined for $(typeof(c))")
 
 """
 get_value(CifCategory,n::Int,colname::Symbol) returns the actual value for the
@@ -308,7 +309,7 @@ data name column.
 get_data(c::CifCategory,mapname) = throw(error("Not implemented"))
 get_link_names(c::CifCategory) = throw(error("Not implemented"))
 
-Base.getindex(d::CifCategory,keyval) = begin
+getindex(d::CifCategory,keyval) = begin
     a = get_key_datanames(d)
     if length(a) != 1
         throw(error("Category $(get_name(d)) accessed with value $keyval but has $(length(a)) key datanames $a"))
@@ -316,16 +317,16 @@ Base.getindex(d::CifCategory,keyval) = begin
     return d[Dict{Symbol,Any}(a[1]=>keyval)]
 end
 
-Base.getindex(d::CifCategory,dict::Dict{Symbol,V} where V) = begin
+getindex(d::CifCategory,dict::Dict{Symbol,V} where V) = begin
     get_row(d,dict)
 end
 
-Base.getindex(d::CifCategory,pairs...) = begin
+getindex(d::CifCategory,pairs...) = begin
     getindex(d,Dict(pairs))
 end
 
 
-Base.show(io::IO,d::CifCategory) = begin
+show(io::IO,d::CifCategory) = begin
     print(io,"Category $(get_name(d)) ")
     print(io,"Length $(length(d))\n")
     df = DataFrame()
@@ -337,14 +338,14 @@ Base.show(io::IO,d::CifCategory) = begin
     show(io,df)
 end
 
-Base.show(io::IO,::MIME"text/cif",d::LoopCategory) = begin
+show(io::IO,::MIME"text/cif",d::LoopCategory) = begin
     catname = get_name(d)
     df = DataFrame(d)
     formatted = format_for_cif(df,catname)
     print(io,formatted)
 end
 
-Base.show(io::IO,s::SetCategory) = begin
+show(io::IO,s::SetCategory) = begin
     println(io,"Category $(get_name(s))")
     for n in keys(s)
         println("$n : $(s[n][])")
@@ -372,7 +373,7 @@ LoopCategory(catname::String,data,cifdic::AbstractCifDictionary) = begin
     small_data = select_namespace(data,namespace)
     have_vals = unique(filter(k-> haskey(small_data,k) && !(k in key_names),data_names))
 
-    println("For $catname datasource has names $have_vals")
+    # println("For $catname datasource has names $have_vals")
     key_names = [name_to_object[k] for k in key_names]
     # Child categories
     child_cats = create_children(catname,data,cifdic)
@@ -403,20 +404,21 @@ LoopCategory(l::LegacyCategory,k) = begin
                  l.namespace)
 end
 
-Base.length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]],d.namespace])
-Base.haskey(d::LoopCategory,n::Symbol) = begin
-    haskey(d.rawdata,get(d.object_to_name,n,""),d.namespace) || any(x->haskey(d.rawdata,get(x.object_to_name,n,""),x.namespace),d.child_categories)
+length(d::LoopCategory) = length(d.rawdata[d.object_to_name[d.keys[1]],d.namespace])
+haskey(d::LoopCategory,n::Symbol) = begin
+    small_data = select_namespace(d.rawdata,d.namespace)
+    haskey(small_data,get(d.object_to_name,n,"")) || any(x->haskey(small_data,get(x.object_to_name,n,"")),d.child_categories)
 end
-Base.haskey(d::LoopCategory,n::AbstractString) = haskey(d.rawdata,n,d.namespace)
+haskey(d::LoopCategory,n::AbstractString) = haskey(select_namespace(d.rawdata,d.namespace),n)
 
 """
 Generate all known key values for a category. Make sure empty data works as well. "Nothing" sorts
 to the end arbitrarily
 """
 
-Base.isless(x::Nothing,y) = false
-Base.isless(x,y::Nothing) = true
-Base.isless(x::Nothing,y::Nothing) = false
+isless(x::Nothing,y) = false
+isless(x,y::Nothing) = true
+isless(x::Nothing,y::Nothing) = false
 
 # DataSource interface
 
@@ -432,14 +434,14 @@ dataframe because of linked data names (not yet implemented).
 # other types for row and key based indexing.  We try all child
 # categories after trying the parent category
 
-Base.getindex(d::LoopCategory,name::Symbol) = begin
+getindex(d::LoopCategory,name::Symbol) = begin
     if name in d.column_names return d.rawdata[d.object_to_name[name],d.namespace] end
     for x in d.child_categories
         if name in x.column_names return x.rawdata[x.object_to_name[name],x.namespace] end
     end
 end
 
-Base.getindex(d::LoopCategory,name::Symbol,index::Integer) = get_value(d,index,name)
+getindex(d::LoopCategory,name::Symbol,index::Integer) = get_value(d,index,name)
 
 # If a single value is provided we turn it into a keyed access as long as
 # we have a single value for the key
@@ -574,7 +576,7 @@ get_key_datanames(d::LoopCategory) = d.keys
 get_link_names(d::LoopCategory) = d.linked_names
 get_dictionary(d::LoopCategory) = d.dictionary
 
-Base.keys(d::LoopCategory) = get_object_names(d)
+keys(d::LoopCategory) = get_object_names(d)
 
 SetCategory(catname::String,data,cifdic::DDLm_Dictionary) = begin
     #
@@ -598,8 +600,8 @@ end
 get_dictionary(s::SetCategory) = s.dictionary
 get_name(s::SetCategory) = s.name
 get_object_names(s::SetCategory) = s.present
-Base.keys(s::SetCategory) = s.present
-Base.haskey(s::SetCategory,name::AbstractString) = name in (s.object_to_name[x] for x in keys(s))
+keys(s::SetCategory) = s.present
+haskey(s::SetCategory,name::AbstractString) = name in (s.object_to_name[x] for x in keys(s))
 
 get_value(s::SetCategory,i::Int,name::Symbol) = begin
     if i != 1
@@ -609,12 +611,12 @@ get_value(s::SetCategory,i::Int,name::Symbol) = begin
     return s.rawdata[access_name]
 end
 
-Base.getindex(s::SetCategory,name::Symbol) = begin
+getindex(s::SetCategory,name::Symbol) = begin
     return s.rawdata[s.object_to_name[name],s.namespace]
 end
 
-Base.getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
-Base.length(s::SetCategory) = 1
+getindex(s::SetCategory,name::Symbol,index::Integer) = s[name][]
+length(s::SetCategory) = 1
 
 LegacyCategory(catname::AbstractString,data,cifdic::AbstractCifDictionary) = begin
     #
@@ -656,7 +658,7 @@ Base.keys(l::LegacyCategory) = begin
 (k for k in l.column_names if haskey(l.rawdata,l.object_to_name[k]))
 end
 
-Base.haskey(l::LegacyCategory,k) = k in keys(l)  
+haskey(l::LegacyCategory,k) = k in keys(l)  
 
 """
 
