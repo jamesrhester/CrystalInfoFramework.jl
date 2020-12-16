@@ -28,7 +28,7 @@ place on your system.
 ## Documentation
 
 Detailed documentation is becoming progressively available 
-[here](https://jamesrhester.github.io/CrystalInfoFramework.jl/dev)
+[here](https://jamesrhester.github.io/CrystalInfoFramework.jl/dev).
 
 ## Getting started
 
@@ -121,9 +121,8 @@ julia> l = bd["_cell_length_a"] #understand aliases
 
 ### Writing
 
-Currently, `show(io::IO,::MIME"text/cif",d::DDLm_Dictionary)` produces
-a correctly-formatted dictionary. Similar output for plain CIF files is
-almost ready.
+Use `show(io::IO,::MIME"text/cif",d)` to produce
+correctly-formatted dictionaries or data files.
 
 ## Architecture
 
