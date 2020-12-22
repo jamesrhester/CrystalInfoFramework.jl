@@ -253,9 +253,11 @@ end
 Find the canonical name for `name` in `d`. If `name` is not
 present, return `name` unchanged. If accessed in cat/obj format, search also child
 categories. Note that the head category may not have a category associated with it.
+If `name` is the dictionary title it is returned as is.
 """
 find_name(d::DDLm_Dictionary,name) =  begin
     lname = lowercase(name)
+    if lname == lowercase(d[:dictionary].title[]) return name end
     # A template etc. dictionary has no defs
     if !haskey(d.block,:definition) return lname end
     if !(:id in propertynames(d[:definition])) return lname end
@@ -263,7 +265,7 @@ find_name(d::DDLm_Dictionary,name) =  begin
     if !haskey(d.block,:alias) return lname end
     potentials = d[:alias][lowercase.(d[:alias][!,:definition_id]) .== lname,:master_id]
     if length(potentials) == 1 return potentials[] end
-    KeyError(name)
+    throw(KeyError(name))
 end
 
 """

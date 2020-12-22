@@ -55,9 +55,9 @@ already.
 convert_to_julia(cdic,cat,obj,value::Array) = begin
     julia_base_type,cont_type = get_julia_type_name(cdic,cat,obj)
     if typeof(value) == Array{julia_base_type,1} return value end
-    if !(eltype(value) <: CifValue)
-        throw(error("Unable to convert values of type $(eltype(value))"))
-    end
+    #if !(eltype(value) <: CifValue)
+    #    throw(error("Unable to convert values of type $(eltype(value))"))
+    #end
     change_func = (x->x)
     #println("Julia type for $cat/$obj is $julia_base_type, converting $value")
     if julia_base_type == Integer

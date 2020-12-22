@@ -222,7 +222,7 @@ find_name(d::DDL2_Dictionary,name) = begin
     if !haskey(d.block,:item_aliases) return lname end
     potentials = d[:item_aliases][lowercase.(d[:item_aliases][!,:alias_name]) .== lname,:name]
     if length(potentials) == 1 return potentials[] end
-    KeyError(name)
+    throw(KeyError(name))
 end
 
 find_name(d::DDL2_Dictionary,cat,obj) = begin
@@ -378,15 +378,15 @@ end
 
 # Methods for setting and retrieving evaluated functions
 set_func!(d::DDL2_Dictionary,func_name::AbstractString,func_text::Expr,func_code) = begin
-    d.func_defs[func_name] = func_code
-    d.func_text[func_name] = func_text
+    d.func_defs[lowercase(func_name)] = func_code
+    d.func_text[lowercase(func_name)] = func_text
 end
 
-get_func(d::DDL2_Dictionary,func_name::AbstractString) = d.func_defs[func_name]
-get_func_text(d::DDL2_Dictionary,func_name::AbstractString) = d.func_text[func_name]
+get_func(d::DDL2_Dictionary,func_name::AbstractString) = d.func_defs[lowercase(func_name)]
+get_func_text(d::DDL2_Dictionary,func_name::AbstractString) = d.func_text[lowercase(func_name)]
 has_func(d::DDL2_Dictionary,func_name::AbstractString) = begin
     try
-        d.func_defs[func_name]
+        d.func_defs[lowercase(func_name)]
     catch KeyError
         return false
     end
