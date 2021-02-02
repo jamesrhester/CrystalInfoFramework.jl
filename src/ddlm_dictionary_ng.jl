@@ -906,8 +906,8 @@ get_import_info(original_dir,import_entry) = begin
     location = url.path
     block = import_entry["save"]
     mode = get(import_entry,"mode","Contents")
-    if_dupl = get(import_entry,"if_dupl","Exit")
-    if_miss = get(import_entry,"if_miss","Exit")
+    if_dupl = get(import_entry,"dupl","Exit")
+    if_miss = get(import_entry,"miss","Exit")
     return location,block,mode,if_dupl,if_miss
 end
 
@@ -1045,6 +1045,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
                 continue
             end
             importee = DDLm_Dictionary(location)
+            println("Full import of $location/$block/$if_dupl/$if_miss")
             importee_head = importee[block]
             if importee_head[:definition][!,:class][] != "Head"
                 println("WARNING: full mode imports of non-head categories not supported, ignored")
@@ -1058,7 +1059,19 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
             dups = filter(x-> count(isequal(x),all_defs)>1,all_defs)
             if length(dups) > 0
                 println("Duplicated frames: $dups")
-                throw(error("Duplicated frame handling not yet implemented: $dups"))
+                if if_dupl == "Replace"
+                    throw(error("Option Replace for duplicated frame handling not yet implemented: $dups"))
+                end
+                if if_dupl == "Exit"
+                    throw(error("Duplicate frames, Exit specified for this case. $dups"))
+                end
+                if if_dupl != "Ignore"
+                    throw(error("Duplicate frames and option $if_dupl not recognised"))
+                end
+                # Remove definitions
+                for (_,table) in importee.block
+                    filter!(x-> !(x.master_id in dups), parent(table))
+                end
             end
             # Remove old head category
             delete!(importee,block)
