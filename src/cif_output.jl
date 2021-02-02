@@ -346,7 +346,8 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
         end
     end
     # And the looped top-level stuff
-    for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history]
+    for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history,
+              :sub_category,:category_group_list]
         if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
             show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info)
         end

@@ -4,7 +4,7 @@
 # Next generation: reads the dictionary as a database the way
 # the PDB intended, and split on '.' for cat/obj
 #
-export DDL2_Dictionary,as_data,get_parent_name
+export DDL2_Dictionary,as_data,get_parent_name,get_toplevel_cats
 
 """
     DDL2_Dictionary
@@ -342,8 +342,8 @@ populate_implicits(all_tables) = begin
         if cat in cats
             target_name = objs[indexin([cat],cats)[]]
             if !(target_name in propertynames(table))
-                rename!(table,(:__blockname=>target_name))
-                #println("Added implicit value for $cat.$target_name")
+                table[target_name] = copy(table.__blockname)
+                println("Added implicit value for $cat.$target_name")
             else
                 table[target_name] = CaselessString.(table[target_name])
             end
@@ -355,6 +355,16 @@ add_cat_obj!(all_info) = begin
     catobj = split.(all_info[:item][!,:name],".")
     all_info[:item].category_id = [String(x[1][2:end]) for x in catobj]
     all_info[:item].__object_id = [String(x[2]) for x in catobj]
+end
+
+"""
+    get_toplevel_cats(d::DDL2_Dictionary)
+
+Return a list of category names that appear outside the definition blocks.
+Typically these are lists of types, units, groups and methods.
+"""
+get_toplevel_cats(d::DDL2_Dictionary) = begin
+    [k for k in keys(d.block) if d.block[k].__blockname[1] == get_dic_name(d)]
 end
 
 """
