@@ -611,7 +611,7 @@ default_options(s::String;verbose=false) = begin
                               )
     starting_cif = Dict()
     context = cif_builder_context(Dict(),CifContainer[],s,verbose)
-    p_opts = cif_parse_options(0,C_NULL,0,0,0,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
+    p_opts = cif_parse_options(0,C_NULL,0,1,1,1,C_NULL,C_NULL,Ref(handlers),C_NULL,C_NULL,C_NULL,C_NULL,context)
     return p_opts
 end
 

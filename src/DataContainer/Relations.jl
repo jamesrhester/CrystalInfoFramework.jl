@@ -716,7 +716,7 @@ DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
         println("Preparing category $ac")
         if has_category(ds,ac,"ddlm") println("We have category $ac") end
         catinfo = get_category(ds,ac,"ddlm")
-        println("We have catinfo $catinfo")
+        println("We have catinfo $(typeof(catinfo)) $catinfo")
         if ismissing(catinfo) continue end
         df = unique!(DataFrame(catinfo))
         att_info[Symbol(ac)] = df
