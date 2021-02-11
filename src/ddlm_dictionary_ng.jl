@@ -22,7 +22,7 @@ using Printf
 export DDLm_Dictionary
 export find_category,get_categories,get_set_categories
 export list_aliases
-export find_object,find_name
+export find_object,find_name,filter_def
 export get_single_key_cats
 export get_linked_names_in_cat,get_keys_for_cat
 export get_linked_name
@@ -58,26 +58,30 @@ struct DDLm_Dictionary <: AbstractCifDictionary
 end
 
 """
-    DDLm_Dictionary(c::Cif)
+    DDLm_Dictionary(c::Cif;ignore_imports=false)
 
-Create a `DDLm_Dictionary` from `c`.
+Create a `DDLm_Dictionary` from `c`. `ignore_imports = true` will
+ignore any `import` attributes.
 """
-DDLm_Dictionary(c::Cif) = begin
+DDLm_Dictionary(c::Cif;ignore_imports=false) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
-    return DDLm_Dictionary(first(c).second)
+    return DDLm_Dictionary(first(c).second,ignore_imports=ignore_imports)
 end
 
 """
-    DDLm_Dictionary(a::String;verbose=false)
+    DDLm_Dictionary(a::String;verbose=false,ignore_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
-extra debugging information during reading.
+extra debugging information during reading.`ignore_imports = true` will ignore
+any `import` attributes.
 """
-DDLm_Dictionary(a::String;verbose=false) = DDLm_Dictionary(Cif(a,verbose=verbose))
+DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
+    DDLm_Dictionary(Cif(a,verbose=verbose),ignore_imports=ignore_imports)
+end
 
-DDLm_Dictionary(b::CifBlock) = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=false) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -119,7 +123,9 @@ DDLm_Dictionary(b::CifBlock) = begin
         update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString("master_id"),title)
     end
     # process imports - could we do this separately?
-    resolve_imports!(all_dict_info,b.original_file)
+    if !ignore_imports
+        resolve_imports!(all_dict_info,b.original_file)
+    end
     DDLm_Dictionary(all_dict_info,nspace)
 end
 
@@ -192,6 +198,38 @@ delete!(d::DDLm_Dictionary,k::String) = begin
     end
 end
 
+"""
+    filter_def((cat,obj),value,d::DDLm_Dictionary)
+
+Return a dictionary containing only those definitions in `d` for which
+attribute given by `_cat.obj` takes `value`.  If an attribute is
+looped, the definition is included if at least one of the values is
+`value`. `cat` and `obj` should be given as symbols.
+
+Example:
+
+filter_def((:type,:purpose),"Measurand",d)
+
+will return a dictionary containing only "Measurand" data items from `d`.
+"""
+filter_def(catobj,val,d::DDLm_Dictionary) = begin
+    cat,obj = catobj
+    target_cat = get(d,cat,DataFrame())
+    def_names = []
+    if nrow(target_cat) != 0 && obj in propertynames(target_cat)
+        all_hits = target_cat[target_cat[!,obj] .== val,:]
+        def_names = all_hits.master_id
+    end
+    # filter on names
+    info_dict = Dict{Symbol,DataFrame}()
+    for cat in keys(d.block)   #use symbols to access master block
+        info_dict[cat] = d[cat][in.(d[cat][!,:master_id], Ref(def_names)),:]
+    end
+    # fix up with same dictionary header
+    info_dict[:dictionary] = d[:dictionary]
+    return DDLm_Dictionary(info_dict,d.namespace)
+end
+
 # `k` is assumed to be already lower case
 
 filter_on_name(d::Dict{Symbol,GroupedDataFrame},k) = begin
@@ -257,7 +295,7 @@ If `name` is the dictionary title it is returned as is.
 """
 find_name(d::DDLm_Dictionary,name) =  begin
     lname = lowercase(name)
-    if lname == lowercase(d[:dictionary].title[]) return name end
+    if lname == lowercase(d[:dictionary].title[]) return lname end
     # A template etc. dictionary has no defs
     if !haskey(d.block,:definition) return lname end
     if !(:id in propertynames(d[:definition])) return lname end
@@ -436,6 +474,17 @@ get_loop_categories(d::DDLm_Dictionary) = begin
     else
         lowercase.(d[:definition][d[:definition][!,:id] .!= "dictionary",:id])
     end
+end
+
+"""
+    get_toplevel_cats(d::DDL2_Dictionary)
+
+Return a list of category names that appear outside the definition blocks.
+Typically these are lists of types, units, groups and methods.
+"""
+get_toplevel_cats(d::DDLm_Dictionary) = begin
+    w = d[get_dic_name(d)]
+    [k for k in keys(w) if nrow(w[k])>0]
 end
 
 # ***Dictionary functions***
