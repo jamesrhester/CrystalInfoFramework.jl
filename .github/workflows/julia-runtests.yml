@@ -27,6 +27,8 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
            version: ${{ matrix.julia-version }}
+      - name: Install build requirements
+        run:  julia -e 'using Pkg; Pkg.add("Lerche")'
       - uses: julia-actions/julia-buildpkg@latest
         name: Run test no coverage
       - uses: julia-actions/julia-runtest@latest
