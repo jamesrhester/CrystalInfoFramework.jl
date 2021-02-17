@@ -30,7 +30,7 @@ jobs:
       - name: Build package
         run:  julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.build()'
       - name: Run test no coverage
-      - uses: julia-actions/julia-runtest@latest
+        uses: julia-actions/julia-runtest@latest
         with:
                 coverage: 'false'
       - name: Do the coverage run
