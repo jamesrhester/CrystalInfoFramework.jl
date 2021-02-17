@@ -1,6 +1,8 @@
 module CrystalInfoFramework
 using DataFrames
 using URIParser
+using Lerche #for native parser
+using Libdl  #to find C library if present
 
 # **Exports**
 
@@ -27,6 +29,7 @@ import Base:delete!,show,first
 include("cif_errors.jl")
 include("libcifapi.jl")
 include("cif_base.jl")
+include("cif2_transformer.jl")
 include("cif_dic.jl")
 include("caseless_strings.jl")
 include("ddlm_dictionary_ng.jl")

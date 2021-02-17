@@ -1,0 +1,22 @@
+#\#CIF_2.0
+
+# Tests use of (UTF-8 encoded) Unicode in CIF instance documents
+
+# Unicode in a comment: αβγ
+
+# Unicode in a block code:
+data_Ŭnicöde→
+
+# Unicode in a frame code:
+save_§1
+
+# Unicode in a data name:
+loop_
+ _formula _ΔHf
+ 'C O2'   −393.509  # and in a value: that's a U+2212, not an ASCII minus sign
+
+# Unicode in a value (code points U+1063E U+16A0 U+2820)
+_uvalue   𐘾ᚠ⠠
+
+save_
+

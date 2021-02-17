@@ -1,0 +1,12 @@
+#\#CIF_1.1
+
+data_cif11_unquoted
+
+# This value is the one described in GitHub issue 22:
+_bracket_mid Fc^*^=kFc[1+0.001xFc^2^\l^3^/sin(2\q)]^-1/4^
+
+_bracket_end a[42]
+_brace_begin {foo}bar
+_brace_mid   bar{foo}bar
+_brace_end   bar{foo}
+

@@ -200,7 +200,7 @@ calc_loop_spacing(df::DataFrame) = begin
     end
     maxwidth = sum(widths[1,:])
     # distribute empty space
-    empty_space = round(Int,80-maxwidth)
+    empty_space = max(0,round(Int,80-maxwidth))
     extra = round(Int,empty_space/(ncol(widths)+1))
     widths = mapcols!(widths) do x
         if x[1] == 0 0
@@ -230,6 +230,7 @@ show_one_def(io,def_name,info_dic;implicits=[],ordering=ddlm_cat_order) = begin
     # cats in ordering are dealt with first
     # append!(ordering,keys(info_dic))
     for cat in unique(Iterators.flatten((ordering,keys(info_dic))))
+        if !haskey(info_dic,cat) continue end
         df = info_dic[cat]
         if nrow(df) == 0 continue end
         out_order = get(ddlm_def_order,cat,())
@@ -318,8 +319,8 @@ end
 
 Base.show(io::IO,::MIME"text/cif",b::NestedCifContainer) = begin
     # first output the save frames
-    show(io,get_frames(b))
-    show(io,Block(b))
+    show(io,MIME("text/cif"),get_frames(b))
+    show(io,MIME("text/cif"),Block(b))
 end
 
 centered_header(header_text;width=78) = begin

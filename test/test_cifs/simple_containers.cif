@@ -1,0 +1,29 @@
+#\#CIF_2.0
+
+# Tests multiple blocks in the same CIF, save frames in blocks, and data and
+# save frame name scoping.
+
+data_block1
+
+save_s1
+_location 'block1/s1'
+save_
+
+_location 'block1'
+
+save_s2
+_location 'block1/s2'
+save_
+
+data_block2
+
+data_block3
+
+save_s1
+_location 'block3/s1'
+save_
+
+_location 'block3'
+
+save_s3
+save_

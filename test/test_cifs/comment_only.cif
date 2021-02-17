@@ -1,0 +1,3 @@
+# Nothing but comments in this CIF.
+# Without a leading CIF 2.0 version comment, it should be parsed as CIF 1.1,
+# but the (lack of) data content would be the same if it were parsed as CIF 2.0

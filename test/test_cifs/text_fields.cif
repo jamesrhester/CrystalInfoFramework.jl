@@ -1,0 +1,76 @@
+#\#CIF_2.0
+
+data_text_fields
+
+# Neither folded nor prefixed
+
+_plain1  # some lines have trailing whitespace
+;\\
+line 2\
+line 3    
+;
+
+_plain2
+;;\
+;
+
+_terminators  # mixed line terminators
+;line 1
+line 2line 3
+end
+;
+
+# Basic line folding
+_folded1
+;\
+A (not so) long\
+ line.
+A normal line.
+NOT a long line.\
+;
+
+# Line folding with trailing space characters
+_folded2
+;\   
+line 1  
+line \ 
+2
+;
+
+# Text prefixing
+
+_prefixed1
+; \
+ _embedded
+ ;
+ ;
+;
+
+_prefixed2
+;pfx>\  
+pfx>_embedded
+pfx>;
+pfx>;
+;
+
+# Combined prefixing and line-folding
+_pfx_folded
+;> \\  
+> line 1 \
+> is folded\
+>  twice.
+;
+
+# Empty folded and prefixed fields
+_folded_empty
+;\
+;
+
+_prefixed_empty
+;>>\
+;
+
+_pfx_fold_empty
+;πφχ\\
+;
+

@@ -1,0 +1,23 @@
+#\#CIF_2.0
+
+data_simple_loops
+
+loop_
+  _col1
+  _col2
+  _col3
+1 v1 ?
+2
+;v2
+; 1.0
+3 'v3' 12.5(2)
+
+loop_
+  _single
+  1 2 3
+
+loop_
+  _scalar_a _scalar_b
+  'a'
+  'b'
+

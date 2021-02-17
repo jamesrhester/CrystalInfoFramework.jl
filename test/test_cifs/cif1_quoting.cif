@@ -1,0 +1,7 @@
+#\#CIF_1.1
+
+data_cif1_quoting
+
+_sq 'don't rock the boat'
+_dq "What's this ab\"out?"
+

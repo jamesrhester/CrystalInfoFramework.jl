@@ -1,0 +1,45 @@
+#\#CIF_2.0
+
+data_table_data
+
+_empty_table1 {}
+_empty_table2 { }
+_empty_table3 {
+              }
+
+_singleton_table1 {
+  'zero':0
+}
+
+_singleton_table2 {
+  'text':
+;text
+;
+}
+
+_singleton_table3 {
+  "":empty_key
+}
+
+_digit3_map {# comment immediately following opening brace
+  'zero':0
+  'one': 1
+  'two':2
+}
+
+_space_keys {
+ '':0
+ " ":1
+ '   ':
+ # comment between key and value
+ 3
+}
+
+_type_examples {
+  "char":"char"
+  "unknown":?
+  "N/A":
+  .
+  "numb":-123.4e+67(5)
+}
+

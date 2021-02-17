@@ -1,0 +1,21 @@
+#\#CIF_2.0
+
+data_triple
+
+_empty1 ''''''
+_empty2 """"""
+_simple '''simple'''
+_tricky1 ''''tricky'''
+_tricky2 """""tricky"""
+_embedded '''"""embedded"""'''
+_multiline1 """first line
+second line"""
+_multiline2 '''
+second line [of 3]
+'''
+_ml_embed """
+_not_a_name
+;embedded
+;
+"""
+

@@ -2,6 +2,7 @@
 using CrystalInfoFramework
 using Test
 using DataFrames
+using Lerche
 
 # This just sets up access to a particular block
 prepare_block(filename,blockname) = begin
@@ -12,6 +13,7 @@ end
 include("creation.jl")
 include("data_access.jl")
 include("caseless_test.jl")
+include("native_parser.jl")
 include("save_frames.jl")
 include("dictionaries.jl")
 include("output.jl")

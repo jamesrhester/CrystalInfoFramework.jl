@@ -1,0 +1,28 @@
+#\#CIF_2.0
+
+data_complex_data
+
+_list_of_lists [
+  []
+  [foo bar ]
+  [ x y z ]
+]
+
+_table_of_tables {
+  'English':{
+    'one':one
+    'two':two
+  }
+
+  'French':{
+    'one':'un'
+    'two':"deux"
+  }
+}
+
+_hodge_podge [
+  ?
+  { 'a':10 'b':11 'c':[? 12] }
+  [. . {} {'alice':Cambridge 'bob':Harvard 'charles':.}]
+]
+

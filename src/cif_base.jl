@@ -180,18 +180,18 @@ Block{V}() where V = begin
 end
 
 """
-A CIF block potentially containing save frames.
+A CIF block potentially containing save frames. Save frames cannot be nested.
 """
 mutable struct CifBlock{V} <: NestedCifContainer{V}
-    save_frames::Dict{String,CifContainer{V}}
+    save_frames::Dict{String,Block{V}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
     original_file::String
 end
 
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
-CifBlock(n::Block{V}) where V = CifBlock(Dict{String,CifContainer{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
-CifBlock(f::CifBlock) = f
+CifBlock(n::Block{V}) where V = CifBlock(Dict{String,Block{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
+#CifBlock(f::CifBlock) = f
 
 # And a simple access API
 get_data_values(b::Block) = b.data_values
@@ -294,21 +294,19 @@ end
 # **CIF files**
 # 
 # A CIF file is represented as a collection of CIF blocks, and retains
-# memory of the source file. The `Native` part of the name refers to
-# the information being held within Julia, not the underlying cifapi
-# routines. Each of the component blocks is indexed by a string.
+# memory of the source file. Each of the component blocks is indexed by a string.
 #
 """
 A CIF file consisting of a collection of `CifContainer` indexed by String and
 recording the source of the collection.
 """
-struct Cif{V} <: CifCollection{V}
-    contents::Dict{String,CifContainer{V}}
+struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
+    contents::Dict{String,T}
     original_file::String
 end
 
-Cif{V}() where V = begin
-    return Cif(Dict{String,CifContainer{V}}(),"")
+Cif{V,T}() where V where T = begin
+    return Cif(Dict{String,T}(),"")
 end
 
 """
@@ -357,6 +355,8 @@ setindex!(c::Cif,v,s) = begin
     c.contents[s]=v
 end
 
+iterate(c::Cif) = iterate(c.contents)
+iterate(c::Cif,s) = iterate(c.contents,s)
 """
     show(io::IO,::MIME"text/plain",c::Cif)
 
@@ -382,7 +382,7 @@ get_source_file(n::Cif) = n.original_file
 
 Return all nested CIF containers in `f` as a `Cif` object.
 """
-get_frames(f::CifBlock{V}) where V = Cif{V}(f.save_frames,get_source_file(f))
+get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_file(f))
 
 # **Interface to low-level C API**
 
@@ -618,16 +618,52 @@ end
 """
     Cif(s::AbstractString;verbose=false)
 
-Read in filename `s` as a CIF file. If `verbose` is true, print progress
-information during parsing.
+Read in filename `s` as a CIF file. If `verbose` is true, print
+progress information during parsing. If `native` is `false`, use the
+C-language parser provided by `libcif`.  If `libcif` is not available,
+the native Julia parser will be used. `version` may be `1`, `2` or
+`0` (default) for auto-detected CIF version.
+`version` is only respected by the native parser. The `libcif` parser
+will always auto-detect.  
 """
-Cif(s::AbstractString;verbose=false) = begin
+Cif(s::AbstractString;verbose=false,native=false,version=0) = begin
     ## get the full filename
     full = realpath(s)
-    p_opts = default_options(full,verbose=verbose)
-    result = cif_tp_ptr(p_opts)
-    ## the real result is in our user data context
-    return Cif(p_opts.user_data.actual_cif,full)
+    if find_library("libcif") != "" && !native
+        p_opts = default_options(full,verbose=verbose)
+        result = cif_tp_ptr(p_opts)
+        ## the real result is in our user data context
+        return Cif(p_opts.user_data.actual_cif,full)
+    else
+        if (!native) println("WARNING: using native parser as libcif not found on system.") end
+        full_contents = read(full,String)
+        # strip any BOM
+        if length(full_contents) > 1 && full_contents[1] == '\ufeff'
+            full_contents = full_contents[(nextind(full_contents,1)):end]
+        end
+        if version == 0
+            actual_version = auto_version(full_contents)
+        else
+            actual_version = version
+        end
+        ct = TreeToCif(full)
+        if actual_version == 2
+            return Lerche.transform(ct,Lerche.parse(cif2_parser,full_contents))
+        else
+            return Lerche.transform(ct,Lerche.parse(cif1_parser,full_contents))
+        end
+    end
+end
+
+"""
+    auto_version(contents)
+
+Determine the version of CIF adhered to by the string `contents`. If the string `#\\#CIF_2.0` is
+not present, the version is assumed to be 1.1. 1.0 is not presently detected.
+"""
+auto_version(contents) = begin
+    if length(contents) < 10 return 1.1 end
+    if contents[1:10] == r"#\#CIF_2.0" return 2 else return 1.1 end
 end
 
 # Given a filename, parse and return a CIF object according to the provided options.
@@ -643,6 +679,7 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     ## Debugging: do we have good values in our parse options context?
     ## println("User context is $(p_opts.user_data)")
     val=ccall((:cif_parse,"libcif"),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
+    close(fptr)
     close(f)
     finalizer(cif_destroy!,dpp)
     ## Check for errors and destroy the CIF if necessary

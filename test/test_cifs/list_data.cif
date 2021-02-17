@@ -1,0 +1,35 @@
+#\#CIF_2.0
+
+data_list_data
+
+_empty_list1 []
+_empty_list2 [ ]
+_empty_list3 [# comment without leading space
+             ]
+
+_single_na1     [.]
+_single_na2     [ .]
+_single_na3     [ . ]
+
+_single_unk     [ ? ]
+
+_single_string1 [bare]
+_single_string2 [
+# comment in list
+'sq']
+_single_string3 [  "[ not a list ]"  ]
+
+_single_numb1   [0]
+_single_numb2   [ -10.0(2) ]
+
+_digit_list     [0 1 2 3
+  # comment mid-list
+  4 5 6 7 8 9]
+_string_list    [ 'one' "two" '"three"' ]
+_mixed_list     [
+  Mary had 1 little ?
+;Its fleece....
+;
+# trailing comment
+]
+
