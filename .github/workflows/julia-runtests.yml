@@ -28,7 +28,7 @@ jobs:
         with:
            version: ${{ matrix.julia-version }}
       - name: Build package
-        run:  julia --project -e 'using Pkg; Pkg.instantiate(); if VERSION >= v"1.1.0-rc1"; Pkg.build(verbose=true); else Pkg.build(); end'
+        run:  julia -e 'using Pkg; Pkg.instantiate(); Pkg.status(); if VERSION >= v"1.1.0-rc1"; Pkg.build(verbose=true); else Pkg.build(); end'
       - name: Run test no coverage
         uses: julia-actions/julia-runtest@latest
         with:
