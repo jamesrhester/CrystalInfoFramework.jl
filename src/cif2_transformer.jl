@@ -120,18 +120,30 @@ end
 
 add_to_block(data_item::Pair{String,T} where T<:CifContainer{CifValue},cb) = begin
     k,v = data_item
-    cb.save_frames[k] = v
+    if !haskey(cb.save_frames,k)
+        cb.save_frames[k] = v
+    else
+        throw(error("Duplicate save frame name $k"))
+    end
 end
 
 add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
     k,v = data_item
-    cb[k] = v
+    if !haskey(cb,k)
+        cb[k] = v
+    else
+        throw(error("Duplicate item name $k"))
+    end
 end
 
 add_to_block(data_item::Dict{String,Array{CifValue,1}},cb) = begin
     new_names = collect(keys(data_item))
     for nn in new_names
-        cb[nn] = data_item[nn]
+        if !haskey(cb,nn)
+            cb[nn] = data_item[nn]
+        else
+            throw(error("Duplicate item name $nn"))
+        end
     end
     create_loop!(cb,new_names)
 end

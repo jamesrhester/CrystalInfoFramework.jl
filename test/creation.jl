@@ -27,5 +27,5 @@ end
     true #if we succeed we are happy
 end
 
-    @test_throws Exception  Cif(joinpath(testdir,"bad_data.cif"))
+    @test_throws Exception  Cif(joinpath(testdir,"test_cifs","bad_data.cif"))
 end

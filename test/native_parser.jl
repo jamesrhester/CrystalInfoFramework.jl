@@ -9,7 +9,8 @@ const test_files_cif2 = ["bom_ver2.cif", "complex_data.cif",
 const test_files_cif1 = ["comment_only.cif","cif11_unquoted.cif", "cif1_quoting.cif",
                    "empty.cif", "simple_data.cif", "simple_loops.cif"]
 
-const test_fail_cif1 = ["cif1_invalid.cif"]
+const test_fail_cif1 = ["cif1_invalid.cif","bad_data.cif"]
+const test_fail_cif2 = ["bad_data.cif"]
 
 @testset "Native parse CIF1 files" begin
     for tf in test_files_cif1
@@ -29,6 +30,12 @@ end
 
 @testset "Invalid CIF1 files" begin
     for tf in test_fail_cif1
-        @test_throws Lerche.UnexpectedCharacters Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=1)
+        @test_throws Exception Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=1)
+    end
+end
+
+@testset "Invalid CIF2 files" begin
+    for tf in test_fail_cif2
+        @test_throws Exception Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=2)
     end
 end
