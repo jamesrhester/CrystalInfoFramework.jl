@@ -99,7 +99,7 @@ end
     contents = Dict{String,Vector{CifValue}}()
     b = Block{CifValue}(loop_list,contents,t.source_name)
     for l in args[2:end-1]
-        println("Adding $l")
+        # println("Adding $l")
         add_to_block(l,b)
     end
     name = String(args[1][6:end])
