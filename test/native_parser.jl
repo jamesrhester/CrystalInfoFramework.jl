@@ -18,6 +18,9 @@ const test_fail_cif2 = ["bad_data.cif"]
         Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=1)
         @test true
     end
+    simple_data = Cif(joinpath(@__DIR__,"test_cifs","simple_data.cif"),native=true,version=1)
+    @test simple_data["simple_data"]["_text_string"] == ["text"]
+    @test simple_data["simple_data"]["_long_text_string"][1][end-3:end] == "text"
 end
 
 @testset "Native parse CIF2 files" begin

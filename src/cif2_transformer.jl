@@ -45,9 +45,28 @@ strip_string(ss::String) = begin
     return ss[2:end-1]
 end
 
+# We may have a \r\n combo in here so we have to
+# be a little careful. And the cr/lf at the end
+# of the last line is part of the delimiter
 @rule semi_string(t::TreeToCif,args) = begin
-    if length(args) == 2 return String(args[1])[3:end] end
-    return String(args[1])[3:end]*join(String.(args[2:end-1]))
+    all_chars = length(args[1])
+    as_string = String(args[1])
+    no_semi = if as_string[2] == ';'
+        if all_chars > 2 as_string[3:end] else "" end
+    else
+        @assert as_string[3] == ';'
+        if all_chars > 3 as_string[4:end] else "" end
+    end
+    if length(args) == 2 final = no_semi
+    else
+        final = no_semi*join(String.(args[2:end-1]))
+    end
+    # chop off the very last line terminator if present
+    if length(final)>1 && final[end-1:end] == "\r\n"
+        return final[1:end-2]
+    else
+        return final[1:end-1]
+    end
 end
 
 @inline_rule table_entry(t::TreeToCif,key,value) = begin
