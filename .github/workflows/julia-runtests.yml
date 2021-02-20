@@ -9,8 +9,8 @@ jobs:
             LD_LIBRARY_PATH: ${{ github.workspace }}/lib:/usr/lib:/lib:/lib64
     strategy:
       matrix:
-        julia-version: ['1.2', '1', 'nightly']
-        julia-arch: [x64, x86]
+        julia-version: ['1.4', '1', 'nightly']
+        julia-arch: [x64]
         os: [ubuntu-latest, macOS-latest, Windows-latest]
         exclude:
           - os: macOS-latest
@@ -33,14 +33,14 @@ jobs:
         with:
                 coverage: 'false'
       - name: Do the coverage run
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1.4' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
         uses: julia-actions/julia-runtest@latest
       - name: Process the coverage run
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1.4' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
         run: |
                        julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info",process_folder())'
       - name: Upload coverage data
-        if: matrix.julia-version == '1.2' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1.4' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
         uses: coverallsapp/github-action@master
         with:
               github-token: ${{ secrets.GITHUB_TOKEN }}
