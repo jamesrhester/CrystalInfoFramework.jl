@@ -1,5 +1,6 @@
 module CrystalInfoFramework
 using DataFrames
+using FilePaths   #easy cross-platform URI
 using URIParser
 using Lerche #for native parser
 using Libdl  #to find C library if present

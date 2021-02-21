@@ -23,10 +23,7 @@ whatever 25.1 "who dares wins and so forth" ababab
 """
 
 loadin() = begin
-    t = open("testoutput.cif","w")
-    write(t,text_cif)
-    close(t)
-    Cif("testoutput.cif")
+    Cif(text_cif)
 end
 
 @testset "Simple constructions" begin
@@ -34,7 +31,7 @@ end
     t = open("new_testoutput.cif","w")
     show(t,MIME("text/cif"),firstcif)
     close(t)
-    secondcif = Cif("new_testoutput.cif")
+    secondcif = Cif(p"new_testoutput.cif")
     old_b = firstcif["testblock"]
     new_b = secondcif["testblock"]
     for kv in ["_item1","_item2"]

@@ -172,11 +172,11 @@ A CIF data block or save frame containing no nested save frames.
 mutable struct Block{V} <: CifContainer{V}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
-    original_file::String
+    original_file::AbstractPath
 end
 
 Block{V}() where V = begin
-    Block(Vector{String}[],Dict{String,Vector{V}}(),"")
+    Block(Vector{String}[],Dict{String,Vector{V}}(),p"")
 end
 
 """
@@ -186,7 +186,7 @@ mutable struct CifBlock{V} <: NestedCifContainer{V}
     save_frames::Dict{String,Block{V}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
-    original_file::String
+    original_file::AbstractPath
 end
 
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
@@ -302,11 +302,11 @@ recording the source of the collection.
 """
 struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
     contents::Dict{String,T}
-    original_file::String
+    original_file::AbstractPath
 end
 
 Cif{V,T}() where V where T = begin
-    return Cif(Dict{String,T}(),"")
+    return Cif(Dict{String,T}(),p"")
 end
 
 Cif() = Cif{CifValue,CifBlock{CifValue}}
@@ -400,7 +400,7 @@ get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_fi
 mutable struct cif_builder_context
     actual_cif::Dict{String,CifContainer{CifValue}}
     block_stack::Array{CifContainer{CifValue}}
-    filename::String
+    filename::AbstractPath
     verbose::Bool
 end
 
@@ -587,7 +587,7 @@ end
 
 # This sets up the callbacks and configures the cifapi parser.
 
-default_options(s::String;verbose=false) = begin
+default_options(s::AbstractPath;verbose=false) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -618,7 +618,7 @@ default_options(s::String;verbose=false) = begin
 end
 
 """
-    Cif(s::AbstractString;verbose=false)
+    Cif(s::AbstractPath;verbose=false)
 
 Read in filename `s` as a CIF file. If `verbose` is true, print
 progress information during parsing. If `native` is `false`, use the
@@ -628,10 +628,11 @@ the native Julia parser will be used. `version` may be `1`, `2` or
 `version` is only respected by the native parser. The `libcif` parser
 will always auto-detect.  
 """
-Cif(s::AbstractString;verbose=false,native=false,version=0) = begin
+Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
     ## get the full filename
     full = realpath(s)
     if find_library("libcif") != "" && !native
+        pathstring = URI(full).path
         p_opts = default_options(full,verbose=verbose)
         result = cif_tp_ptr(p_opts)
         ## the real result is in our user data context
@@ -639,21 +640,33 @@ Cif(s::AbstractString;verbose=false,native=false,version=0) = begin
     else
         if (!native) println("WARNING: using native parser as libcif not found on system.") end
         full_contents = read(full,String)
-        # strip any BOM
-        if length(full_contents) > 1 && full_contents[1] == '\ufeff'
-            full_contents = full_contents[(nextind(full_contents,1)):end]
-        end
-        if version == 0
-            actual_version = auto_version(full_contents)
-        else
-            actual_version = version
-        end
-        ct = TreeToCif(full)
-        if actual_version == 2
-            return Lerche.transform(ct,Lerche.parse(cif2_parser,full_contents))
-        else
-            return Lerche.transform(ct,Lerche.parse(cif1_parser,full_contents))
-        end
+        Cif(full_contents,verbose=verbose,version=version,source=full)
+    end
+end
+
+"""
+    Cif(s::AbstractString;verbose=false,version=0)
+
+Process contents of `s` as a CIF file using the native Julia parser.
+If `verbose` is true, print progress information during parsing.
+`version` may be `1`, `2` or `0` (default) for auto-detected CIF
+version. If `source` is provided, it is a filesystem location to
+record as the source for `s`.
+"""
+Cif(s::AbstractString;verbose=false,version=0,source=p"") = begin
+    if length(s) > 1 && s[1] == '\ufeff'
+        s = s[(nextind(s,1)):end]
+    end
+    if version == 0
+        actual_version = auto_version(s)
+    else
+        actual_version = version
+    end
+    ct = TreeToCif(source)
+    if actual_version == 2
+        return Lerche.transform(ct,Lerche.parse(cif2_parser,s))
+    else
+        return Lerche.transform(ct,Lerche.parse(cif1_parser,s))
     end
 end
 

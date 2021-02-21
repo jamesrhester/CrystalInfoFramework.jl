@@ -2,17 +2,17 @@
 
 @testset "Testing dictionary access and construction" begin
     @test begin
-        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+        t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))
         true
     end
     @test begin
-        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+        t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))
         String(t["_alias.deprecation_date"][:type][!,:source][]) == "Assigned"
     end
 end
 
 prepare_system() = begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_mag.dic"))
+    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"))
 end
 
 @testset "DDLm_Dictionaries" begin
@@ -21,7 +21,7 @@ end
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
     @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
     # Test child names
-    t = DDLm_Dictionary("cif_core.dic")
+    t = DDLm_Dictionary(p"cif_core.dic")
     @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
     @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label"])
     @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
@@ -44,7 +44,7 @@ end
 end
 
 @testset "Function-related tests for DDLm" begin
-    t = DDLm_Dictionary("cif_core.dic")
+    t = DDLm_Dictionary(p"cif_core.dic")
     ff = get_dict_funcs(t)
     @test ff[1] == "function"
     @test "atomtype" in ff[2]
@@ -60,7 +60,7 @@ end
 end
 
 @testset "Function-related tests for DDL2" begin
-    t = DDL2_Dictionary(joinpath(@__DIR__,"ddl2_with_methods.dic"))
+    t = DDL2_Dictionary(joinpath(@__PATH__,"ddl2_with_methods.dic"))
     ff = get_dict_funcs(t)
     @test ff[1] == nothing
     @test length(ff[2]) == 0
@@ -81,7 +81,7 @@ end
 end
 
 @testset "DDLm reference dictionaries" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+    t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))
     @test "_definition.master_id" in keys(t)
     @test t["_definition.master_id"][:definition].id[] == "_definition.master_id"
     @test find_name(t,"enumeration_set","master_id") == "_enumeration_set.master_id"
@@ -93,7 +93,7 @@ end
 end
 
 @testset "DDL2 dictionaries" begin
-    t = DDL2_Dictionary(joinpath(@__DIR__,"ddl2_with_methods.dic"))
+    t = DDL2_Dictionary(joinpath(@__PATH__,"ddl2_with_methods.dic"))
     @test find_category(t,"_sub_category_examples.case") == "sub_category_examples"
     @test haskey(t,"_category.mandatory_code")
     @test get_keys_for_cat(t,"sub_category") == ["_sub_category.id"]
@@ -120,14 +120,14 @@ end
     testout = open("testout.dic","w")
     show(testout,MIME("text/cif"),t)
     close(testout)
-    new_t = DDLm_Dictionary("testout.dic")
+    new_t = DDLm_Dictionary(p"testout.dic")
     @test t["_atom_site_moment.Cartn"][:definition][!,:update][] == new_t["_atom_site_moment.Cartn"][:definition][!,:update][]
     #
-    t = DDL2_Dictionary("cif_img_1.7.11.dic")
+    t = DDL2_Dictionary(p"cif_img_1.7.11.dic")
     testout = open("testout.dic","w")
     show(testout,MIME("text/cif"),t)
     close(testout)
-    new_t = DDL2_Dictionary("testout.dic")
+    new_t = DDL2_Dictionary(p"testout.dic")
     @test t["_array_element_size.array_id"][:item][!,:category_id] == new_t["_array_element_size.array_id"][:item][!,:category_id]
 end
 

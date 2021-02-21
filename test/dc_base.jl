@@ -5,9 +5,9 @@ using Test
 
 # Test a plain CIF as data source
 
-const cif_test_file = "nick1.cif"
-const multi_block_test_file = "cif_img_1.7.11.dic"
-const core_dic = "cif_core.dic"
+const cif_test_file = p"nick1.cif"
+const multi_block_test_file = p"cif_img_1.7.11.dic"
+const core_dic = p"cif_core.dic"
 
 prepare_files() = begin
     c = Cif(cif_test_file)

@@ -30,7 +30,7 @@ already been processed.
 ==#
 
 struct TreeToCif <: Transformer
-    source_name::String
+    source_name::AbstractPath
 end
 
 @inline_rule quoted_string(t::TreeToCif,st) = begin

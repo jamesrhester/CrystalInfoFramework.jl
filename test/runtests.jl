@@ -3,10 +3,11 @@ using CrystalInfoFramework
 using Test
 using DataFrames
 using Lerche
+using FilePaths
 
 # This just sets up access to a particular block
 prepare_block(filename,blockname;native=false) = begin
-    t = Cif(joinpath(@__DIR__,"test_cifs",filename),native=native)
+    t = Cif(joinpath(@__PATH__,"test_cifs",filename),native=native)
     b = t[blockname]
 end
 

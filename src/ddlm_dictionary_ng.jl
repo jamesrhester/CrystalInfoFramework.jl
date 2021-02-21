@@ -71,13 +71,13 @@ DDLm_Dictionary(c::Cif;ignore_imports=false) = begin
 end
 
 """
-    DDLm_Dictionary(a::String;verbose=false,ignore_imports=false)
+    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
 extra debugging information during reading.`ignore_imports = true` will ignore
 any `import` attributes.
 """
-DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
+DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false) = begin
     DDLm_Dictionary(Cif(a,verbose=verbose),ignore_imports=ignore_imports)
 end
 
@@ -916,18 +916,21 @@ const ddlm_categories = [
 
 
 """
-Turn a possibly relative URL into an absolute one. Will probably fail with pathological
-URLs containing colons early on
+Turn a possibly relative URL into an absolute one. Will probably fail if file
+component starts with "."
 """
-fix_url(s::String,parent::String) = begin
-    if s[1]=='/'
-        return "file://"*s
-    elseif s[1]=="."
-        return "file://"*parent*s[2:end]
-    else
-        return "file://"*parent*"/"*s
+fix_url(s::String,parent) = begin
+    scheme = match(r"^[a-zA-Z]+:",s)
+    if scheme == nothing
+        if s[1]=='/'
+            return URI(Path(s))
+        elseif s[1]=="."  # really shouldn't accept this
+            return URI(joinpath(parent,s))
+        else
+            return URI(joinpath(parent,s))
+        end
     end
-    return s
+    return URI(s)
 end
 
 """
@@ -946,13 +949,12 @@ end
 
 get_import_info(original_dir,import_entry) = begin
     #println("Now processing $import_entry")
-    fixed = fix_url(import_entry["file"],original_dir)
-    url = URI(fixed)
+    url = fix_url(import_entry["file"],original_dir)
     #println("URI is $(url.scheme), $(url.path)")
     if url.scheme != "file"
         error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
     end
-    location = url.path
+    location = Path(url.path)
     block = import_entry["save"]
     mode = get(import_entry,"mode","Contents")
     if_dupl = get(import_entry,"dupl","Exit")

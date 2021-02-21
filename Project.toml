@@ -5,6 +5,7 @@ version = "0.2.1"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+FilePaths = "8fc22ac5-c921-52a6-82fd-178b2807b824"
 Lerche = "d42ef402-04e6-4356-9f73-091573ea58dc"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"

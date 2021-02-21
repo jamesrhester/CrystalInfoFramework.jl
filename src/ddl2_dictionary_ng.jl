@@ -31,12 +31,13 @@ DDL2_Dictionary(c::Cif) = begin
 end
 
 """
-    DDL2_Dictionary(a::String;verbose=false)
+    DDL2_Dictionary(a::AbstractPath;verbose=false)
 
 Create a `DDL2_Dictionary` given filename `a`. `verbose = true` will print
 extra debugging information during reading.
 """
-DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(Cif(a,verbose=verbose))
+DDL2_Dictionary(a::AbstractPath;verbose=false) = DDL2_Dictionary(Cif(a,verbose=verbose))
+DDL2_Dictionary(a::String;verbose=false) = DDL2_Dictionary(Cif(Path(a),verbose=verbose))
 
 DDL2_Dictionary(b::CifBlock,blockname::AbstractString) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
