@@ -192,12 +192,12 @@ end
 """
 A Cif Block is a data source. It implements the dictionary interface.
 """
-DataSource(::Block) = IsDataSource()
+DataSource(::CifContainer) = IsDataSource()
 
 #
 # Blocks have no namespaces so we ignore if supplied
 #
-Base.getindex(x::Block,y::AbstractString,z::AbstractString) = x[y]
+Base.getindex(x::CifContainer,y::AbstractString,z::AbstractString) = x[y]
 
 """
     iterate_blocks(c::NestedCifContainer)
