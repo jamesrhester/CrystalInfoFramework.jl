@@ -106,7 +106,9 @@ end
 end
 
 @inline_rule scalar_item(t::TreeToCif,dataname,datavalue) = begin
-    String(dataname) => CifValue[datavalue]
+    if !ismissing(datavalue)
+        String(dataname) => CifValue[datavalue]
+    end
 end
 
 @inline_rule data(t::TreeToCif,arg) = arg
@@ -156,17 +158,18 @@ add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
 end
 
 add_to_block(data_item::Dict{String,Array{CifValue,1}},cb) = begin
-    new_names = collect(keys(data_item))
-    for nn in new_names
-        if !haskey(cb,nn)
-            cb[nn] = data_item[nn]
-        else
-            throw(error("Duplicate item name $nn"))
-        end
+    for nn in keys(data_item)
+        if haskey(cb,nn) throw(error("Duplicate item name $nn")) end
     end
-    create_loop!(cb,new_names)
+    non_missing = filter(x->any(y->!ismissing(y),data_item[x]),keys(data_item))
+    for nn in non_missing
+        cb[nn] = data_item[nn]
+    end
+    create_loop!(cb,collect(non_missing)) #collect as Array needed
 end
-             
+
+add_to_block(::Nothing,cb) = cb
+
 @rule input(t::TreeToCif,args) = begin
     Cif{CifValue,CifBlock{CifValue}}(Dict{String,CifBlock{CifValue}}(args),t.source_name)
 end

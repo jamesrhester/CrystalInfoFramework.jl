@@ -272,14 +272,14 @@ add_to_loop!(b::CifContainer, tgt, newname) = begin
 end
 
 """
-    create_loop!(b::CifContainer,names::Array{String,1})
+    create_loop!(b::CifContainer,names)
 
 Create a loop in `b` from the datanames in `names`.  Datanames 
 previously assigned to
 other loops are transferred to the new loop. All data attached to `names` 
 should have the same length.
 """
-create_loop!(b::CifContainer,names::Array{String,1}) = begin
+create_loop!(b::CifContainer,names) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) != 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
@@ -665,7 +665,7 @@ not present, the version is assumed to be 1.1. 1.0 is not presently detected.
 """
 auto_version(contents) = begin
     if length(contents) < 10 return 1.1 end
-    if contents[1:10] == r"#\#CIF_2.0" return 2 else return 1.1 end
+    if contents[1:10] == raw"#\#CIF_2.0" return 2 else return 1.1 end
 end
 
 # Given a filename, parse and return a CIF object according to the provided options.
