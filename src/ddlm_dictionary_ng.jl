@@ -934,6 +934,20 @@ fix_url(s::String,parent) = begin
 end
 
 """
+    to_path(::URI)
+
+Convert a file: URI to a Path.
+Really belongs in FilePaths.jl but for now this will work.
+"""
+to_path(u::URI) = begin
+    if Sys.iswindows()
+        Path(u.path[2:end])
+    else
+        Path(u.path)
+    end
+end
+
+"""
     resolve_imports!(d::Dict{Symbol,DataFrame},original_file)
 
 Replace all `_import.get` statements with the contents of the imported dictionary.
@@ -954,7 +968,7 @@ get_import_info(original_dir,import_entry) = begin
     if url.scheme != "file"
         error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
     end
-    location = Path(url.path)
+    location = to_path(url)
     block = import_entry["save"]
     mode = get(import_entry,"mode","Contents")
     if_dupl = get(import_entry,"dupl","Exit")
