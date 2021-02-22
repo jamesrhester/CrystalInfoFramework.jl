@@ -1,5 +1,6 @@
 [deps]
 CrystalInfoFramework = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FilePaths = "8fc22ac5-c921-52a6-82fd-178b2807b824"
 
