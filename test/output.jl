@@ -10,9 +10,10 @@ data_testblock
 ;
     Fancy string with stuff in it
 ;
+   _Item3 'case should not matter'
 
 loop_
-  _myname1
+  _myName1
   _myname2
   _myname3
 whatever 25.1 "who dares wins and so forth" ababab
@@ -23,7 +24,7 @@ whatever 25.1 "who dares wins and so forth" ababab
 """
 
 loadin() = begin
-    Cif(text_cif)
+    Cif(text_cif)   #native parser
 end
 
 @testset "Simple constructions" begin
@@ -34,7 +35,7 @@ end
     secondcif = Cif(p"new_testoutput.cif")
     old_b = firstcif["testblock"]
     new_b = secondcif["testblock"]
-    for kv in ["_item1","_item2"]
+    for kv in ["_item1","_item2","_item3"]
         @test old_b[kv] == new_b[kv]
     end
     # test loops by indexing with _myname1
@@ -60,4 +61,9 @@ end
     @test format_for_cif(really_tricky) == "'''$really_tricky'''"
     @test format_for_cif("_atom_site_u_iso_or_equiv") == "'_atom_site_u_iso_or_equiv'"
     @test format_for_cif("data_validation_number") == "'data_validation_number'"
+end
+
+@testset "Straight in and out" begin
+    @test begin show(stdout,MIME("text/cif"),Cif(p"nick1.cif"));true end
+    @test begin show(stdout,MIME("text/cif"),Cif(p"nick1.cif",native=true));true end
 end

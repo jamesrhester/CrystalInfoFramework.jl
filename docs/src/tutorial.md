@@ -8,9 +8,9 @@ To open CIF file `demo.cif`, and read `_cell.length_a` from block `saly2_all_ani
 
 ```jldoctest nick1
 
-using CrystalInfoFramework, DataFrames
+using CrystalInfoFramework, DataFrames, FilePaths
 
-nc = Cif("demo.cif")
+nc = Cif(p"demo.cif")
 my_block = nc["saly2_all_aniso"]  #could also use first(nc).second
 my_block["_cell.length_a"]
 
@@ -80,7 +80,7 @@ The number of values in the array assigned to `_new_loop_item` must match
 the length of the loop it is added to - this is checked.
 
 A completely new loop can be created with [`create_loop!`](@ref).  The
-columns corresponding to the data names provided to `create_loop` must 
+columns corresponding to the data names provided to `create_loop!` must 
 have previously been added to the data block, just like for
 [`add_to_loop!`](@ref).
 
@@ -110,7 +110,7 @@ dictionaries are published by the Protein Data Bank (wwPDB) and DDLm
 dictionaries are used by the IUCr.
 
 ```julia
-d = DDLm_Dictionary("cif_core.dic")
+d = DDLm_Dictionary(p"cif_core.dic")
 ```
 
 ### DataSources
@@ -118,7 +118,7 @@ d = DDLm_Dictionary("cif_core.dic")
 CIF dictionaries can be used with any `DataSource`, providing
 that the datasource recognises the data names defined in the dictionary.
 
-A `DataSource` is any data source returning an array of values when
+A `DataSource` is any object returning an array of values when
 supplied with a string.  A CIF `Block` conforms to this
 specification, as does a simple `Dict{String,Any}`.  `DataSource`s 
 are defined in submodule `CrystalInfoFramework.DataContainer`.
@@ -129,7 +129,7 @@ creating a [`TypedDataSource`](@ref):
 
 ```jldoctest nick1
 using CrystalInfoFramework.DataContainer
-my_dict = DDLm_Dictionary("../test/cif_core.dic")
+my_dict = DDLm_Dictionary(p"../test/cif_core.dic")
 bd = TypedDataSource(my_block,my_dict)
 bd["_cell.length_a"]
 
@@ -172,7 +172,7 @@ A file format can be used with CIF dictionaries if:
 1. It returns an `Array` of values when provided with a data name defined in the dictionary
 2. `Array`s returned for data names from the same CIF category have corresponding values at the same position in the array - that is, they line up correctly if presented as columns in a table.
 
-At a minimum, the following methods should work with the `DataSource`: 
+At a minimum, the following methods should be defined for the `DataSource`: 
 `getindex`, `haskey`.
 
 If the above are true of your type, then it is sufficient to define
@@ -189,7 +189,7 @@ objects can be built to form hierarchies.
 
 A `TypedDataSource` consists of a `DataSource` and a CIF dictionary.
 
-Values returned from a `TypedDataSource` are of the appropriate
+Values returned from a `TypedDataSource` are transformed to the appropriate
 Julia type as specified by the dictionary *if* the underlying 
 `DataSource` returns `String` values formatted in a way that Julia `parse`
 can understand.  Otherwise, the `DataSource` is responsible
@@ -197,8 +197,8 @@ for returning the appropriate Julia type. Future improvements
 may add user-defined transformations if that proves necesssary.
 
 A `NamespacedTypedDataSource` includes data from multiple namespaces.
-Correctly-typed data for a particular namespace can then be obtained by 
-`select_namespace(t::NamespacedTypedDataSource,nspace)`.
+Correctly-typed data for a particular namespace can then be obtained from 
+the object returned by `select_namespace(t::NamespacedTypedDataSource,nspace)`.
 
 ## Cif Categories from DataSources
 
@@ -271,7 +271,8 @@ one_row.fract_x
 
 If a category key consists multiple data names, a `Dict{Symbol,V}` should
 be provided as the indexing value, where `Symbol` is the `object_id` of
-the particular data name forming part of the key.
+the particular data name forming part of the key and `V` is the type of
+the values.
 
 A category can be iterated over as usual, with the value of each dataname
 for each row available as a property:

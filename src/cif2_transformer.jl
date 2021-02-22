@@ -102,7 +102,7 @@ end
     if m!=0 throw(error("Number of values in loop containing $(name_list[1]) is not a multiple of number of looped names")) end
     new_vals = reshape(value_list,length(name_list),:)
     per_name = permutedims(new_vals,[2,1])
-    Dict{String,Array{CifValue,1}}(zip(name_list,eachcol(per_name)))
+    Dict{String,Array{CifValue,1}}(zip(lowercase.(name_list),eachcol(per_name)))
 end
 
 @inline_rule scalar_item(t::TreeToCif,dataname,datavalue) = begin
@@ -151,7 +151,7 @@ end
 add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
     k,v = data_item
     if !haskey(cb,k)
-        cb[k] = v
+        cb[lowercase(k)] = v
     else
         throw(error("Duplicate item name $k"))
     end

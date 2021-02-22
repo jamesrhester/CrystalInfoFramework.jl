@@ -5,7 +5,8 @@
 A `Cif` is a collection of `CifContainer`s indexed by a `String` label.
 
 ```@docs
-Cif(s::AbstractString;verbose=false)
+Cif(s::AbstractPath;verbose=false,native=false,version=0)
+Cif(s::AbstractString;verbose=false,version=0,source=p"")
 keys(c::Cif)
 first(c::Cif)
 length(c::Cif)
@@ -73,8 +74,8 @@ use the DDLm attribute set.
 
 ```@docs
 DDLm_Dictionary
-DDLm_Dictionary(c::Cif)
-DDLm_Dictionary(a::String;verbose=false)
+DDLm_Dictionary(c::Cif;ignore_imports=false)
+DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false)
 keys(d::DDLm_Dictionary)
 getindex(d::DDLm_Dictionary,k)
 delete!(d::DDLm_Dictionary,k::String)
@@ -99,7 +100,7 @@ Protein Data Bank (wwPDB).
 ```@docs
 DDL2_Dictionary
 DDL2_Dictionary(c::Cif)
-DDL2_Dictionary(a::String;verbose=false)
+DDL2_Dictionary(a::AbstractPath;verbose=false)
 keys(d::DDL2_Dictionary)
 getindex(d::DDL2_Dictionary,k)
 get_categories(d::DDL2_Dictionary)

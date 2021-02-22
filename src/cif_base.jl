@@ -618,7 +618,7 @@ default_options(s::AbstractPath;verbose=false) = begin
 end
 
 """
-    Cif(s::AbstractPath;verbose=false)
+    Cif(s::AbstractPath;verbose=false,native=false,version=0)
 
 Read in filename `s` as a CIF file. If `verbose` is true, print
 progress information during parsing. If `native` is `false`, use the
@@ -645,7 +645,7 @@ Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
 end
 
 """
-    Cif(s::AbstractString;verbose=false,version=0)
+    Cif(s::AbstractString;verbose=false,version=0,source=p"")
 
 Process contents of `s` as a CIF file using the native Julia parser.
 If `verbose` is true, print progress information during parsing.

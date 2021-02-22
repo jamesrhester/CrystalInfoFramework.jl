@@ -81,6 +81,10 @@ DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false) = begin
     DDLm_Dictionary(Cif(a,verbose=verbose),ignore_imports=ignore_imports)
 end
 
+DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
+    DDLm_Dictionary(Path(a),verbose=verbose,ignore_imports=ignore_imports)
+end
+
 DDLm_Dictionary(b::CifBlock;ignore_imports=false) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
