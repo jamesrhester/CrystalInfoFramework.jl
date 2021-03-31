@@ -14,6 +14,9 @@ _long_text_string
 ; texty text text
  texty text text
  more text
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 ;
 _numb_plain      1.25e+03
 _numb_su         0.0625(2)

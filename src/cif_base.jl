@@ -566,7 +566,10 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
         val = cif_list(b)
     elseif syntax_type == cif_table
         val = cif_table(b)
-    else val = syntax_type()
+    elseif syntax_type == Nothing
+        val = nothing
+    elseif syntax_type == Missing
+        val = missing
     end
     if c.verbose
         if !ismissing(val) && val != nothing

@@ -231,6 +231,8 @@ filter_def(catobj,val,d::DDLm_Dictionary) = begin
     end
     # fix up with same dictionary header
     info_dict[:dictionary] = d[:dictionary]
+    hc = find_head_category(d)
+    add_head_category!(info_dict,hc)
     return DDLm_Dictionary(info_dict,d.namespace)
 end
 

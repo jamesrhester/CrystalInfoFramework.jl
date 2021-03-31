@@ -1,7 +1,5 @@
 # The Native CIF parser
 
-using Serialization
-
 #==
 
 We use the Lerche EBNF parser-generator to create a parser from
@@ -14,8 +12,11 @@ representation of a CIF file.
 
 # The parser is prebuilt (see deps/build.jl) and deserialised here.
 # If this fails, consider running 'build.jl' again
+include("cif2.ebnf")
+include("cif1.ebnf")
 
-const cif1_parser, cif2_parser = Serialization.deserialize(joinpath(@__DIR__,"..","deps","cif_grammar_serialised.jli"))
+const cif1_parser = Lerche.Lark(_cif1_grammar_spec,start="input",parser="lalr",lexer="contextual")
+const cif2_parser = Lerche.Lark(_cif2_grammar_spec,start="input",parser="lalr",lexer="contextual")
 
 #==
 == Introduction ==
@@ -32,6 +33,10 @@ already been processed.
 struct TreeToCif <: Transformer
     source_name::AbstractPath
 end
+
+# No token functions defined at present
+# And false is much, much faster
+visit_tokens(t::TreeToCif) = false
 
 @inline_rule quoted_string(t::TreeToCif,st) = begin
     ss = String(st)
