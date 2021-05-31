@@ -55,6 +55,7 @@ struct DDLm_Dictionary <: AbstractCifDictionary
     def_meths::Dict{Tuple,Function}
     def_meths_text::Dict{Tuple,Expr}
     namespace::String
+    header_comments::String
 end
 
 """
@@ -67,7 +68,7 @@ DDLm_Dictionary(c::Cif;ignore_imports=false) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
-    return DDLm_Dictionary(first(c).second,ignore_imports=ignore_imports)
+    return DDLm_Dictionary(first(c).second,ignore_imports=ignore_imports,header=get_header_comments(c))
 end
 
 """
@@ -85,7 +86,7 @@ DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
     DDLm_Dictionary(Path(a),verbose=verbose,ignore_imports=ignore_imports)
 end
 
-DDLm_Dictionary(b::CifBlock;ignore_imports=false) = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="") = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -130,17 +131,18 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=false) = begin
     if !ignore_imports
         resolve_imports!(all_dict_info,b.original_file)
     end
-    DDLm_Dictionary(all_dict_info,nspace)
+    DDLm_Dictionary(all_dict_info,nspace,header=header)
 end
 
 """
-    DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace)
+    DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace,header="")
 
 The symbol keys in `attr_dict` are DDLm attribute categories, 
 and the columns in the indexed `DataFrame`s are the object_ids 
-of the DDLm attributes of that category.
+of the DDLm attributes of that category. `header` are optional comments
+to be output at the top of the dictionary.
 """
-DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
+DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace;header="") = begin
     # Apply default values if not a template dictionary
     if attr_dict[:dictionary][!,:class][] != "Template"
         enter_defaults(attr_dict)
@@ -153,7 +155,7 @@ DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace) = begin
     for k in keys(attr_dict)
         gdf[k] = groupby(attr_dict[k],:master_id)
     end
-    DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace)
+    DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace,header)
 end
 
 """
@@ -1340,5 +1342,14 @@ Return the DDLm container type for `dataname` according to `cdic`.
 """
 get_container_type(cdic::DDLm_Dictionary,dataname) = begin
     return cdic[dataname][:type][!,:container][]
+end
+
+"""
+    get_implicit_list(d::DDLm_Dictionary)
+
+Return a list of cat/columns that should not be included in the output
+"""
+get_implicit_list(d::DDLm_Dictionary) = begin
+    return ()
 end
 

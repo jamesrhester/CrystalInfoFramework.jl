@@ -303,10 +303,11 @@ recording the source of the collection.
 struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
     contents::Dict{String,T}
     original_file::AbstractPath
+    header_comments::String
 end
 
 Cif{V,T}() where V where T = begin
-    return Cif(Dict{String,T}(),p"")
+    return Cif(Dict{String,T}(),p"","")
 end
 
 Cif() = Cif{CifValue,CifBlock{CifValue}}
@@ -368,6 +369,7 @@ correct CIF. To display `c` as a CIF file, use
 `::MIME"text/cif"`.
 """
 show(io::IO,::MIME"text/plain",c::Cif) = begin
+    write(io,c.header_comments)
     for k in keys(c)
         write(io,"data_$k\n")
         show(io,c[k])
@@ -376,6 +378,7 @@ end
 
 get_contents(n::Cif) = n.contents
 get_source_file(n::Cif) = n.original_file
+get_header_comments(n::Cif) = n.header_comments
 
 # Obtaining save frames.
 
@@ -384,7 +387,7 @@ get_source_file(n::Cif) = n.original_file
 
 Return all nested CIF containers in `f` as a `Cif` object.
 """
-get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_file(f))
+get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_file(f),"")
 
 # **Interface to low-level C API**
 
@@ -639,7 +642,7 @@ Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
         p_opts = default_options(full,verbose=verbose)
         result = cif_tp_ptr(p_opts)
         ## the real result is in our user data context
-        return Cif(p_opts.user_data.actual_cif,full)
+        return Cif(p_opts.user_data.actual_cif,full,"")
     else
         if (!native) println("WARNING: using native parser as libcif not found on system.") end
         full_contents = read(full,String)
@@ -665,7 +668,7 @@ Cif(s::AbstractString;verbose=false,version=0,source=p"") = begin
     else
         actual_version = version
     end
-    ct = TreeToCif(source)
+    ct = TreeToCif(source,get_header_comments(s))
     if actual_version == 2
         return Lerche.transform(ct,Lerche.parse(cif2_parser,s))
     else
@@ -682,6 +685,24 @@ not present, the version is assumed to be 1.1. 1.0 is not presently detected.
 auto_version(contents) = begin
     if length(contents) < 10 return 1.1 end
     if contents[1:10] == raw"#\#CIF_2.0" return 2 else return 1.1 end
+end
+
+"""
+    get_header_comments(contents)
+
+Extract any block of comments found before the first data block, without the comment
+characters.
+"""
+get_header_comments(contents) = begin
+    finder = r"^(#(.+)\n)+"
+    x = match(finder,contents)
+    if x === nothing return "" end
+    no_comment = replace(x.match,r"^#"m => "")
+    if length(no_comment) > 6 && no_comment[1:6] == "\\#CIF_"
+        first_line_end = findfirst('\n',no_comment)
+        no_comment = no_comment[first_line_end+1:end]
+    end
+    return no_comment
 end
 
 # Given a filename, parse and return a CIF object according to the provided options.

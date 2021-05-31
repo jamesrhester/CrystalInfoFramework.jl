@@ -32,6 +32,7 @@ already been processed.
 
 struct TreeToCif <: Transformer
     source_name::AbstractPath
+    header_comments::AbstractString
 end
 
 # No token functions defined at present
@@ -46,7 +47,7 @@ end
 strip_string(ss::String) = begin
     if length(ss) < 6 return ss[2:end-1] end
     if ss[1:3] == "'''" || ss[1:3] == "\"\"\""
-        return ss[4:end-4] end
+        return ss[4:end-3] end
     return ss[2:end-1]
 end
 
@@ -176,5 +177,5 @@ end
 add_to_block(::Nothing,cb) = cb
 
 @rule input(t::TreeToCif,args) = begin
-    Cif{CifValue,CifBlock{CifValue}}(Dict{String,CifBlock{CifValue}}(args),t.source_name)
+    Cif{CifValue,CifBlock{CifValue}}(Dict{String,CifBlock{CifValue}}(args),t.source_name,t.header_comments)
 end

@@ -470,7 +470,7 @@ get_container_type(cdic::DDL2_Dictionary,dataname) = "Single"
 #
 # We always want item.name to be printed.
 #
-get_implicit_list() = begin
+get_implicit_list(cdic::DDL2_Dictionary) = begin
     all_imps = map(x->x[2:end],implicits)
     filter!(x-> !(x in ["item.name","item.category_id",
                         "item_linked.parent_name"]),all_imps)
