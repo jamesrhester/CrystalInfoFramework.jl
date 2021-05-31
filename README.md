@@ -5,7 +5,9 @@
 Julia tools for working with the
 [Crystallographic Information Framework](https://www.iucr.org/resources/cif), 
 including reading data files in Crystallographic Information Format (CIF) 
-versions 1 and 2 (this includes mmCIF files from the PDB). The tools also
+versions 1 and 2 (this includes mmCIF files from the PDB). As CIF format is a 
+significant subset of STAR format, files in STAR format are
+likely to read in without problems. The tools also
 understand dictionaries written in DDLm and DDL2, which can be used to return correct
 types and find aliased datanames (note that this includes the PDB
 mmCIF dictionaries).

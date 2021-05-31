@@ -27,7 +27,6 @@ jobs:
       - name: Build package
         run:  |
                 julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.status();'
-                julia --project deps/build.jl
       - name: Run test no coverage
         uses: julia-actions/julia-runtest@latest
         with:
