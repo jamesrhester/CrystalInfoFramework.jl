@@ -53,6 +53,12 @@ which_prefix(value::AbstractString) = begin
     return ("","CIF")
 end
 
+which_prefix(lines::Array) = begin
+    bad = filter(x->length(x)>1 && x[1]==';',lines)
+    if length(bad) > 0 return (">","2.1.8") end
+    return ("","CIF")
+end
+
 """
     format_for_cif(val)
 
@@ -68,7 +74,7 @@ function format_for_cif end
     format_for_cif(val::AbstractString;delim=nothing,cif1=false)
 
 Return `val` formatted as a text string for output in
-a CIF2 file.  Line folding and prefixing is not used.
+a CIF2 file.  Line folding is not used.
 
 If `cif1`, triple-quoted strings
 will never be output, but output will fail if the
@@ -76,11 +82,16 @@ supplied string contains the "\n;" digraph.  For `cif1`,
 non-ASCII code points in `val` are output despite
 this being a violation of the CIF1 standard.
 
-If `pretty`, semicolon-delimited strings will be indented
-by `text_indent` spaces.
+If `pretty`, permission is granted to remove and insert whitespace
+in multi-line strings to produce nicely spaced and indented text,
+including removal of leading and trailing whitespace, which may
+result in a single-line data value.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,kwargs...) = begin
     if delim === nothing
+        if pretty
+            val = strip(val)
+        end
         delim,_ = which_delimiter(val)
     end
     prefix,_ = which_prefix(val)
@@ -89,7 +100,7 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,kwargs.
     end
     if delim == "\n;"
         if pretty   #
-            return format_cif_text_string(val,prefix=prefix)
+            return format_cif_text_string(val,prefix=prefix,justify=true)
         elseif prefix != ""
             return delim*apply_prefix_protocol(val,prefix=prefix)*delim
         end
@@ -97,7 +108,7 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,kwargs.
     return delim*val*delim
 end
 
-format_for_cif(val::Real;kwargs...) = begin
+format_for_cif(val::Real;dummy=0,kwargs...) = begin
     return "$val"
 end
 
@@ -168,8 +179,9 @@ Format string `value` as a CIF semicolon-delimited string,
 inserting `indent` characters at the beginning of each line and
 with no lines greater than `line_length`, removing trailing space. If
 `justify` is true, each line will be filled as close as possible
-to the maximum length, which could potentially spoil formatting like
-centering or ASCII equations.
+to the maximum length and all spaces replaced by a single space,
+which could potentially spoil formatting like centering, tabulation
+or ASCII equations.
 """
 format_cif_text_string(value;indent=text_indent,width=line_length,justify=false,prefix="") = begin
     if occursin("\n",value)
@@ -188,7 +200,9 @@ format_cif_text_string(value;indent=text_indent,width=line_length,justify=false,
     old_indent = min(map(x->length(match(r"^\s*",x).match),have_indent)...)
     if justify   # all one line
         t = map(lines) do x
-            if match(r"\S+",x) !== nothing x[old_indent+1:end]
+            # remove all non-start multi-spaces
+            r = replace(x,r"(\S+)\s+"=>s"\1 ")
+            if match(r"\S+",r) !== nothing x[old_indent+1:end]
             else
                 x
             end
@@ -215,9 +229,13 @@ format_cif_text_string(value;indent=text_indent,width=line_length,justify=false,
         push!(reflowed,final)
     end
     # Now apply prefix
-    assembled = join(reflowed,"\n")
-    prefixed = apply_prefix_protocol(assembled,prefix=which_prefix(assembled)[1])
-    return "\n;"*prefixed*"\n;"
+    prefix,_ = which_prefix(reflowed)
+    assembled = join(reflowed,"\n"*prefix)
+    if prefix == ""
+        return "\n;\n"*assembled*"\n;"
+    else
+        return "\n;"*prefix*"\\\n"*prefix*assembled*"\n;"
+    end
 end
 
 """
