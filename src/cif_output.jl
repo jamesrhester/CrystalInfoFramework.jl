@@ -115,7 +115,7 @@ end
 format_for_cif(val::Missing;kwargs...) = "?"
 format_for_cif(val::Nothing;kwargs...) = "."
 
-format_for_cif(val::Array;indent=value_indent,max_length=line_length,level=1,kwargs...) = begin
+format_for_cif(val::Array;indent=6,max_length=80,level=1,kwargs...) = begin
     outstring = IOBuffer()
     if level > 2
         write(outstring,"\n"*' '^(value_indent + 2*level))
