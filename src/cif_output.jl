@@ -46,6 +46,13 @@ end
 
 which_delimiter(value) = ("","CIF")
 
+which_prefix(value) = ("","CIF")
+
+which_prefix(value::AbstractString) = begin
+    if occursin("\n;", value) return (">","2.1.8") end
+    return ("","CIF")
+end
+
 """
     format_for_cif(val)
 
@@ -76,14 +83,18 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,kwargs.
     if delim === nothing
         delim,_ = which_delimiter(val)
     end
+    prefix,_ = which_prefix(val)
     if delim == "\n;" && occursin("\n;",val) && cif1
         throw(error("$val cannot be formatted using CIF1 syntax"))
     end
-    if delim == "\n;" && pretty
-        return format_cif_text_string(val)
-    else
-        return delim*val*delim
+    if delim == "\n;"
+        if pretty   #
+            return format_cif_text_string(val,prefix=prefix)
+        elseif prefix != ""
+            return delim*apply_prefix_protocol(val,prefix=prefix)*delim
+        end
     end
+    return delim*val*delim
 end
 
 format_for_cif(val::Real;kwargs...) = begin
@@ -151,7 +162,7 @@ format_for_cif(val::Dict;indent=value_indent,max_length=line_length,level=1,kwar
 end
 
 """
-    format_cif_text_string(value,indent=text_indent,width=line_length,justify=false)
+    format_cif_text_string(value,indent=text_indent,width=line_length,prefix="",justify=false)
 
 Format string `value` as a CIF semicolon-delimited string,
 inserting `indent` characters at the beginning of each line and
@@ -160,7 +171,7 @@ with no lines greater than `line_length`, removing trailing space. If
 to the maximum length, which could potentially spoil formatting like
 centering or ASCII equations.
 """
-format_cif_text_string(value;indent=text_indent,width=line_length,justify=false) = begin
+format_cif_text_string(value;indent=text_indent,width=line_length,justify=false,prefix="") = begin
     if occursin("\n",value)
         lines = split(value,"\n")
     else
@@ -203,7 +214,10 @@ format_cif_text_string(value;indent=text_indent,width=line_length,justify=false)
         remainder,final = reduce_line(" "^text_indent*remainder,width)
         push!(reflowed,final)
     end
-    return "\n;\n"*join(reflowed,"\n")*"\n;"
+    # Now apply prefix
+    assembled = join(reflowed,"\n")
+    prefixed = apply_prefix_protocol(assembled,prefix=which_prefix(assembled)[1])
+    return "\n;"*prefixed*"\n;"
 end
 
 """
@@ -220,6 +234,14 @@ reduce_line(line,max_length) = begin
     end
     if cut === nothing return "",line end
     return line[cut+1:end],line[1:cut-1]
+end
+
+# Insert a prefix or blank first line
+apply_prefix_protocol(val::AbstractString;prefix="") = begin
+    if prefix != ""
+        return "$prefix\\\n$prefix"*replace(val, "\n"=>"\n$prefix")
+    else return val
+    end
 end
 
 """

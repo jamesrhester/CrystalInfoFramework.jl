@@ -140,7 +140,7 @@ end
 # If a symbol is passed we access the block directly.
 getindex(d::DDL2_Dictionary,k::Symbol) = getindex(d.block,k)
 
-get_dic_name(d::DDL2_Dictionary) = d.block[:dictionary][:title][]
+get_dic_name(d::DDL2_Dictionary) = d.block[:dictionary][!,:title][]
 
 get_dic_namespace(d::DDL2_Dictionary) = "ddl2"  #single namespace
 
@@ -343,10 +343,10 @@ populate_implicits(all_tables) = begin
         if cat in cats
             target_name = objs[indexin([cat],cats)[]]
             if !(target_name in propertynames(table))
-                table[target_name] = copy(table.__blockname)
+                table[!,target_name] = copy(table.__blockname)
                 println("Added implicit value for $cat.$target_name")
             else
-                table[target_name] = CaselessString.(table[target_name])
+                table[!,target_name] = CaselessString.(table[!,target_name])
             end
         end
     end

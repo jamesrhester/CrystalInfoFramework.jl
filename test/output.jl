@@ -56,9 +56,9 @@ end
     tricky_line = "this line has a carriage \n return and an ' so tricky"
     @test format_for_cif(tricky_line) == "\n;$tricky_line\n;"
     really_tricky = "this line has \n; and ''' oh dear"
-    @test format_for_cif(really_tricky) == "\"\"\"$really_tricky\"\"\""
+    @test format_for_cif(really_tricky) == "\n;>\\\n>this line has \n>; and ''' oh dear\n;"
     really_tricky = "this line has \n; and \"\"\" oh dear"
-    @test format_for_cif(really_tricky) == "'''$really_tricky'''"
+    @test format_for_cif(really_tricky) == "\n;>\\\n>this line has \n>; and \"\"\" oh dear\n;"
     @test format_for_cif("_atom_site_u_iso_or_equiv") == "'_atom_site_u_iso_or_equiv'"
     @test format_for_cif("data_validation_number") == "'data_validation_number'"
 end
