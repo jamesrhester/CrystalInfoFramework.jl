@@ -242,12 +242,21 @@ end
 
 filter_on_name(d::Dict{Symbol,GroupedDataFrame},k) = begin
     info_dict = Dict{Symbol,DataFrame}()
+    trial = DataFrame()
     for cat in keys(d)
         try
-            info_dict[cat] = d[cat][(master_id = k,)]
+            trial = d[cat][(master_id = k,)]
         catch KeyError
-            info_dict[cat] = DataFrame()
+            trial = DataFrame()
         end
+        # find columns that are not all missing
+        keep_cols = filter(x-> any(y->!ismissing(y),trial[!,x]),propertynames(trial))
+        newdf = DataFrame()
+        for k in keep_cols
+            newdf[!,k] = trial[!,k]
+        end
+        info_dict[cat] = newdf
+        #select!(info_dict[cat],keep_cols...)
     end
     return info_dict
 end
@@ -358,7 +367,10 @@ find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:objec
 
 Return true if `name` is a category according to `d`.
 """
-is_category(d::DDLm_Dictionary,name) = :scope in propertynames(d[name][:definition]) ? d[name][:definition][!,:scope][] == "Category" : false
+is_category(d::DDLm_Dictionary,name) = begin
+    definfo = d[name][:definition]
+    :scope in propertynames(definfo) ? definfo[!,:scope][] == "Category" : false
+end
 
 """
     get_categories(d::DDLm_Dictionary)
@@ -521,8 +533,32 @@ end
 Find the parent category of `child` according to `d`.
 """
 get_parent_category(d::DDLm_Dictionary,child) = begin
-    lowercase(d[child][:name][!,:category_id][])
+    try
+        lowercase(d[child][:name][!,:category_id][])
+    catch
+        return child
+    end
 end
+
+"""
+    is_parent(d::DDLm_Dictionary,parent,child)
+
+Returns true if `parent` is a direct or indirect parent of `child`
+"""
+
+is_parent(d::DDLm_Dictionary,parent,child) = begin
+    p = get_parent_category(d,child)
+    while p != parent
+        q = get_parent_category(d,p)
+        if q == p
+            break
+        else
+            p = q
+        end
+    end
+    return p == parent
+end
+
 
 """
     get_child_categories(d::DDLm_Dictionary,parent)
