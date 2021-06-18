@@ -249,6 +249,8 @@ a single space, which could potentially spoil formatting like centering, tabulat
 or ASCII equations.
 """
 format_cif_text_string(value::AbstractString;loop=false,width=line_length,justify=false,prefix="",kwargs...) = begin
+    # catch pathological all whitespace values
+    if match(r"^\s+$",value) !== nothing return "\n;$value\n;" end
     if occursin("\n",value)
         lines = split(value,"\n")
     else
@@ -256,7 +258,6 @@ format_cif_text_string(value::AbstractString;loop=false,width=line_length,justif
     end
     reflowed = []
     remainder = ""
-    # remove empty lines at top
     while strip(lines[1]) == "" lines = lines[2:end] end
     # remove empty lines at bottom
     while strip(lines[end]) == "" pop!(lines) end
@@ -361,6 +362,7 @@ format_for_cif(df::DataFrame;catname=nothing,indent=[text_indent,value_col],
         outname = "_"*catname*"."
     end
     # remove missing columns
+    order = intersect(order,propertynames(df))               
     colnames = setdiff(sort!(propertynames(df)),order)
     final_list = filter(collect(Iterators.flatten((order,colnames)))) do n
         !(all(x->ismissing(x),df[!,n]))
@@ -413,7 +415,7 @@ Return minimum and maximum possible widths for this value when
 formatting. Min and max only have meaning for compound data
 values, which may be split in different ways.
 """
-layout_length(x::String;level=1,delim=nothing) = begin
+layout_length(x::AbstractString;level=1,delim=nothing) = begin
     if occursin("\n",x) || delim == "\n;"
         return fill(line_length,2)
     end
@@ -546,6 +548,7 @@ calc_ideal_spacing(colwidths) = begin
         interim = [indent]
         #println("Starting line, column $calc_col")
         if colwidths[calc_col].lower + indent > line_length
+            push!(calc_widths,line_length)
             finish_line()
             interim = []
         elseif colwidths[calc_col].upper + indent <= line_length
@@ -567,6 +570,7 @@ calc_ideal_spacing(colwidths) = begin
             line = line + 1
             return
         end
+        #println("End of line: $calc_starts $interim $calc_widths")
         final_col = length(calc_starts) + length(interim)
         final_pos = interim[end] + calc_widths[final_col]
         #println("Final width $final_pos")
@@ -643,6 +647,7 @@ const ddlm_attribute_order = (:definition => (:id,:scope,:class),
                          )
 
 const ddlm_no_justify = (:method,:description,:description_example) #do not reformat items in this category
+const ddl2_no_justify = (:category,:category_examples,:item,:item_examples)
 # Always use semicolon delimiters
 const ddlm_semicolons = Dict(:description=>(:text,),:method=>(:expression,))
 """
@@ -660,6 +665,12 @@ show_one_def(io,def_name,info_dic;implicits=[],ordering=ddlm_attribute_order) = 
     blank_line = true  #if previous line was blank to avoid double blanks
     # cats in ordering are dealt with first
     # append!(ordering,keys(info_dic))
+    if length(ordering) == 0
+        ordering = []
+        for (k,df) in info_dic
+            push!(ordering,(k,setdiff(propertynames(df),(:master_id,:__blockname,:__object_id))))
+        end
+    end
     leftover = Dict()
     final_chance = Dict()
     for (k,df) in info_dic
@@ -676,7 +687,7 @@ show_one_def(io,def_name,info_dic;implicits=[],ordering=ddlm_attribute_order) = 
         if nrow(df) == 0 continue end
         final_chance[cat] = final_chance[cat] - 1
         out_order = filter(x-> x in propertynames(df),objs)
-        justify = !(cat in ddlm_no_justify)
+        justify = !(cat in ddlm_no_justify) && !(cat in ddl2_no_justify)
         semis = get(ddlm_semicolons,cat,())
         if nrow(df) == 1
             if length(out_order) > 0
@@ -730,7 +741,8 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
     if nrow(df) > 1
         throw(error("Request to output multi-row dataframe for $cat as single row"))
     end
-    colnames = length(order)>0 ? order : sort!(propertynames(df))
+    pn = propertynames(df)
+    colnames = length(order)>0 ? intersect(order,pn) : sort!(pn)
     leftindent = " "^indents[1]
     for cl in colnames
         if cl in [:master_id,:__blockname,:__object_id] continue end
@@ -939,13 +951,19 @@ end
 
 get_sorted_cats(d,cat) = begin
     cc = get_categories(d)
-    catinfo = [(c,get_parent_category(d,c)) for c in cc]
-    return recurse_sort(cat,catinfo)
+    catinfo = sort!([(c,get_parent_category(d,c)) for c in cc])
+    filter!(x->x[1]!=x[2],catinfo)
+    sorted = recurse_sort(cat,catinfo)
+    if length(sorted) != length(catinfo) - 1 #all except head
+        orig = [x[1] for x in catinfo]
+        throw(error("Missing categories after sort: $(setdiff(orig,sorted))"))
+    end
+    return sorted
 end
 
 recurse_sort(cat,l) = begin
     final = []
-    children = sort(filter(x->x[2]==cat,l))
+    children = filter(x->x[2]==cat,l)
     for ch in children
         push!(final,ch[1])
         append!(final,recurse_sort(ch[1],l))
@@ -983,16 +1001,18 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     all_cats = sort(get_categories(ddl2_dic))
     for one_cat in all_cats
         cat_info = ddl2_dic[one_cat]
-        show_one_def(io,one_cat,cat_info,implicits=implicit_info)
+        show_one_def(io,one_cat,cat_info,implicits=implicit_info,ordering=())
         items = sort(get_names_in_cat(ddl2_dic,one_cat))
         for one_item in items
-            show_one_def(io,one_item,ddl2_dic[one_item],implicits=implicit_info)
+            show_one_def(io,one_item,ddl2_dic[one_item],implicits=implicit_info,
+                         ordering=())
         end
     end
     # And the looped top-level stuff
     for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history,
               :sub_category,:category_group_list]
         if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
+            println("Now printing $c")
             show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info,reflow=true)
         end
     end

@@ -78,6 +78,7 @@ end
     @test String(ud["_atom_site_rotation.label"][:name][!,:linked_item_id][]) == "_atom_site.label"
     # everything has a definition
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
+    @test get_parent_category(ud,"structure") == "magnetic"
 end
 
 @testset "DDLm reference dictionaries" begin

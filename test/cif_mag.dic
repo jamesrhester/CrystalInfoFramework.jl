@@ -24,6 +24,7 @@ _definition.id                          MAGNETIC
 _definition.scope                       Category
 _definition.class                       Head
 _name.object_id                         MAGNETIC
+_name.category_id                       MAGNETIC
 _description.text 
 ;
    This category is the parent of all categories in the dictionary.

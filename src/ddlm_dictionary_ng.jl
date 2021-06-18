@@ -1198,7 +1198,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
                 d[k] = vcat(d[k],parent(importee.block[k]),cols=:union)
             end
             # And reparent
-            transform!(d[:name],:category_id => (x -> if x == old_head new_head else x end) => :xxx)
+            transform!(d[:name],:category_id => ByRow(x -> if lowercase(x) == old_head new_head else x end) => :xxx)
             # And rename
             select!(d[:name],Not(:category_id))
             rename!(d[:name],:xxx => :category_id)
