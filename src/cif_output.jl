@@ -31,20 +31,38 @@ const value_indent = text_indent + loop_step
     which_delimiter(value)
 
 Return the appropriate delimiter to use for `value` and which style rule that 
-delimiter is chosen by.
+delimiter is chosen by. Note that internal double and single quotes are
+still allowed in CIF2.
 """
 which_delimiter(value::AbstractString) = begin
+    # deal with simple ones first
     if length(value) == 0 return ("'","2.1.2") end
-    if occursin("\n", value) return ("\n;","2.1.7") end
-    if occursin("'''",value) && occursin("\"\"\"",value) return ("\n;","2.1.6") end
-    if occursin("'''",value) return ("\"\"\"","2.1.5") end
-    if occursin("'",value) && occursin("\"",value) return ("'''","2.1.4") end
-    if occursin("'",value) return ("\"","2.1.3") end
-    q = match(r"^data_|^save_|^global_|^loop_"i,String(value))
-    if !isnothing(q) return ("'","2.1.2") end
-    if first(value) in ['_','[','{'] return ("'","2.1.2") end
-    q = match(r"\S+",String(value))
-    if !isnothing(q) && q.match == value return ("","2.1.1") end
+    if occursin("\n", value) return ("\n;","2.1.3") end
+    needs_delimiter = match(r"[][{}]",String(value)) !== nothing ||
+        value[1] in ['\'','"','_',';','$','#']
+    needs_delimiter = needs_delimiter || match(r"\s",String(value)) !== nothing
+    needs_delimiter = needs_delimiter ||
+        match(r"^data_|^save_|^global_|^loop_"i,String(value)) !== nothing
+    if !needs_delimiter return ("","2.1.1") end
+    # now choose the right one
+    if occursin("'''",value) && occursin("\"\"\"",value) return ("\n;","2.1.2") end
+    if occursin("'''",value)
+        if occursin("\"",value)
+            return ("\"\"\"","2.1.2")
+        else
+            return ("\"","2.1.2")
+        end
+    end
+    if occursin("\"\"\"",value)
+        if occursin("'",value)
+            return ("'''")
+        else
+            return ("'")
+        end
+    end
+    if occursin("'",value) && occursin("\"",value) return ("'''","2.1.2") end
+    if occursin("'",value) return ("\"","2.1.2") end
+    if occursin("\"",value) return ("'","2.1.2") end
     return ("'","2.1.2")
 end
 
@@ -110,7 +128,11 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
     end
     if delim == "\n;"
         if pretty   #
-            return format_cif_text_string(val;prefix=prefix,loop=loop,kwargs...)
+            if loop == :short indent = loop_align - 1
+            elseif loop == :long indent = text_indent + loop_indent + 1
+            else indent = text_indent
+            end
+            return format_cif_text_string(val,indent;prefix=prefix,kwargs...)
         elseif prefix != ""
             return delim*apply_prefix_protocol(val,prefix=prefix)*delim
         end
@@ -152,13 +174,12 @@ end
                               
 format_compound(val::Array;indent=value_col,max_length=line_length,level=1,
                ideal=false,kwargs...) = begin
-                   outstring = IOBuffer()
+    outstring = IOBuffer()
     #println("Array indent is $indent")
     if level > 2
         write(outstring,"\n"*' '^(indent + level))
     end
-    write(outstring,"[")
-    line_pos = indent + level
+    line_pos = indent + level - 1
     did_new_line = false
     close_new_line = false               
     for (i,item) in enumerate(val)
@@ -178,7 +199,7 @@ format_compound(val::Array;indent=value_col,max_length=line_length,level=1,
                 need_new_line = length(value) + line_pos + min_whitespace > max_length
             else # end
                 need_new_line = length(value) + line_pos + min_whitespace + final_bracket > max_length
-                close_new_line = (typeof(item) <: Dict || typeof(item) <: Array) && close_new_line
+                close_new_line = (typeof(item) <: Dict || typeof(item) <: Array) || close_new_line
             end
             if ideal && level > 1 && need_new_line
                 throw(error("Pos $line_pos, value $value, choose a better indent"))
@@ -203,8 +224,12 @@ format_compound(val::Array;indent=value_col,max_length=line_length,level=1,
     if level > 2 || close_new_line
         write(outstring,"\n"*' '^(indent-1  + level - 1))
     end
-    write(outstring,']')              
-    return String(take!(outstring))
+    write(outstring,']')
+    if level > 2 || close_new_line               
+        return "[\n"*' '^(indent-1 + level)*String(take!(outstring))
+    else
+        return "["*String(take!(outstring))
+    end
 end
 
 # If `ideal` is true, raise an error if a smaller indent would improve the
@@ -238,17 +263,17 @@ format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,
 end
 
 """
-    format_cif_text_string(value,loop=false,width=line_length,prefix="",justify=false)
+    format_cif_text_string(value,indent,width=line_length,prefix="",justify=false)
 
 Format string `value` as a CIF semicolon-delimited string, adjusted
-so that no lines are greater than `line_length`, and indented. If `loop`
-is false, indentation is `text_indent`, otherwise it is `text_indent` +
-`loop_indent` + 2. If `justify` is true, each line will be filled as 
+so that no lines are greater than `line_length`, and each line starts with
+`indent` spaces.
+If `justify` is true, each line will be filled as 
 close as possible to the maximum length and all spaces replaced by 
 a single space, which could potentially spoil formatting like centering, tabulation
 or ASCII equations.
 """
-format_cif_text_string(value::AbstractString;loop=false,width=line_length,justify=false,prefix="",kwargs...) = begin
+format_cif_text_string(value::AbstractString,indent;width=line_length,justify=false,prefix="",kwargs...) = begin
     # catch pathological all whitespace values
     if match(r"^\s+$",value) !== nothing return "\n;$value\n;" end
     if occursin("\n",value)
@@ -264,11 +289,6 @@ format_cif_text_string(value::AbstractString;loop=false,width=line_length,justif
     # find minimum current indent
     have_indent = filter(x->match(r"\S+",x)!== nothing,lines)
     old_indent = min(map(x->length(match(r"^\s*",x).match),have_indent)...)
-    if loop
-        indent = text_indent + loop_indent + 1
-    else
-        indent = text_indent
-    end
     # remove trailing whitespace
     lines = map(x->rstrip(x),lines)
     #println("Lines: $lines")
@@ -376,12 +396,14 @@ format_for_cif(df::DataFrame;catname=nothing,indent=[text_indent,value_col],
     starts,lines,widths = calc_ideal_spacing(width_ranges)
 
     #println("Widths, starts: $widths $starts")
+    loop_flag = :long
+    if length(final_list) == 2 && delims[2] == "\n;" loop_flag = :short end               
     for one_row in eachrow(for_output)
         line_pos = 1  #where the next character should go
         for (n,name) in enumerate(final_list)
             new_val = getproperty(one_row,name)
             delim = delims[n]
-            out_val = format_for_cif(new_val;delim=delim,loop=true,indent=starts[n],kwargs...)
+            out_val = format_for_cif(new_val;delim=delim,loop=loop_flag,indent=starts[n],kwargs...)
             if line_pos == 1    # start of line
                 if out_val[1] != '\n' write(outstring,' '^(starts[n]-line_pos))
                     write(outstring,out_val)
@@ -509,7 +531,7 @@ prepare_for_layout(df;kwargs...) = begin
         y = layout_length.(x[1],delim=x[2])
         (lower=max([z[1] for z in y]...),upper=max([z[2] for z in y]...))
     end           
-    #stringified = map(x->format_for_cif.(x[2];delim=x[1],loop=true,kwargs...), zip(delims,eachcol(df)))
+    #stringified = map(x->format_for_cif.(x[2];delim=x[1],kwargs...), zip(delims,eachcol(df)))
     #stringified = DataFrame(stringified,names(df),copycols=false)
     return lengths,delims
 end
@@ -774,7 +796,7 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
             elseif lwidth <= line_length - value_indent + 1 || !reflow
                 write(io,"\n"*" "^(value_indent-1)*val_as_string*"\n")
             else
-                write(io,format_cif_text_string(this_val;pretty=reflow,justify=justify)*"\n")
+                write(io,format_cif_text_string(this_val,text_indent;pretty=reflow,justify=justify)*"\n")
             end
         end
     end
@@ -914,7 +936,13 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
     #
     # All categories
     #
+    fcat,_ = get_dict_funcs(ddlm_dic)
     all_cats = get_sorted_cats(ddlm_dic,head)
+    # Function category is at the end
+    if !isnothing(fcat)
+        deleteat!(all_cats,findfirst(isequal(fcat),all_cats))
+        push!(all_cats,fcat)
+    end
     for one_cat in all_cats
         if one_cat == head continue end
         cat_info = ddlm_dic[one_cat]
@@ -929,7 +957,7 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
         #
         #  Definitions in the categories
         #
-        items = sort(get_names_in_cat(ddlm_dic,one_cat))
+        items = sort_item_names(ddlm_dic,one_cat)
         for one_item in items
             one_def = ddlm_dic[one_item]
             if one_def[:name].object_id[] == "master_id" continue end
@@ -969,6 +997,38 @@ recurse_sort(cat,l) = begin
         append!(final,recurse_sort(ch[1],l))
     end
     return final
+end
+
+sort_item_names(d,cat) = begin
+    start_list = sort(get_names_in_cat(d,cat))
+    # now find any su values
+    sus = filter(start_list) do x
+        :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] == "SU"
+    end
+    links = map(x->(x,lowercase(d[x][:name].linked_item_id[])),sus)
+    for (s,l) in links
+        si = findfirst(isequal(s),start_list)
+        li = findfirst(isequal(l),start_list)
+        if isnothing(si)
+            println("WARNING: $s not found in item list $start_list")
+            continue
+        end
+        if isnothing(li)
+            println("WARNING: $l not found in item list $start_list")
+            continue
+        end
+        if si != li+1
+            deleteat!(start_list,si)
+            if si < li
+                insert!(start_list,li,s)
+            else
+                insert!(start_list,li+1,s)
+            end
+            println("Moved $s,$l from positions $si, $li")
+            println("Cat list is now $start_list")
+        end
+    end
+    return start_list
 end
 #
 # **Output**

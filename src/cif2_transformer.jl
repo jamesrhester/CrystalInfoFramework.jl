@@ -37,7 +37,7 @@ end
 
 # No token functions defined at present
 # And false is much, much faster
-visit_tokens(t::TreeToCif) = false
+Lerche.visit_tokens(t::TreeToCif) = false
 
 @inline_rule quoted_string(t::TreeToCif,st) = begin
     ss = String(st)

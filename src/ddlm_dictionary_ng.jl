@@ -42,6 +42,7 @@ export get_dic_namespace
 export is_category
 export find_head_category,add_head_category!
 export get_julia_type_name,get_dimensions
+export conform_capitals
 import Base.show
 
 """
@@ -1389,3 +1390,36 @@ get_implicit_list(d::DDLm_Dictionary) = begin
     return ()
 end
 
+# Capitalisation
+#
+# The style guide for dictionaries suggests that caseless values should
+# have the first letter capitalised. We choose to match the case provided
+# in the ddl dictionary.
+"""
+    conform_capitals(d::DDLm_Dictionary,ref_dic)
+
+Check and convert if necessary all values in `d` to match
+the capitalisation of the values listed for that attribute in `ref_dic`.
+"""
+conform_capitals(d::DDLm_Dictionary,ref_dic) = begin
+    for (c,v) in d.block
+        all_vals = parent(v)
+        objs = propertynames(all_vals)
+        for o in objs
+            ref_def = ref_dic["_$c.$o"]
+            println("Processing _$c.$o")
+            if ref_def[:type].contents[] != "Code" continue end
+            if !haskey(ref_def,:enumeration_set) || size(ref_def[:enumeration_set],1) == 0 continue end
+            poss_vals = ref_def[:enumeration_set].state
+            all_vals[!,o] = map(all_vals[!,o]) do x
+                if !ismissing(x) && !(x in poss_vals)
+                    myval = findfirst(y->lowercase(x)==lowercase(y), poss_vals)
+                    println("$x -> $(poss_vals[myval])")
+                    poss_vals[myval]
+                else
+                    x
+                end
+            end
+        end
+    end
+end
