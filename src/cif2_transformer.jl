@@ -51,21 +51,52 @@ strip_string(ss::String) = begin
     return ss[2:end-1]
 end
 
+unfold(sa) = begin
+    final = IOBuffer()
+    for one_line in sa
+        if match(r"\\\s*$",String(one_line)) !== nothing
+            write(final,one_line[1:findlast('\\',one_line)-1])
+        else
+            write(final,one_line)
+        end
+    end
+    return String(take!(final))
+end
+
+unprefix(sa,prefix) = begin
+    # check
+    bad = filter(x->x[1:length(prefix)] != prefix,sa)
+    if length(bad) > 0
+        throw(error("Line prefix '$prefix' missing from lines $bad"))
+    end
+    return map(x->x[length(prefix)+1:end],sa)
+end
+
 # We may have a \r\n combo in here so we have to
 # be a little careful. And the cr/lf at the end
 # of the last line is part of the delimiter
 @rule semi_string(t::TreeToCif,args) = begin
+    line_folding = false
+    prefix = ""
     all_chars = length(args[1])
     as_string = String(args[1])
-    no_semi = if as_string[2] == ';'
-        if all_chars > 2 as_string[3:end] else "" end
-    else
-        @assert as_string[3] == ';'
-        if all_chars > 3 as_string[4:end] else "" end
+    semi = findfirst(';',as_string)
+    no_semi = semi == all_chars ? "" : as_string[semi+1:end]
+    if length(no_semi) > 0 && match(r"\\\s*$",no_semi) !== nothing
+        no_semi = strip(no_semi)
+        line_folding = length(no_semi) == 1 || no_semi[end-1] == '\\'
+        if length(no_semi) > 1
+            prefix = no_semi[1:prevind(no_semi,findfirst('\\',no_semi))]
+        end
+        no_semi = ""
     end
     if length(args) == 2 final = no_semi
     else
-        final = no_semi*join(String.(args[2:end-1]))
+        if !line_folding && prefix == ""
+            final = no_semi*join(String.(args[2:end-1]))
+        else
+            final = no_semi*unfold(unprefix(args[2:end-1],prefix))
+        end
     end
     # chop off the very last line terminator if present
     if length(final)>1 && final[end-1:end] == "\r\n"

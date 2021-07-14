@@ -38,6 +38,7 @@ export get_ultimate_link
 export get_default,lookup_default
 export get_dic_name
 export get_cat_class
+export get_enums          #get all enumerated lists
 export get_dic_namespace
 export is_category
 export find_head_category,add_head_category!
@@ -603,6 +604,24 @@ get_single_key_cats(d::DDLm_Dictionary) = begin
         linkval = d[x[2]][:name][!,:linked_item_id][]
         linkval == nothing || linkval == x[2]
     end
+end
+
+"""
+    get_enums(d::DDLm_Dictionary)
+
+Return all items defined in `d` that take enumerated values, together
+with the list of values as a dictionary.
+"""
+
+get_enums(d::DDLm_Dictionary) = begin
+    res = Dict{String,Array{String,1}}()
+    for k in keys(d)
+        v = d[k]
+        if haskey(v,:enumeration_set) && nrow(v[:enumeration_set])>0
+            res[k] = v[:enumeration_set].state
+        end
+    end
+    return res
 end
 
 """
@@ -1240,8 +1259,12 @@ is changed.
 """
 enter_defaults(d) = begin
     for ((tab,obj),val) in ddlm_defaults
-        if haskey(d,tab) && obj in propertynames(d[tab])
-            d[tab][!,obj] = coalesce.(d[tab][!,obj],val)
+        if haskey(d,tab)
+            if obj in propertynames(d[tab])
+                d[tab][!,obj] = coalesce.(d[tab][!,obj],val)
+            else
+                insertcols!(d[tab],obj=>val)
+            end
         end
     end
 end

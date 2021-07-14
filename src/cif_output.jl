@@ -540,8 +540,9 @@ end
     calc_ideal_spacing(colwidths)
 
 Calculate column start positions based on reported widths. Packets start at loop_align, with
-subsequent values aligned to loop align. Widths are (min,max) values, where min is the minimum
-possible width and max is the maximum possible width.  These are only different for compound
+subsequent values aligned to loop align. Widths are (lower,upper) named tuples, where lower
+is the minimum
+possible width and upper is the maximum possible width.  These are only different for compound
 data values.
 """
 calc_ideal_spacing(colwidths) = begin
@@ -550,7 +551,7 @@ calc_ideal_spacing(colwidths) = begin
     calc_widths = Int[] #locked-in widths
     old_p = 1
     line = 1
-    sumsofar = 0     #Current column
+    sumsofar = 0     #Final column so far without extra whitespace
     interim = Int[]  #values that may require addition of preceding whitespace
 
     # When starting a line we calculate the indent and then see if the
@@ -601,8 +602,10 @@ calc_ideal_spacing(colwidths) = begin
         if remainder < 0
             throw(error("Line overflow!"))
         end
-        push!(calc_starts,interim[1])
-        append!(calc_starts,interim[2:end] .+ remainder)
+        #println("Remainder is $remainder")
+        for i in 1:length(interim)
+            push!(calc_starts,interim[i] + remainder*(i-1))
+        end
         # adjust for two value rule
         #println("After remainder $interim $calc_starts")
         if length(interim) == 2 && interim[2] < value_col && calc_starts[end] > value_col
@@ -621,13 +624,13 @@ calc_ideal_spacing(colwidths) = begin
         end
         #println("Col $p: $sumsofar")
         if sumsofar + 2 + colwidths[p].upper <= line_length
-            push!(interim,sumsofar)
+            push!(interim,sumsofar+2)
             sumsofar += colwidths[p].upper + 2
             push!(calc_widths,colwidths[p].upper)
             continue
         end
         if sumsofar + 2 + colwidths[p].lower <= line_length
-            push!(interim,sumsofar)
+            push!(interim,sumsofar+2)
             push!(calc_widths,line_length - sumsofar - 2)
             sumsofar = line_length
             continue
@@ -766,13 +769,15 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
     pn = propertynames(df)
     colnames = length(order)>0 ? intersect(order,pn) : sort!(pn)
     leftindent = " "^indents[1]
+    # Add any missing key columns         
     for cl in colnames
         if cl in [:master_id,:__blockname,:__object_id] continue end
         if "$cat.$(String(cl))" in implicits continue end
         this_val = df[!,cl][]
         if ismissing(this_val) continue end
         if haskey(ddlm_defaults,(cat,cl)) && ddlm_defaults[(cat,cl)] == this_val
-            if !(cat == :type && cl in (:purpose,:source,:container,:contents)) continue
+            if !(cat == :type && cl in (:purpose,:source,:container,:contents)) &&
+                !(cat == :method && cl == :purpose) continue
             end
         end
         fullname = "_$cat.$cl"
@@ -887,7 +892,7 @@ to allow checking software easy access.
 const ddlm_toplevel_order = (:dictionary => (:title,:class,:version,:date,:uri,:ddl_conformance,
                                         :namespace),
                         :description => (:text,),
-                        :dictionary_valid => (:application,:attributes),
+                        :dictionary_valid => (:application,:scope,:option,:attributes),
                         :dictionary_audit => (:version,:date,:revision)
                         )
 
@@ -981,6 +986,7 @@ get_sorted_cats(d,cat) = begin
     cc = get_categories(d)
     catinfo = sort!([(c,get_parent_category(d,c)) for c in cc])
     filter!(x->x[1]!=x[2],catinfo)
+    println("Catinfo: $catinfo")
     sorted = recurse_sort(cat,catinfo)
     if length(sorted) != length(catinfo) - 1 #all except head
         orig = [x[1] for x in catinfo]
