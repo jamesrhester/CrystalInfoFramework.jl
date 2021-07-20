@@ -892,7 +892,7 @@ to allow checking software easy access.
 const ddlm_toplevel_order = (:dictionary => (:title,:class,:version,:date,:uri,:ddl_conformance,
                                         :namespace),
                         :description => (:text,),
-                        :dictionary_valid => (:application,:scope,:option,:attributes),
+                        :dictionary_valid => (:scope,:option,:attributes),
                         :dictionary_audit => (:version,:date,:revision)
                         )
 
