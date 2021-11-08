@@ -96,7 +96,7 @@ CIF1 syntax with the same meaning.
 function format_for_cif end
 
 """
-    format_for_cif(val::AbstractString;delim=nothing,cif1=false)
+    format_for_cif(val::AbstractString;delim=nothing,cif1=false,pretty=false,loop=false)
 
 Return `val` formatted as a text string for output in
 a CIF2 file.  Line folding is not used.
@@ -116,14 +116,19 @@ If `loop`, multi-line values should be indented for presentation in a loop,
 if `pretty` is true.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=false,kwargs...) = begin
+    tgtval = val
     if delim === nothing
+        # Figure out the best delimiter
         if pretty
-            val = strip(val)
+            tgtval = strip(val)
         end
-        delim,_ = which_delimiter(val)
+        delim,_ = which_delimiter(tgtval)
+        if delim == "\n;" && pretty   #Stripping didn't simplify
+            tgtval = strip(val,'\n')
+        end
     end
-    prefix,_ = which_prefix(val)
-    if delim == "\n;" && occursin("\n;",val) && cif1
+    prefix,_ = which_prefix(tgtval)
+    if delim == "\n;" && occursin("\n;",tgtval) && cif1
         throw(error("$val cannot be formatted using CIF1 syntax"))
     end
     if delim == "\n;"
@@ -132,13 +137,13 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
             elseif loop == :long indent = text_indent + loop_indent + 1
             else indent = text_indent
             end
-            return format_cif_text_string(val,indent;prefix=prefix,kwargs...)
+            return format_cif_text_string(tgtval,indent;prefix=prefix,kwargs...)
         elseif prefix != ""
-            return delim*apply_prefix_protocol(val,prefix=prefix)*delim
+            return delim*apply_prefix_protocol(tgtval,prefix=prefix)*delim
         end
-        println("Not pretty for $val")
+        println("Not pretty for $tgtval")
     end
-    return delim*val*delim
+    return delim*tgtval*delim
 end
 
 format_for_cif(val::Real;dummy=0,kwargs...) = begin
@@ -291,7 +296,6 @@ format_cif_text_string(value::AbstractString,indent;width=line_length,justify=fa
     old_indent = min(map(x->length(match(r"^\s*",x).match),have_indent)...)
     # remove trailing whitespace
     lines = map(x->rstrip(x),lines)
-    #println("Lines: $lines")
     #
     if justify   # all one line
         #println("Request to justify:\n$value")
@@ -965,6 +969,7 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
         items = sort_item_names(ddlm_dic,one_cat)
         for one_item in items
             one_def = ddlm_dic[one_item]
+            println("$one_item")
             if one_def[:name].object_id[] == "master_id" continue end
             show_one_def(io,one_item[2:end],one_def) # no underscore
         end

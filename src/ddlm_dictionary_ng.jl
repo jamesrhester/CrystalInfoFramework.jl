@@ -44,6 +44,7 @@ export is_category
 export find_head_category,add_head_category!
 export get_julia_type_name,get_dimensions
 export conform_capitals
+export add_definition!,add_definition  #add new definitions
 import Base.show
 
 """
@@ -81,7 +82,8 @@ extra debugging information during reading.`ignore_imports = true` will ignore
 any `import` attributes.
 """
 DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false) = begin
-    DDLm_Dictionary(Cif(a,verbose=verbose),ignore_imports=ignore_imports)
+    c = Cif(a,verbose=verbose,native=true) #Native to catch header comments
+    DDLm_Dictionary(c,ignore_imports=ignore_imports)
 end
 
 DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
@@ -133,6 +135,13 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="") = begin
     if !ignore_imports
         resolve_imports!(all_dict_info,b.original_file)
     end
+        # Apply default values if not a template dictionary
+    if all_dict_info[:dictionary][!,:class][] != "Template"
+        enter_defaults(all_dict_info)
+    end
+    if all_dict_info[:dictionary].class[] == "Reference"
+        extra_reference!(all_dict_info)
+    end
     DDLm_Dictionary(all_dict_info,nspace,header=header)
 end
 
@@ -145,13 +154,6 @@ of the DDLm attributes of that category. `header` are optional comments
 to be output at the top of the dictionary.
 """
 DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace;header="") = begin
-    # Apply default values if not a template dictionary
-    if attr_dict[:dictionary][!,:class][] != "Template"
-        enter_defaults(attr_dict)
-    end
-    if attr_dict[:dictionary].class[] == "Reference"
-        extra_reference!(attr_dict)
-    end
     # group for efficiency
     gdf = Dict{Symbol,GroupedDataFrame}()
     for k in keys(attr_dict)
@@ -738,6 +740,22 @@ as_data(d::DDLm_Dictionary) = begin
 end
 
 """
+    as_jdict(d::DDLm_Dictionary)
+
+Return a Julia dictionary corresponding to the attribute categories
+held in `d`. This effectively recovers the `attr_dict` input to the 
+DDLm_Dictionary constructor. The underlying data are copied so can
+be mutated without affecting `d`.
+"""
+as_jdict(d::DDLm_Dictionary) = begin
+    output = Dict{Symbol,DataFrame}()
+    for (c,b) in d.block
+        output[c] = copy(parent(b))
+    end
+    return output
+end
+
+"""
     set_func!(d::DDLm_Dictionary,func_name::String,func_text::Expr,func_code)
 
 Store compiled code `func_code` created from `func_text` under `func_name` in `d`.
@@ -852,6 +870,42 @@ update_row!(all_dict_info,new_vals,extra_name,extra_value) = begin
     final_vals[Symbol(extra_name)] = extra_value
     #push!(all_dict_info[catname],final_vals,cols=:union) dataframes 0.21
     all_dict_info[catname] = vcat(all_dict_info[catname],DataFrame(final_vals),cols=:union)
+end
+
+"""
+    add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def)
+
+Update dictionary information `all_dict_info` with the contents of `new_def`
+"""
+add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def::Dict{Symbol,DataFrame}) = begin
+    if !haskey(new_def,:definition)
+        throw(error("Cannot update definition without data name: given $new_def"))
+    end
+    defname = lowercase(new_def[:definition].id[])
+    for (k,df) in new_def
+        if !haskey(all_dict_info,k)
+            all_dict_info[k] = tablename
+        end
+        df[!,:master_id] = fill(defname,nrow(df))
+        all_dict_info[k] = vcat(all_dict_info[k],df,cols=:union)
+    end
+    return all_dict_info
+end
+
+"""
+    add_definition(d::DDLm_Dictionary,new_def)
+
+Update DDLm Dictionary `d` with the contents of `new_def`. A new dictionary
+is returned.
+"""
+add_definition(d::DDLm_Dictionary,new_def) = begin
+    underlying = as_jdict(d)
+    updated = add_definition!(underlying,new_def)
+    # Apply default values if not a template dictionary
+    if underlying[:dictionary][!,:class][] != "Template"
+        enter_defaults(underlying)
+    end
+    DDLm_Dictionary(updated,d.namespace,header=d.header_comments)
 end
 
 """

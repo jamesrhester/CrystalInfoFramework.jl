@@ -1,7 +1,7 @@
 name = "CrystalInfoFramework"
 uuid = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
 authors = ["James.Hester <jxh@ansto.gov.au>"]
-version = "0.4.3"
+version = "0.4.4"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -14,6 +14,6 @@ URIParser = "30578b45-9adc-5946-b283-645ec420af67"
 [compat]
 DataFrames = "^1.1.0"
 FilePaths = "^0.8.0"
-Lerche = "^0.4.1"
+Lerche = "^0.5.0"
 URIParser = "^0.4.0"
 julia = "^1.4.0"
