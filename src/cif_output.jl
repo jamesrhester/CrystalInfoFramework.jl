@@ -846,18 +846,26 @@ show(io::IO,::MIME"text/cif",c::Cif) = begin
     end
 end
 
-Base.show(io::IO,::MIME"text/cif",c::CifContainer) = begin
+Base.show(io::IO,::MIME"text/cif",c::CifContainer;ordering=[]) = begin
     write(io,"\n")
     key_vals = setdiff(collect(keys(c)),get_loop_names(c)...)
-    for k in key_vals
-        item = format_for_cif(first(c[k]))
-        write(io,"$k\t$item\n")
+    for k in ordering
+        if k in key_vals
+            item = format_for_cif(first(c[k]))
+            write(io,"$k\t$item\n")
+        end
     end
-    
+    # now write out the rest
+    for k in key_vals
+        if !(k in ordering)
+            item = format_for_cif(first(c[k]))
+            write(io,"$k\t$item\n")
+        end
+    end
     # now go through the loops
     for one_loop in get_loop_names(c)
         a_loop = get_loop(c,first(one_loop))
-        write(io,format_for_cif(a_loop))
+        write(io,format_for_cif(a_loop,order=Symbol.(ordering)))
     end
 end
 

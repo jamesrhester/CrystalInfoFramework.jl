@@ -64,6 +64,6 @@ end
 end
 
 @testset "Straight in and out" begin
-    @test begin show(stdout,MIME("text/cif"),Cif(p"nick1.cif"));true end
-    @test begin show(stdout,MIME("text/cif"),Cif(p"nick1.cif",native=true));true end
+    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__PATH__,"nick1.cif")));true end
+    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__PATH__,"nick1.cif"),native=true));true end
 end

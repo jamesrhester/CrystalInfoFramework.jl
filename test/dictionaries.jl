@@ -21,7 +21,7 @@ end
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
     @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
     # Test child names
-    t = DDLm_Dictionary(p"cif_core.dic")
+    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
     @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
     @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label"])
     @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
@@ -44,7 +44,7 @@ end
 end
 
 @testset "Function-related tests for DDLm" begin
-    t = DDLm_Dictionary(p"cif_core.dic")
+    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
     ff = get_dict_funcs(t)
     @test ff[1] == "function"
     @test "atomtype" in ff[2]
@@ -102,7 +102,7 @@ end
     @test "revision" in get_objs_in_cat(t,"dictionary_history")
     @test get_dic_name(t) == "mmcif_ddl.dic"
     @test get_dic_namespace(t) == "ddl2"
-    t = DDL2_Dictionary("cif_img_1.7.11.dic")
+    t = DDL2_Dictionary(joinpath(@__PATH__,"cif_img_1.7.11.dic"))
     @test list_aliases(t,"_diffrn_detector.details") == ["_diffrn_detector_details"]
     @test length(intersect(list_aliases(t,"_diffrn_detector.details",include_self=true),
                            ["_diffrn_detector_details","_diffrn_detector.details"])) == 2
@@ -124,7 +124,7 @@ end
     new_t = DDLm_Dictionary(p"testout.dic")
     @test t["_atom_site_moment.Cartn"][:definition][!,:update][] == new_t["_atom_site_moment.Cartn"][:definition][!,:update][]
     #
-    t = DDL2_Dictionary(p"cif_img_1.7.11.dic")
+    t = DDL2_Dictionary(joinpath(@__PATH__,"cif_img_1.7.11.dic"))
     testout = open("testout.dic","w")
     show(testout,MIME("text/cif"),t)
     close(testout)
