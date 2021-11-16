@@ -340,14 +340,29 @@ length(n::Cif) = length(n.contents)
 
 Whether `c` has a block named `name`.
 """
-haskey(n::Cif,s) = haskey(n.contents,s)
+haskey(n::Cif,s) = begin
+    if haskey(n.contents,s) return true end
+    return lowercase(s) in lowercase.(keys(n.contents))
+end
 
 """
     getindex(c::Cif,n)
 
-`c[n]` returns the block named `n` in `c`.
+`c[n]` returns the block case-insensitively named `n` in `c`.
 """
-getindex(n::Cif,s) = n.contents[s]
+getindex(n::Cif,s) = begin
+    try
+        return n.contents[s]     # optimisation for matching case
+    catch e
+        if e isa KeyError
+            sl = lowercase(s)
+            real_key = filter(x->lowercase(x)==sl,keys(n.contents))
+            if length(real_key)!=1 rethrow() end
+            n.contents[first(real_key)]
+        else rethrow()
+        end
+    end
+end
 
 """
     setindex!(c::Cif,v,n)
