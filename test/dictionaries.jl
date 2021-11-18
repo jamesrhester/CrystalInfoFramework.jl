@@ -15,6 +15,12 @@ prepare_system() = begin
     t = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"))
 end
 
+@testset "Introspecting imports" begin
+    ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=true)
+    @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
+    @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
+end
+
 @testset "DDLm_Dictionaries" begin
     t = prepare_system()
     @test "_audit_conform.dict_name" in get_names_in_cat(t,"audit_conform")
@@ -80,6 +86,7 @@ end
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
     @test get_parent_category(ud,"structure") == "magnetic"
 end
+
 
 @testset "DDLm reference dictionaries" begin
     t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))

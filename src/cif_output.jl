@@ -1018,11 +1018,16 @@ recurse_sort(cat,l) = begin
     return final
 end
 
+"""
+    Sort all of the names in `cat`, putting SU data names directly after
+    their primary data names.
+"""
 sort_item_names(d,cat) = begin
     start_list = sort(get_names_in_cat(d,cat))
     # now find any su values
     sus = filter(start_list) do x
-        :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] == "SU"
+        direct = :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] == "SU"
+        direct || haskey(d[x],:import) && check_import_block(d,x,:type,:purpose,"SU")
     end
     links = map(x->(x,lowercase(d[x][:name].linked_item_id[])),sus)
     for (s,l) in links
@@ -1096,3 +1101,4 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
         end
     end
 end
+

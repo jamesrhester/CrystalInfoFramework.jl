@@ -45,6 +45,7 @@ export find_head_category,add_head_category!
 export get_julia_type_name,get_dimensions
 export conform_capitals
 export add_definition!,add_definition  #add new definitions
+export check_import_block #inspect an import block
 import Base.show
 
 """
@@ -59,6 +60,8 @@ struct DDLm_Dictionary <: AbstractCifDictionary
     def_meths_text::Dict{Tuple,Expr}
     namespace::String
     header_comments::String
+    original_file::String   #for looking at imports later
+    cached_imports::Dict{Any,DDLm_Dictionary}
 end
 
 """
@@ -67,30 +70,42 @@ end
 Create a `DDLm_Dictionary` from `c`. `ignore_imports = true` will
 ignore any `import` attributes.
 """
-DDLm_Dictionary(c::Cif;ignore_imports=false) = begin
+DDLm_Dictionary(c::Cif;kwargs...) = begin
     if length(keys(c))!= 1
         error("Error: Cif dictionary has more than one data block")
     end
-    return DDLm_Dictionary(first(c).second,ignore_imports=ignore_imports,header=get_header_comments(c))
+    return DDLm_Dictionary(first(c).second;header=get_header_comments(c),kwargs...)
 end
 
 """
-    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false)
+    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false,cache_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
 extra debugging information during reading.`ignore_imports = true` will ignore
-any `import` attributes.
+any `import` attributes. `cache_imports` will store the contents of imported
+files (`Contents` mode only) but will not merge the contents into the
+importing definition.
+
+Setting `ignore_imports` to `false` (the default) merges all information in
+imported files into the dictionary, replacing the `import` attribute.
+
+By default imports are cached, even if they are not
+merged. `cache_imports` can be set to `false` to completely ignore any
+import attributes.
+
+`cache_imports` is ignored if `ignore_imports` is `false`.
+
 """
-DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false) = begin
+DDLm_Dictionary(a::AbstractPath;verbose=false,kwargs...) = begin
     c = Cif(a,verbose=verbose,native=true) #Native to catch header comments
-    DDLm_Dictionary(c,ignore_imports=ignore_imports)
+    DDLm_Dictionary(c;kwargs...)
 end
 
-DDLm_Dictionary(a::String;verbose=false,ignore_imports=false) = begin
-    DDLm_Dictionary(Path(a),verbose=verbose,ignore_imports=ignore_imports)
+DDLm_Dictionary(a::String;kwargs...) = begin
+    DDLm_Dictionary(Path(a);kwargs...)
 end
 
-DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="") = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="",cache_imports=true) = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -131,35 +146,40 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="") = begin
         new_vals = (b[x][] for x in dnames)
         update_row!(all_dict_info,Dict(zip(dnames,new_vals)),CaselessString("master_id"),title)
     end
-    # process imports - could we do this separately?
-    if !ignore_imports
-        resolve_imports!(all_dict_info,b.original_file)
+    cache = Dict()
+    # process imports
+    if cache_imports || !ignore_imports
+        cache = import_cache(all_dict_info,b.original_file)
     end
-        # Apply default values if not a template dictionary
+    if !ignore_imports
+        resolve_imports!(all_dict_info,b.original_file,cache)
+    end
+    # Apply default values if not a template dictionary
     if all_dict_info[:dictionary][!,:class][] != "Template"
         enter_defaults(all_dict_info)
     end
     if all_dict_info[:dictionary].class[] == "Reference"
         extra_reference!(all_dict_info)
     end
-    DDLm_Dictionary(all_dict_info,nspace,header=header)
+    DDLm_Dictionary(all_dict_info,nspace,header=header,origin=b.original_file,
+                    imports=cache)
 end
 
 """
-    DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace,header="")
+    DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace,header="",origin="")
 
 The symbol keys in `attr_dict` are DDLm attribute categories, 
 and the columns in the indexed `DataFrame`s are the object_ids 
 of the DDLm attributes of that category. `header` are optional comments
 to be output at the top of the dictionary.
 """
-DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace;header="") = begin
+DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace;header="",origin="",imports=Dict()) = begin
     # group for efficiency
     gdf = Dict{Symbol,GroupedDataFrame}()
     for k in keys(attr_dict)
         gdf[k] = groupby(attr_dict[k],:master_id)
     end
-    DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace,header)
+    DDLm_Dictionary(gdf,Dict(),Dict(),Dict(),Dict(),nspace,header,origin,imports)
 end
 
 """
@@ -1066,13 +1086,53 @@ to_path(u::URI) = begin
 end
 
 """
-    resolve_imports!(d::Dict{Symbol,DataFrame},original_file)
+    import_cache(d,original_file)
+
+Return an array with all import template files as DDLm dictionaries
+ready for use. This routine is intended to save time re-reading
+the imported files.
+"""
+import_cache(d,original_file) = begin
+    cached_dicts = Dict()
+    if !haskey(d,:import) return cached_dicts end
+    original_dir = dirname(original_file)
+    for one_row in eachrow(d[:import])
+        import_table = one_row.get
+        for one_entry in import_table
+            import_def = missing
+#           println("one import instruction: $one_entry")
+    (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
+            if mode == "Full"
+                continue   # these are done separately
+            end
+            # Now carry out the import
+            if !(location in keys(cached_dicts))
+                #println("Now trying to import $location")
+                try
+                    cached_dicts[location] = DDLm_Dictionary(location)
+                catch y
+                    println("Error $y, backtrace $(backtrace())")
+                    if if_miss == "Exit"
+                        throw(error("Unable to find import for $location"))
+                    end
+                    continue
+                end
+            end
+
+        end
+    end
+    return cached_dicts
+end
+
+"""
+    resolve_imports!(d::Dict{Symbol,DataFrame},original_file,cache)
 
 Replace all `_import.get` statements with the contents of the imported dictionary.
+`cache` contains a list of pre-imported files.
 """
-resolve_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
+resolve_imports!(d::Dict{Symbol,DataFrame},original_file,cache) = begin
     if !haskey(d,:import) return d end
-    resolve_templated_imports!(d,original_file)
+    resolve_templated_imports!(d,original_file,cache)
     new_c = resolve_full_imports!(d,original_file)
     # remove all imports
     delete!(d,:import)
@@ -1094,8 +1154,7 @@ get_import_info(original_dir,import_entry) = begin
     return location,block,mode,if_dupl,if_miss
 end
 
-resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
-    cached_dicts = Dict() # so as not to read twice
+resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_file,cached_dicts) = begin
     original_dir = dirname(original_file)
     for one_row in eachrow(d[:import])
         import_table = one_row.get
@@ -1281,6 +1340,47 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_file) = begin
     return d
 end
 
+"""
+    check_import_block(d::DDLm_Dictionary,name,attribute,val)
+
+Check if the definition for `name` contains `attribute` equal
+to `val` within an import block. `val` should be a single value.
+"""
+check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
+    x = d[name]
+    if !haskey(x,:import) || nrow(x[:import])!=1 return false end
+    spec = x[:import].get[]
+    if length(spec) > 1
+        println("Warning: cannot introspect multiple imports")
+        return false
+    end
+    spec = spec[]
+    if get(spec,"mode","Contents") == "Full" return false end
+    templ_file_name = joinpath(Path(dirname(d.original_file)),spec["file"])
+    if !(templ_file_name in keys(d.cached_imports))
+        println("Warning: cannot find $templ_file_name when checking imports for $name")
+        return false
+    end
+    templates = d.cached_imports[templ_file_name]
+    target_block = templates[spec["save"]]
+    # Find what we care about
+    if haskey(target_block,cat)
+        df = target_block[cat]
+        if obj in propertynames(df)
+            v = df[:,obj]
+            return length(v) == 1 && v[] == val
+        end
+    end
+    return false
+end
+
+check_import_block(d::DDLm_Dictionary,name,attribute,val) = begin
+    cat,obj = split(attribute,".")
+    cat = Symbol(cat[2:end])
+    obj = Symbol(obj)
+    check_import_block(d,name,cat,obj,val)
+end
+    
 """
 Default values for DDLm attributes
 """
