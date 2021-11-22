@@ -1,0 +1,1224 @@
+#\#CIF_2.0
+##########################################################################
+#                                                                        #
+#  Cut down CIF CORE DICTIONARY for testing                              #
+#                                                                        #
+##########################################################################
+
+data_CORE_DIC
+
+_dictionary.title                       CORE_DIC
+_dictionary.class                       Instance
+_dictionary.version                     3.0.14
+_dictionary.date                        2020-08-13
+_dictionary.uri
+https://raw.githubusercontent.com/COMCIFS/cif_core/cif2-conversion/cif_core.dic
+_dictionary.ddl_conformance             3.14.0
+_dictionary.namespace                   CifCore
+_description.text                       
+;
+    The CIF_CORE dictionary records all the CORE data items defined
+    and used with in the Crystallographic Information Framework (CIF).
+;
+
+save_CIF_CORE
+
+_definition.id                          CIF_CORE
+_definition.scope                       Category
+_definition.class                       Head
+_definition.update                      2014-06-18
+_description.text                       
+;
+     The CIF_CORE group contains the definitions of data items that
+     are common to all domains of crystallographic studies.
+;
+_name.category_id                       CORE_DIC
+_name.object_id                         CIF_CORE
+
+save_
+
+
+save_DIFFRACTION
+
+_definition.id                          DIFFRACTION
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-11-26
+_description.text                       
+;
+    The DICTIONARY group encompassing the CORE DIFFRACTION data items defined
+    and used with in the Crystallographic Information Framework (CIF).
+;
+_name.category_id                       CIF_CORE
+_name.object_id                         DIFFRACTION
+
+save_
+
+
+save_DIFFRN
+
+_definition.id                          DIFFRN
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-12-13
+_description.text                       
+;
+     The CATEGORY of data items used to describe the diffraction experiment.
+;
+_name.category_id                       DIFFRACTION
+_name.object_id                         DIFFRN
+
+save_
+
+
+save_diffrn.ambient_environment
+
+_definition.id                          '_diffrn.ambient_environment'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_environment' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The gas or liquid environment of the crystal sample, if not air.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_environment
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         He        
+         vacuum    
+         'mother liquor' 
+
+save_
+
+
+save_diffrn.ambient_pressure
+
+_definition.id                          '_diffrn.ambient_pressure'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_pressure' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Mean hydrostatic  pressure at which intensities were measured.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_pressure
+_type.purpose                           Measurand
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kilopascals
+
+save_
+
+
+save_diffrn.ambient_pressure_gt
+
+_definition.id                          '_diffrn.ambient_pressure_gt'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_pressure_gt' 
+_definition.update                      2012-12-13
+_description.text                       
+;
+     Mean hydrostatic pressure above which intensities were measured.
+     These items allow for a pressure range to be given.
+    _diffrn.ambient_pressure should be used in preference to this
+     item when possible.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_pressure_gt
+_type.purpose                           Number
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kilopascals
+
+save_
+
+
+save_diffrn.ambient_pressure_lt
+
+_definition.id                          '_diffrn.ambient_pressure_lt'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_pressure_lt' 
+_definition.update                      2012-12-13
+_description.text                       
+;
+     Mean hydrostatic pressure below which intensities were measured.
+     These items allow for a pressure range to be given.
+    _diffrn.ambient_pressure should be used in preference to this
+     item when possible.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_pressure_lt
+_type.purpose                           Number
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kilopascals
+
+save_
+
+
+save_diffrn.ambient_pressure_su
+
+_definition.id                          '_diffrn.ambient_pressure_su'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_pressure_su'           
+         '_diffrn.ambient_pressure_esd' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Standard Uncertainty of the
+     Mean hydrostatic  pressure at which intensities were measured.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_pressure_su
+_name.linked_item_id                    '_diffrn.ambient_pressure'
+_type.purpose                           SU
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_units.code                             kilopascals
+
+save_
+
+
+save_diffrn.ambient_temperature
+
+_definition.id                          '_diffrn.ambient_temperature'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_temperature'           
+         '_diffrn_ambient_temp'        
+         '_diffrn.ambient_temp' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Mean temperature at which intensities were measured.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_temperature
+_type.purpose                           Measurand
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kelvins
+
+save_
+
+
+save_diffrn.ambient_temperature_details
+
+_definition.id                          '_diffrn.ambient_temperature_details'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_temp_details'          
+         '_diffrn.ambient_temp_details' 
+_definition.update                      2014-06-12
+_description.text                       
+;
+     A description of special aspects of temperature control during
+     data collection.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_temperature_details
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_diffrn.ambient_temperature_gt
+
+_definition.id                          '_diffrn.ambient_temperature_gt'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_temp_gt'     
+         '_diffrn_ambient_temperature_gt'        
+         '_diffrn.ambient_temp_gt' 
+_definition.update                      2012-12-13
+_description.text                       
+;
+     Mean temperature above which intensities were measured.
+     These items allow for a temperature range to be given.
+    _diffrn.ambient_temperature should be used in preference to
+     this item when possible.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_temperature_gt
+_type.purpose                           Number
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kelvins
+
+save_
+
+
+save_diffrn.ambient_temperature_lt
+
+_definition.id                          '_diffrn.ambient_temperature_lt'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_temp_lt'     
+         '_diffrn_ambient_temperature_lt'        
+         '_diffrn.ambient_temp_lt' 
+_definition.update                      2012-12-13
+_description.text                       
+;
+     Mean temperature below which intensities were measured.
+     These items allow for a temperature range to be given.
+    _diffrn.ambient_temperature should be used in preference to
+     this item when possible.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_temperature_lt
+_type.purpose                           Number
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             kelvins
+
+save_
+
+
+save_diffrn.ambient_temperature_su
+
+_definition.id                          '_diffrn.ambient_temperature_su'
+loop_
+  _alias.definition_id
+         '_diffrn_ambient_temperature_su'        
+         '_diffrn_ambient_temp_su'     
+         '_diffrn.ambient_temp_esd' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Standard Uncertainty of the
+     mean temperature at which intensities were measured.
+;
+_name.category_id                       diffrn
+_name.object_id                         ambient_temperature_su
+_name.linked_item_id                    '_diffrn.ambient_temperature'
+_type.purpose                           SU
+_type.source                            Related
+_type.container                         Single
+_type.contents                          Real
+_units.code                             kelvins
+
+save_
+
+
+save_diffrn.crystal_support
+
+_definition.id                          '_diffrn.crystal_support'
+_definition.update                      2014-06-12
+_description.text                       
+;
+     The physical device used to support the crystal during data
+     collection.
+;
+_name.category_id                       diffrn
+_name.object_id                         crystal_support
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'glass capillary'   
+         'quartz capillary'  
+         fiber     
+         'metal loop' 
+
+save_
+
+
+save_diffrn.crystal_treatment
+
+_definition.id                          '_diffrn.crystal_treatment'
+loop_
+  _alias.definition_id
+         '_diffrn_crystal_treatment' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Remarks about how the crystal was treated prior to intensity measurement.
+     Particularly relevant when intensities were measured at low temperature.
+;
+_name.category_id                       diffrn
+_name.object_id                         crystal_treatment
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'equilibrated in hutch for 24 hours'    
+         'flash frozen in liquid nitrogen'       
+         'slow cooled with direct air stream' 
+
+save_
+
+
+save_diffrn.measured_fraction_theta_full
+
+_definition.id                          '_diffrn.measured_fraction_theta_full'
+loop_
+  _alias.definition_id
+         '_diffrn_measured_fraction_theta_full' 
+_definition.update                      2013-01-20
+_description.text                       
+;
+     Fraction of unique (symmetry-independent) reflections measured
+     out to _diffrn_reflns.theta_full.
+;
+_name.category_id                       diffrn
+_name.object_id                         measured_fraction_theta_full
+_type.purpose                           Number
+_type.source                            Derived
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:1.0
+_units.code                             none
+
+save_
+
+
+save_diffrn.measured_fraction_theta_max
+
+_definition.id                          '_diffrn.measured_fraction_theta_max'
+loop_
+  _alias.definition_id
+         '_diffrn_measured_fraction_theta_max' 
+_definition.update                      2013-01-20
+_description.text                       
+;
+     Fraction of unique (symmetry-independent) reflections measured
+     out to _diffrn_reflns.theta_max.
+;
+_name.category_id                       diffrn
+_name.object_id                         measured_fraction_theta_max
+_type.purpose                           Number
+_type.source                            Derived
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:1.0
+_units.code                             none
+
+save_
+
+
+save_diffrn.special_details
+
+_definition.id                          '_diffrn.special_details'
+loop_
+  _alias.definition_id
+         '_diffrn_special_details'     
+         '_diffrn.details' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Special details of the diffraction measurement process. Should include
+     information about source instability, crystal motion, degradation, etc.
+;
+_name.category_id                       diffrn
+_name.object_id                         special_details
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         
+;
+     The results may not be entirely reliable as the measurement was
+     made during a heat wave when the air-conditioning had failed.
+; 
+
+save_
+
+
+save_diffrn.symmetry_description
+
+_definition.id                          '_diffrn.symmetry_description'
+loop_
+  _alias.definition_id
+         '_diffrn_symmetry_description' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Recorded diffraction point symmetry, systematic absences and possible
+     space group(s) or superspace group(s) compatible with these.
+;
+_name.category_id                       diffrn
+_name.object_id                         symmetry_description
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_DIFFRN_ATTENUATOR
+
+_definition.id                          DIFFRN_ATTENUATOR
+_definition.scope                       Category
+_definition.class                       Loop
+_definition.update                      2013-09-08
+_description.text                       
+;
+     The CATEGORY of data items which specify the attenuators used in the
+     diffraction source.
+;
+_name.category_id                       DIFFRN
+_name.object_id                         DIFFRN_ATTENUATOR
+_category.key_id                        '_diffrn_attenuator.code'
+loop_
+  _category_key.name
+         '_diffrn_attenuator.code' 
+
+save_
+
+
+save_diffrn_attenuator.code
+
+_definition.id                          '_diffrn_attenuator.code'
+loop_
+  _alias.definition_id
+         '_diffrn_attenuator_code' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Code identifying a particular attenuator setting; referenced by the
+     _diffrn_refln.attenuator_code which is stored with the intensities.
+;
+_name.category_id                       diffrn_attenuator
+_name.object_id                         code
+_type.purpose                           Encode
+_type.source                            Assigned
+_type.container                         Single
+_type.contents                          Code
+
+save_
+
+save_diffrn_attenuator.material
+
+_definition.id                          '_diffrn_attenuator.material'
+loop_
+  _alias.definition_id
+         '_diffrn_attenuator_material' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of the material from which the attenuator is made.
+;
+_name.category_id                       diffrn_attenuator
+_name.object_id                         material
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_diffrn_attenuator.scale
+
+_definition.id                          '_diffrn_attenuator.scale'
+loop_
+  _alias.definition_id
+         '_diffrn_attenuator_scale' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The scale factor applied to a measured intensity if it is reduced by
+     an attenuator identified by _diffrn_attenuator.code.
+;
+_name.category_id                       diffrn_attenuator
+_name.object_id                         scale
+_type.purpose                           Number
+_type.source                            Assigned
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      1.0:
+_units.code                             none
+
+save_
+
+
+save_DIFFRN_DETECTOR
+
+_definition.id                          DIFFRN_DETECTOR
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The CATEGORY of data items which specify the detectors used in the
+     in the measurement of diffraction intensities.
+;
+_name.category_id                       DIFFRN
+_name.object_id                         DIFFRN_DETECTOR
+
+save_
+
+
+save_diffrn_detector.area_resol_mean
+
+_definition.id                          '_diffrn_detector.area_resol_mean'
+loop_
+  _alias.definition_id
+         '_diffrn_detector_area_resol_mean' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The resolution limit of an area diffraction radiation detector.
+;
+_name.category_id                       diffrn_detector
+_name.object_id                         area_resol_mean
+_type.purpose                           Number
+_type.source                            Assigned
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             pixels_per_millimetre
+
+save_
+
+
+save_diffrn_detector.description
+
+_definition.id                          '_diffrn_detector.description'
+loop_
+  _alias.definition_id
+         '_diffrn_radiation_detector'  
+         '_diffrn_detector'  
+         '_diffrn_detector.detector' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of the type of diffraction radiation detector.
+;
+_name.category_id                       diffrn_detector
+_name.object_id                         description
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'photographic film'           
+         'scintillation counter'       
+         'CCD plate'         
+         'BF~3~ counter' 
+
+save_
+
+
+save_diffrn_detector.details
+
+_definition.id                          '_diffrn_detector.details'
+loop_
+  _alias.definition_id
+         '_diffrn_detector_details' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of special aspects of the radiation detector.
+;
+_name.category_id                       diffrn_detector
+_name.object_id                         details
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_diffrn_detector.dtime
+
+_definition.id                          '_diffrn_detector.dtime'
+loop_
+  _alias.definition_id
+         '_diffrn_detector_dtime'      
+         '_diffrn_radiation.detector_dtime'      
+         '_diffrn_radiation_detector_dtime' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The maximum time between two detector signals that cannot be resolved.
+;
+_name.category_id                       diffrn_detector
+_name.object_id                         dtime
+_type.purpose                           Number
+_type.source                            Assigned
+_type.container                         Single
+_type.contents                          Real
+_enumeration.range                      0.0:
+_units.code                             microseconds
+
+save_
+
+
+save_diffrn_detector.make
+
+_definition.id                          '_diffrn_detector.make'
+loop_
+  _alias.definition_id
+         '_diffrn_detector_type'       
+         '_diffrn_detector.type' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The make, model or name of the diffraction radiation detector.
+;
+_name.category_id                       diffrn_detector
+_name.object_id                         make
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_DIFFRN_MEASUREMENT
+
+_definition.id                          DIFFRN_MEASUREMENT
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The CATEGORY of data items which specify the details of the
+     diffraction measurement.
+;
+_name.category_id                       DIFFRN
+_name.object_id                         DIFFRN_MEASUREMENT
+
+save_
+
+
+save_diffrn_measurement.details
+
+_definition.id                          '_diffrn_measurement.details'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_details'           
+         '_diffrn.measurement_details' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of special aspects of the diffraction measurement.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         details
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         '440 frames of 0.25\%' 
+
+save_
+
+
+save_diffrn_measurement.device_class
+
+_definition.id                          '_diffrn_measurement.device_class'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_device'  
+         '_diffrn.measurement_device_class'      
+         '_diffrn_measurement.device' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Type of goniometer device used to mount and orient the specimen.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         device_class
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'three-circle diffractometer'           
+         'four-circle diffractometer'  
+         '\k-geometry diffractometer'  
+         'oscillation camera'          
+         'precession camera' 
+
+save_
+
+
+save_diffrn_measurement.device_details
+
+_definition.id                          '_diffrn_measurement.device_details'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_device_details'    
+         '_diffrn.measurement_device_details' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Details of the goniometer device used in the diffraction experiment.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         device_details
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'commercial goniometer modified locally to allow for 90\% \t arc' 
+
+save_
+
+
+save_diffrn_measurement.device_make
+
+_definition.id                          '_diffrn_measurement.device_make'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_device_type'       
+         '_diffrn.measurement_device_make'       
+         '_diffrn_measurement.device_type' 
+_definition.update                      2013-03-07
+_description.text                       
+;
+     The make, model or name of the goniometer device used.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         device_make
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'Supper model q'    
+         'Huber model r'     
+         'Enraf-Nonius model s'        
+         home-made 
+
+save_
+
+
+save_diffrn_measurement.method
+
+_definition.id                          '_diffrn_measurement.method'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_method'  
+         '_diffrn.measurement_method' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of scan method used to measure diffraction intensities.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         method
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'profile data from \q/2\q scans' 
+
+save_
+
+
+save_diffrn_measurement.specimen_support
+
+_definition.id                          '_diffrn_measurement.specimen_support'
+loop_
+  _alias.definition_id
+         '_diffrn_measurement_specimen_support'  
+         '_diffrn.measurement_specimen_support' 
+_definition.update                      2013-01-23
+_description.text                       
+;
+     Mounting method for the crystal specimen during data collection.
+;
+_name.category_id                       diffrn_measurement
+_name.object_id                         specimen_support
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+loop_
+  _description_example.case
+         'glass capillary'   
+         'quartz capillary'  
+         fiber     
+         'metal loop' 
+
+save_
+
+save_diffrn_measurement.specimen_attachment_type
+
+_definition.id                '_diffrn_measurement.specimen_attachment_type'
+_definition.update            2020-08-13
+_description.text
+;
+
+    The way in which the sample is attached to the sample holder,
+    including the type of adhesive material used if relevant. The sample
+    holder is usually wholly outside the beam, whereas the attachment
+    method may cause non-sample material to be illuminated. If the
+    attachment method is not included in the list below, 'Other' should be
+    chosen and details provided in
+    _diffrn_measurement.specimen_support
+
+;
+_name.category_id             diffrn_measurement
+_name.object_id               specimen_attachment_type
+_type.contents                Code
+_type.container               Single
+_type.purpose                 State
+_type.source                  Recorded
+
+loop_
+     _enumerated_set.case
+     _enumerated_set.detail
+        epoxy            "An epoxy glue"
+        oil              "An oil"
+        grease           "A type of grease, for example hydrocarbon or silicone grease"
+        frozen_liquid    "A frozen liquid, not water or oil"
+        other            "A method not listed here"
+        ice              "The specimen is frozen in place using water ice"
+        mechanical
+;
+     The specimen is held in place by mechanical forces, e.g. capillary or pressure cell
+;
+
+save_
+
+save_DIFFRN_ORIENT
+
+_definition.id                          DIFFRN_ORIENT
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The CATEGORY of data items which specify the orientation of the crystal
+     axes to the diffractometer goniometer.
+;
+_name.category_id                       DIFFRN
+_name.object_id                         DIFFRN_ORIENT
+
+save_
+
+
+save_DIFFRN_ORIENT_MATRIX
+
+_definition.id                          DIFFRN_ORIENT_MATRIX
+_definition.scope                       Category
+_definition.class                       Set
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The CATEGORY of data items which specify the matrix specifying the
+     orientation of the crystal axes to the diffractometer goniometer.
+;
+_name.category_id                       DIFFRN_ORIENT
+_name.object_id                         DIFFRN_ORIENT_MATRIX
+
+save_
+
+
+save_diffrn_orient_matrix.type
+
+_definition.id                          '_diffrn_orient_matrix.type'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_type' 
+_definition.update                      2012-11-26
+_description.text                       
+;
+     Description of orientation matrix and how it should be applied to define
+     the orientation of the crystal with respect to the diffractometer axes.
+;
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         type
+_type.purpose                           Describe
+_type.source                            Recorded
+_type.container                         Single
+_type.contents                          Text
+
+save_
+
+
+save_diffrn_orient_matrix.UB_11
+
+_definition.id                          '_diffrn_orient_matrix.UB_11'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_11'           
+         '_diffrn_orient_matrix.UB[1][1]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_11
+
+save_
+
+
+save_diffrn_orient_matrix.UB_12
+
+_definition.id                          '_diffrn_orient_matrix.UB_12'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_12'           
+         '_diffrn_orient_matrix.UB[1][2]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_12
+
+save_
+
+
+save_diffrn_orient_matrix.UB_13
+
+_definition.id                          '_diffrn_orient_matrix.UB_13'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_13'           
+         '_diffrn_orient_matrix.UB[1][3]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_13
+
+save_
+
+
+save_diffrn_orient_matrix.UB_21
+
+_definition.id                          '_diffrn_orient_matrix.UB_21'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_21'           
+         '_diffrn_orient_matrix.UB[2][1]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_21
+
+save_
+
+
+save_diffrn_orient_matrix.UB_22
+
+_definition.id                          '_diffrn_orient_matrix.UB_22'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_22'           
+         '_diffrn_orient_matrix.UB[2][2]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_22
+
+save_
+
+
+save_diffrn_orient_matrix.UB_23
+
+_definition.id                          '_diffrn_orient_matrix.UB_23'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_23'           
+         '_diffrn_orient_matrix.UB[2][3]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_23
+
+save_
+
+
+save_diffrn_orient_matrix.UB_31
+
+_definition.id                          '_diffrn_orient_matrix.UB_31'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_31'           
+         '_diffrn_orient_matrix.UB[3][1]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_31
+
+save_
+
+
+save_diffrn_orient_matrix.UB_32
+
+_definition.id                          '_diffrn_orient_matrix.UB_32'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_32'           
+         '_diffrn_orient_matrix.UB[3][2]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_32
+
+save_
+
+
+save_diffrn_orient_matrix.UB_33
+
+_definition.id                          '_diffrn_orient_matrix.UB_33'
+loop_
+  _alias.definition_id
+         '_diffrn_orient_matrix_UB_33'           
+         '_diffrn_orient_matrix.UB[3][3]' 
+_import.get [{'save':orient_matrix  'file':templ_attr.cif}]
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UB_33
+
+save_
+
+
+save_diffrn_orient_matrix.UBIJ
+
+_definition.id                          '_diffrn_orient_matrix.UBIJ'
+_definition.update                      2012-11-26
+_description.text                       
+;
+     The 3x3 matrix specifying the orientation of the crystal with
+     respect to the diffractometer axes.
+;
+_name.category_id                       diffrn_orient_matrix
+_name.object_id                         UBIJ
+_type.purpose                           Number
+_type.source                            Derived
+_type.container                         Matrix
+_type.contents                          Real
+_type.dimension                         '[3,3]'
+loop_
+  _method.purpose
+  _method.expression
+         Evaluation          
+;
+     With  o  as  diffrn_orient_matrix
+ 
+      _diffrn_orient_matrix.UBIJ  =   [[ o.ub_11, o.ub_12, o.ub_13 ],
+                                       [ o.ub_21, o.ub_22, o.ub_23 ],
+                                       [ o.ub_31, o.ub_32, o.ub_33 ]]
+; 
+
+save_
+
+loop_
+  _dictionary_audit.version
+  _dictionary_audit.date
+  _dictionary_audit.revision
+         3.0.05    2016-05-13
+;
+     Merged in most symmetry dictionary definitions (James Hester)
+;
+         3.0.06    2016-09-13
+;
+     Adjusted and removed keys for changes in dREL operation.
+     _citation_id added to key list of citation_author (James Hester).
+     _diffrn.crystal_id removed as diffrn is Set category. Changed 
+     EXPTL_CRYSTAL to Set type in keeping with current use patterns.
+     Removed all child keys of exptl_crystal_id.
+;
+         3.0.07    2017-06-10
+;
+     Added and deprecated symmetry.cell_setting. Removed rhombohedral
+     option from dREL method for space_group.crystal_system. (James Hester)
+;
+         3.0.08    2017-09-23
+;    
+     Added missing items from DDL1 version: _citation.doi, _audit.block_doi
+     _citation.publisher, _database.dataset_doi, _publ_contact_author.id_orcid,
+     _publ_author.id_orcid (James Hester)
+; 
+         3.0.09    2018-04-10
+;
+     Rewrote CITATION category description to cover all relevant uses rather than
+     only publication-related uses (James Hester).
+;
+         3.0.10    2019-01-08
+;
+     Added DATABASE_RELATED category (James Hester).
+;
+         3.0.11    2019-09-25
+;
+     Removed the _chemical_conn_bond.distance_su data item.
+     Changed the purpose of the diffrn_radiation_wavelength.value data item
+     from 'Number' to 'Measurand'. Added the diffrn_radiation_wavelength.value_su
+     data item.
+
+     Replaced all instances of the _definition.replaced_by data item with
+     data items from the DEFINITION_REPLACED category.
+
+     Marked the _atom_site.refinement_flags data item as deprecated and
+     replaced by the _atom_site.refinement_flags_posn,
+     _atom_site.refinement_flags_adp and _atom_site.refinement_flags_occupancy
+     data items.
+
+     Changed the _type.purpose from 'Encode' to 'Link' in the definitions of
+     the _geom_angle.atom_site_label_2, _valence_param_atom_1,
+     _valence_param_atom_2, _valence_param_ref_id, _atom_site_aniso.label
+     and _atom_type_scat.symbol data items. Removed the _name.linked_item_id
+     data item from the definitions of the _diffrn_scale_group.code and
+     diffrn_standard_refln.code data items.
+
+     Updated the definitions of the _geom_hbond.angle_DHA and
+     _geom_hbond.angle_DHA_su data items.
+     
+     Corrected the definitions of the _cell_measurement.temperature_su and
+     _cell_measurement.pressure_su data items.
+
+     Corrected a typo in the definitions of the _geom_contact.distance and
+     _geom_torsion.angle and data items.
+
+     Changed the content type of multiple data items from 'Index' or 'Count'
+     to 'Integer' and assigned the appropriate enumeration range if needed.
+;
+     3.0.12     2020-03-13
+;
+     Adjusted the ranges of _geom_bond.angle and _geom_hbond.angle_DHA to
+     be 0:180 degrees.
+
+     Changed dREL methods for Cartesian transformation matrix elements 
+     to calculate default values rather than required values.
+; 
+     3.0.13     2020-03-16
+;
+     Changed all synthetic identifiers ('id') to be Text, and removed dREL.
+     Validation method for _space_group.crystal_system removed as it contained
+     undefined dREL functions "throw" and "alert".
+;
+     3.0.14     2020-08-13
+;
+     Added opaque author identifiers to audit_author and publ_author as well
+     as relevant linking identifiers to audit_contact_author and 
+     publ_contact_author. Added diffrn_measurement.specimen_attachment_type
+;
