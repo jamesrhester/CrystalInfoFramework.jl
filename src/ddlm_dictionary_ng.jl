@@ -1069,9 +1069,9 @@ fix_url(s::String,parent) = begin
         if s[1]=='/'
             return URI(Path(s))
         elseif s[1]=="."  # really shouldn't accept this
-            return URI(joinpath(parent,s))
+            return URI(Path(joinpath(parent,s)))
         else
-            return URI(joinpath(parent,s))
+            return URI(Path(joinpath(parent,s)))
         end
     end
     return URI(s)
@@ -1149,6 +1149,7 @@ get_import_info(original_dir,import_entry) = begin
     url = fix_url(import_entry["file"],original_dir)
     #println("URI is $(url.scheme), $(url.path)")
     if url.scheme != "file"
+        println("Looking in dir $original_dir, URI = $url")
         error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
     end
     location = to_path(url)
