@@ -39,13 +39,20 @@ export get_default,lookup_default
 export get_dic_name
 export get_cat_class
 export get_enums          #get all enumerated lists
+export get_attribute      #get value of particular attribute for a definition 
 export get_dic_namespace
 export is_category
 export find_head_category,add_head_category!
+export rename_category!, rename_name!   #Rename category and names throughout
 export get_julia_type_name,get_dimensions
 export conform_capitals
-export add_definition!,add_definition  #add new definitions
+export add_definition!    #add new definitions
 export check_import_block #inspect an import block
+
+# Editing
+export update_dict! #Update dictionary contents
+
+# Displaying
 import Base.show
 
 """
@@ -219,6 +226,24 @@ end
 # If a symbol is passed we access the block directly.
 getindex(d::DDLm_Dictionary,k::Symbol) = parent(getindex(d.block,k)) #not a grouped data frame
 get(d::DDLm_Dictionary,k::Symbol,default) = parent(get(d.block,k,default))
+
+# Allow access to an arbitrary attribute within a definition
+"""
+    get_attribute(d::DDLm_Dictionary,defname,attname::String)
+
+Return the value of `attname` in definition `defname` of dictionary `d`. Will return 
+`missing` if absent.
+"""
+get_attribute(d::DDLm_Dictionary,defname,attname::String) = begin
+    all_attrs = d[defname]
+    tab,obj = split(attname,'.')
+    tab = Symbol(tab[2:end])
+    if !haskey(all_attrs,tab) return missing end
+    target_tab = all_attrs[tab]
+    if !(obj in names(target_tab)) return missing end
+    if length(target_tab[!,obj]) == 0 return missing end
+    return target_tab[!,obj]
+end
 
 """
 delete!(d::DDLm_Dictionary,k::String)
@@ -871,6 +896,67 @@ get_parent_name(d::DDLm_Dictionary,name) = begin
     d[name][:name][!,:category_id][]
 end
 
+#== Dictionary updating
+
+Helper functions for building dictionaries. In general access to
+the unsorted tables is necessary.
+
+==#
+
+"""
+    update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true)
+
+Update dictionary `d`, making the value of the `old_val` item of
+attribute `attr` in the definition for `dname` equal to `new_val`.
+`old_val` must exist otherwise an error is raised. If more than one
+entry for `attr` equals `old_val` and `all` is true, all values are 
+changed, otherwise only the first value is changed. If no values were
+changed, `false` is returned, otherwise `true`.
+"""
+update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true) = begin
+    tablename,objname = split(attr,'.')
+    tablename = Symbol(tablename[2:end])
+    objname = Symbol(objname)
+    for_update = d[dname][tablename]
+    updated  = false
+    for one_row in eachrow(for_update)
+        if getproperty(one_row,objname) == old_val
+            setproperty!(one_row,objname,new_val)
+            updated = true
+            if !all break end
+        end
+    end
+    if attr == "_definition.id"   # the whole identity changes!
+        new_val = lowercase(new_val)
+        ldname = lowercase(dname)
+        for (t,v) in d.block
+            for one_row in eachrow(parent(v))
+                if one_row.master_id == ldname
+                    one_row.master_id = new_val
+                end
+            end
+        end
+        # and resort!
+        for t in keys(d.block)
+            d.block[t] = groupby(parent(d.block[t]),:master_id)
+        end
+    end
+
+    return updated
+end
+
+"""
+If there is only one value for an attribute there is no need to specify the
+value it is replacing.
+"""
+update_dict!(d::DDLm_Dictionary,dname,attr,new_val) = begin
+    old_val = get_attribute(d,dname,attr)
+    if ismissing(old_val) || length(old_val) != 1
+        throw(error("Cannot replace a value for $dname/$attr (missing/ambiguous)"))
+    end
+    return update_dict!(d,dname,attr,old_val[],new_val)
+end
+
 """
 
 Update the appropriate table of `all_dict_info` with
@@ -919,19 +1005,63 @@ add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def::Dict{Symbol,DataF
 end
 
 """
-    add_definition(d::DDLm_Dictionary,new_def)
+    add_definition!(d::DDLm_Dictionary,new_def)
 
-Update DDLm Dictionary `d` with the contents of `new_def`. A new dictionary
-is returned.
+Update DDLm Dictionary `d` with the contents of `new_def`.
 """
-add_definition(d::DDLm_Dictionary,new_def) = begin
+add_definition!(d::DDLm_Dictionary,new_def) = begin
     underlying = as_jdict(d)
     updated = add_definition!(underlying,new_def)
     # Apply default values if not a template dictionary
     if underlying[:dictionary][!,:class][] != "Template"
         enter_defaults(underlying)
     end
-    DDLm_Dictionary(updated,d.namespace,header=d.header_comments)
+    for t in keys(updated)         #re-sort
+        d.block[t] = groupby(updated[t],:master_id)
+    end
+    return d
+end
+
+"""
+    rename_category!(d::DDLm_Dictionary,old,new)
+
+Change all appearances of category `old` to `new`. This includes renaming datanames
+and changing `_name.category_id` attributes. It cannot change references to datanames
+in definition text or dREL methods (yet).
+"""
+rename_category!(d::DDLm_Dictionary,old,new) = begin
+    if !is_category(d,old) return end
+    # Collect information
+    dnames = get_names_in_cat(d,old)
+    # Change category definition itself
+    update_dict!(d,old,"_name.object_id",new)
+    update_dict!(d,old,"_definition.id",new)
+    for one_name in dnames
+        obj = d[one_name][:name][!,:object_id][]
+        newname = "_"*new*"."*obj
+        update_dict!(d,one_name,"_name.category_id",new)
+        rename_name!(d,one_name,newname)
+    end
+    # Reparent categories
+    d[:name][:,:category_id] = map(x-> !ismissing(x) && lowercase(x) == lowercase(old) ? new : x, d[:name][!,:category_id])
+end
+
+"""
+    rename_name!(d::DDLm_Dictionary,old,new)
+
+Change dataname `old` to `new`. The category and object are not touched. All references
+to this name in `d` are adjusted to the new name. To update the data name due to changing
+the category, use `rename_category!` 
+"""
+rename_name!(d::DDLm_Dictionary,old,new) = begin
+    if is_category(d,old) return end
+    update_dict!(d,old,"_definition.id",new)
+    for (c,o) in ((:name,:linked_item_id),(:alias,:definition_id),(:category_key,:name),
+                  (:enumeration,:def_index_id))
+        if !haskey(d.block,c) continue end
+        if !(o in propertynames(parent(d.block[c]))) continue end
+        d[c][:,o] = map(x-> !ismissing(x) && !isnothing(x) && lowercase(x) == lowercase(old) ? new : x , d[c][!,o])
+    end
 end
 
 """

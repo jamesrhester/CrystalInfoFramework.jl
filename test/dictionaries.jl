@@ -15,24 +15,6 @@ prepare_system() = begin
     t = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"))
 end
 
-    # process imports
-@testset "Importation" begin
-    ud = prepare_system()
-    @test String(ud["_atom_site_rotation.label"][:name][!,:linked_item_id][]) == "_atom_site.label"
-    # everything has a definition
-    @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
-    @test get_parent_category(ud,"structure") == "magnetic"
-    # try importing through alternative directory, we've changed update date.
-    uf = DDLm_Dictionary(joinpath(@__PATH__,"small_core_test.dic"),
-                         import_dir=joinpath(@__PATH__,"other_import_dir"))
-    @test String(uf["_diffrn_orient_matrix.UB_11"][:definition][!,:update][]) == "2021-12-07" 
-end
-
-@testset "Introspecting imports" begin
-    ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=true)
-    @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
-    @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
-end
 
 @testset "DDLm_Dictionaries" begin
     t = prepare_system()
@@ -60,6 +42,56 @@ end
     end
     @test lookup_default(t,"_atom_type.atomic_mass",dummy_packet("Ag")) == "107.868"
     @test "radius_contact" in as_data(t)["_name.object_id"]
+end
+
+@testset "Dictionary updating" begin
+    t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))
+    @test update_dict!(t,"_enumeration.default","_type.purpose","Encode","XXX")
+    @test t["_enumeration.default"][:type].purpose[] == "XXX"
+    @test !update_dict!(t,"_units.code","_type.source","XXX","YYY")
+    # what about changing the definition name
+    @test update_dict!(t,"_type.source","_definition.id","_type.saucy")
+    @test t["_type.saucy"][:name].object_id[] == "source"
+    # adding a definition
+    old_def = t["_definition.class"]
+    new_def_name = "_onetwothree.four"
+    old_def[:name].object_id = ["four"]
+    old_def[:name].category_id = ["onetwothree"]
+    old_def[:definition].id = [new_def_name]
+    old_def[:definition].update = ["2022-01-11"]
+    old_def[:definition].text = ["Please edit me"]
+    add_definition!(t,old_def)
+    @test t[new_def_name][:name].category_id[] == "onetwothree"
+    @test t[new_def_name][:definition].text[] == "Please edit me"
+    @test t["_definition.class"][:name].category_id[] == "definition"
+    # replacement of category
+    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
+    rename_category!(t,"atom_site","new_atom_site")
+    @test t["_new_atom_site.attached_hydrogens"][:name].object_id[] == "attached_hydrogens"
+    @test lowercase(t["_new_atom_site.b_equiv_geom_mean_su"][:name].linked_item_id[]) == "_new_atom_site.b_equiv_geom_mean"
+    @test t["_new_atom_site.Cartn_x"][:name].category_id[] == "new_atom_site"
+    @test t["new_atom_site"][:definition].scope[] == "Category"
+    @test t["atom_site_aniso"][:name].category_id[] == "new_atom_site"
+end
+
+# process imports
+
+@testset "Importation" begin
+    ud = prepare_system()
+    @test String(ud["_atom_site_rotation.label"][:name][!,:linked_item_id][]) == "_atom_site.label"
+    # everything has a definition
+    @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
+    @test get_parent_category(ud,"structure") == "magnetic"
+    # try importing through alternative directory, we've changed update date.
+    uf = DDLm_Dictionary(joinpath(@__PATH__,"small_core_test.dic"),
+                         import_dir=joinpath(@__PATH__,"other_import_dir"))
+    @test String(uf["_diffrn_orient_matrix.UB_11"][:definition][!,:update][]) == "2021-12-07" 
+end
+
+@testset "Introspecting imports" begin
+    ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=true)
+    @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
+    @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
 end
 
 @testset "Function-related tests for DDLm" begin
@@ -91,8 +123,6 @@ end
     @test occursin("with e as enumeration",load_func_text(t,"_item_default.value","Evaluation"))
     @test occursin("loop d as description",load_func_text(t,"item_description","Evaluation"))
 end
-
-
 
 @testset "DDLm reference dictionaries" begin
     t = DDLm_Dictionary(joinpath(@__PATH__,"ddl.dic"))
@@ -136,6 +166,8 @@ end
     close(testout)
     new_t = DDLm_Dictionary(p"testout.dic")
     @test t["_atom_site_moment.Cartn"][:definition][!,:update][] == new_t["_atom_site_moment.Cartn"][:definition][!,:update][]
+    # This sometimes gets left out
+    @test t["_atom_site_fourier_wave_vector.q1_coeff"][:type].contents[] == "Integer"
     #
     t = DDL2_Dictionary(joinpath(@__PATH__,"cif_img_1.7.11.dic"))
     testout = open("testout.dic","w")

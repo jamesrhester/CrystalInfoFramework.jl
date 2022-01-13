@@ -995,15 +995,24 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
     end
 end
 
+# Note that sometimes there will be categories that are not defined
+# in the dictionary, as they are defined in an imported dictionary.
+# We need to make sure we don't accidentally miss out on outputting
+# them. We add them at the end until we have a standard for how they
+# should be presented.
 get_sorted_cats(d,cat) = begin
     cc = get_categories(d)
     catinfo = sort!([(c,get_parent_category(d,c)) for c in cc])
-    filter!(x->x[1]!=x[2],catinfo)
+    filter!(x->x[1]!=x[2] && x[1] != cat,catinfo)
     println("Catinfo: $catinfo")
+    if length(catinfo) == 0 return [] end    #empty
     sorted = recurse_sort(cat,catinfo)
-    if length(sorted) != length(catinfo) - 1 #all except head
+    if length(sorted) != length(catinfo)
         orig = [x[1] for x in catinfo]
-        throw(error("Missing categories after sort: $(setdiff(orig,sorted))"))
+        orphans = setdiff(orig,sorted)
+        sort!(orphans)
+        println("Missing (must be foreign) categories after sort: $orphans")
+        append!(sorted,orphans)
     end
     return sorted
 end

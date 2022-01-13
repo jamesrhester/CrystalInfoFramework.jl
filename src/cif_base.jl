@@ -281,7 +281,7 @@ should have the same length.
 """
 create_loop!(b::CifContainer,names) = begin
     l = unique(length.([b[n] for n in names]))
-    if length(l) != 1
+    if length(l) > 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
     end
     # drop names from other loops
