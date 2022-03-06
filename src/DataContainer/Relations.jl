@@ -149,13 +149,13 @@ construct_category(r::AbstractRelationalContainer,one_cat::AbstractString,nspace
     elseif is_loop_category(dict,one_cat)
         all_names = get_keys_for_cat(dict,one_cat)
         if all(k -> haskey(get_data(small_r),k), all_names)
-            println("All keys for Loop category $one_cat are in relation")
+            @debug "All keys for Loop category $one_cat are in relation"
             return LoopCategory(one_cat,r,dict)
         end
     end
     if any(n-> haskey(get_data(small_r),n),get_names_in_cat(dict,one_cat))
         # A legacy loop category which is missing keys
-        println("Legacy category $one_cat is present in relation")
+        @debug "Legacy category $one_cat is present in relation"
         return LegacyCategory(one_cat,r,dict)
     end
     return missing
@@ -505,7 +505,7 @@ end
 # If we are given only a column name, we have to put all
 # of the values in
 get_value(d::LoopCategory,colname::AbstractString) = begin
-    println("WARNING: super inefficient column access")
+    @warn "super inefficient column access"
     return [get_value(d,n,colname) for n in 1:length(d)]
 end
 
@@ -516,9 +516,9 @@ Return the value of `name` corresponding to the unique values
 of key datanames given in `k`.
 """
 get_value(d::LoopCategory,k::Dict{String,V} where V,name) = begin
-    println("Searching for $name using $k in $(d.name)")
+    @debug "Searching for $name using $k in $(d.name)"
     if !haskey(d.object_to_name,name)
-        println("$name not found...")
+        @debug "$name not found..."
         if length(d.child_categories) > 0
             for c in d.child_categories
                 try
@@ -535,9 +535,9 @@ get_value(d::LoopCategory,k::Dict{String,V} where V,name) = begin
     dic = get_dictionary(d)
     ckeys = [(ko,d.object_to_name[ko]) for ko in key_order]
     linkvals = [(ko,get_linked_name(dic,ck)) for (ko,ck) in ckeys]
-    println("Linkvals is $linkvals")
+    @debug "Linkvals is $linkvals"
     linkvals = Dict((l[1] => k[l[2]]) for l in linkvals)
-    println("Getting row number for $linkvals in $(d.name)")
+    @debug "Getting row number for $linkvals in $(d.name)"
     rownum = 0
     try
         rownum = get_rownum(d,linkvals)
@@ -545,7 +545,7 @@ get_value(d::LoopCategory,k::Dict{String,V} where V,name) = begin
         if e isa KeyError return missing end
         throw(e)
     end
-    println("Row $rownum")
+    @debug "Row $rownum"
     return d.rawdata[d.object_to_name[name]][rownum]
 end
 
@@ -633,7 +633,7 @@ LegacyCategory(catname::AbstractString,data,cifdic::AbstractCifDictionary) = beg
     
     have_vals = unique(filter(k-> haskey(small_data,k),data_names))
 
-    println("For $catname datasource has names $have_vals")
+    @debug "For $catname datasource has names $have_vals"
 
     LegacyCategory(catname,internal_object_names,data,
                             name_to_object,object_to_name,cifdic,n)
@@ -711,12 +711,12 @@ DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
     att_cats = get_categories(att_dic)
     att_info = Dict{Symbol,DataFrames.DataFrame}()
     #println("Cached values: $(ds.value_cache["ddlm"])")
-    println("All cats: $att_cats")
+    @debug "All cats: $att_cats"
     for ac in att_cats
-        println("Preparing category $ac")
+        @debug "Preparing category $ac"
         if has_category(ds,ac,"ddlm") println("We have category $ac") end
         catinfo = get_category(ds,ac,"ddlm")
-        println("We have catinfo $(typeof(catinfo)) $catinfo")
+        @debug "We have catinfo $(typeof(catinfo)) $catinfo"
         if ismissing(catinfo) continue end
         df = unique!(DataFrame(catinfo))
         att_info[Symbol(ac)] = df
@@ -729,7 +729,7 @@ DDLm_Dictionary(ds,att_dic::DDLm_Dictionary,dividers) = begin
 end ==#
     for (tab,cols) in att_info
         if !(:master_id in propertynames(cols))
-            println("Adding a master_id to $tab")
+            @debug "Adding a master_id to $tab"
             att_info[tab].master_id = dicname
         end
         # master_id always lower case

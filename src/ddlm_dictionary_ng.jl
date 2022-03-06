@@ -732,7 +732,7 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     # Note non-deriving form of getproperty
     # println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
     current_val = getproperty(cp,Symbol(object_name))
-    print("Indexing $dataname using $current_val to get")
+    @debug "Indexing $dataname using $current_val to get"
     # Now index into the information. ddl.dic states that this is of type 'Code'
     # so we apply the CaselessString constructor
     indexlist = CaselessString.(dict[dataname][:enumeration_default][!,:index])
@@ -757,7 +757,7 @@ load_func_text(dict::DDLm_Dictionary,dataname::String,meth_type::String) =  begi
     end
     # TODO: allow multiple methods
     eval_meths = func_text[func_text[!,:purpose] .== meth_type,:]
-    println("Meth size for $dataname is $(size(eval_meths))")
+    @debug "Meth size for $dataname is $(size(eval_meths))"
     if size(eval_meths,1) == 0
         return ""
     end
@@ -1085,7 +1085,7 @@ find_head_category(df::DataFrame) = begin
             new_cat = new_cat[]
             break
         end
-        println("$old_cat -> $new_cat")
+        @debug "$old_cat -> $new_cat"
         even_older_cat = old_cat
         old_cat = new_cat[]
     end
@@ -1106,7 +1106,7 @@ find_head_category(df::Dict) = begin
         if length(explicit_head) == 1
             return explicit_head[]
         elseif length(explicit_head) > 1
-            println("Warning, more than one head category: $explicit_head")
+            @warn "Warning, more than one head category" explicit_head
         end
     end
     find_head_category(df[:name])
@@ -1122,7 +1122,7 @@ find_head_category(df::DDLm_Dictionary) = begin
     if length(explicit_head) == 1
         return explicit_head[]
     elseif length(explicit_head) > 1
-        println("Warning, more than one head category: $explicit_head")
+        @warn "Warning, more than one head category" explicit_head
     end
     find_head_category(df[:name])
 end
@@ -1279,8 +1279,8 @@ get_import_info(original_dir,import_entry) = begin
     url = fix_url(import_entry["file"],original_dir)
     #println("URI is $(url.scheme), $(url.path)")
     if url.scheme != "file"
-        println("Looking in dir $original_dir, URI = $url")
-        error("Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])")
+        @debug "Looking in dir $original_dir, URI = $url"
+        @error "Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])"
     end
     location = to_path(url)
     block = import_entry["save"]
@@ -1317,7 +1317,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
             try
                 import_def = cached_dicts[location][block]
             catch KeyError
-                println("Error $y, backtrace $(backtrace())")
+                @error "Error $y, backtrace $(backtrace())"
                 if if_miss == "Exit"
                     throw(error("When importing frame: Unable to find save frame $block in $location"))
                 end
@@ -1417,14 +1417,14 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             end
             block_id = one_row.master_id
             if d[:definition][d[:definition].master_id .== block_id,:].class[] != "Head"
-                println("Warning:  full mode imports into non-head categories not supported, ignored")
+                @warn "Full mode imports into non-head categories not supported, ignored"
                 continue
             end
             importee = DDLm_Dictionary(location,import_dir=original_dir)
             println("Full import of $location/$block/$if_dupl/$if_miss")
             importee_head = importee[block]
             if importee_head[:definition][!,:class][] != "Head"
-                println("WARNING: full mode imports of non-head categories not supported, ignored")
+                @warn "full mode imports of non-head categories not supported, ignored"
                 continue
             end
             old_head = lowercase(importee_head[:name][!,:object_id][])
@@ -1434,7 +1434,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             #println("All visible defs: $all_defs")
             dups = filter(x-> count(isequal(x),all_defs)>1,all_defs)
             if length(dups) > 0
-                println("Duplicated frames: $dups")
+                @debug "Duplicated frames" dups
                 if if_dupl == "Replace"
                     throw(error("Option Replace for duplicated frame handling not yet implemented: $dups"))
                 end
@@ -1579,7 +1579,7 @@ extra_reference!(t::Dict{Symbol,DataFrame}) = begin
     # add category key information
     cats = get_categories(t)
     head_cat = find_head_category(t)
-    println("Head category is $head_cat")
+    @debug "Head category is $head_cat"
     for one_cat in cats
         if one_cat == head_cat continue end #no head category
         target_name = "_$one_cat.master_id"
@@ -1718,14 +1718,14 @@ conform_capitals(d::DDLm_Dictionary,ref_dic) = begin
         objs = propertynames(all_vals)
         for o in objs
             ref_def = ref_dic["_$c.$o"]
-            println("Processing _$c.$o")
+            @debug "Processing _$c.$o"
             if ref_def[:type].contents[] != "Code" continue end
             if !haskey(ref_def,:enumeration_set) || size(ref_def[:enumeration_set],1) == 0 continue end
             poss_vals = ref_def[:enumeration_set].state
             all_vals[!,o] = map(all_vals[!,o]) do x
                 if !ismissing(x) && !(x in poss_vals)
                     myval = findfirst(y->lowercase(x)==lowercase(y), poss_vals)
-                    println("$x -> $(poss_vals[myval])")
+                    @debug "$x -> $(poss_vals[myval])"
                     poss_vals[myval]
                 else
                     x
