@@ -101,25 +101,26 @@ Base.get(ds::MultiDataSource,n,default) = begin
 end
 
 Base.getindex(ds::MultiDataSource,n) = begin
+    if n in keys(ds.cache) return ds.cache[n] end
     returnvals = []
-    println("Looking for $n")
+    @debug "Looking for $n"
     for d in ds
         #println("Looking for $n in $(typeof(d))")
         append!(returnvals,get(d,n,[]))
     end
-    println("Found $(length(returnvals)) values")
+    @debug "Found $(length(returnvals)) values"
     if length(returnvals) == 0 throw(KeyError) end
+    ds.cache[n] = returnvals
     return returnvals
 end
 
 Base.length(x::MultiDataSource,name) = begin
     ds = x.wrapped
-    cnt = 0
-    print("Length of $name is ") 
+    cnt = 0 
     for d in ds
         cnt += length(get(d,name,[]))
     end
-    println("$cnt")
+    @debug "Length of $name is $cnt"
     return cnt
 end
 
@@ -214,7 +215,7 @@ end
 iterate_blocks(c::NestedCifContainer,s) = begin
     #println("Next iteration over $(typeof(c)), length $(length(s)) left")
     if length(s) == 0
-        println("Finished iteration")
+        @debug "Finished iteration"
         return nothing
     end
     next_frame = popfirst!(s)
@@ -233,7 +234,7 @@ iterate_blocks(c::Cif) = begin
     n = Base.iterate(blocks)
     if n == nothing return nothing end
     nxt,s = n
-    println("Iterating Cif of length $(length(blocks))")
+    @debug "Iterating Cif of length $(length(blocks))"
     return make_data_source(get_contents(c)[nxt]),(blocks,s)
 end
 

@@ -60,7 +60,10 @@ abstract type NamespacedDataSource <: DataSource end
 
 struct MultiDataSource{T} <: DataSource
     wrapped::T
+    cache::Dict{String,Any}
 end
+
+MultiDataSource(x) = MultiDataSource(x,Dict{String,Any}())
 
 # **Typed data source**
 #
@@ -68,11 +71,11 @@ end
 """
     TypedDataSource(data,dictionary)
 
-A `TypedDataSource` is a `DataSource` that returns items of with the correct type
+A `TypedDataSource` is a `DataSource` that returns items with the correct type
 and aliases resolved, as specified in the associated CIF dictionary.
 """
-struct TypedDataSource <: DataSource
-    data
+struct TypedDataSource{T} <: DataSource
+    data::T
     dict::AbstractCifDictionary
 end
 
@@ -108,9 +111,9 @@ abstract type Row end
 
 abstract type AbstractRelationalContainer <: NamespacedDataSource end
 
-struct RelationalContainer <: AbstractRelationalContainer
-    data::Dict{String,Any}    #usually values are TypedDataSource
-    dicts::Dict{String,AbstractCifDictionary}
+struct RelationalContainer{T} <: AbstractRelationalContainer
+    data::Dict{String,T}    #usually values are TypedDataSource
+    dicts::Dict{String,V} where {V<:AbstractCifDictionary}
 end
 
 # == Cif Categories == #

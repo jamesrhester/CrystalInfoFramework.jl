@@ -17,7 +17,7 @@
 # A reference dictionary may be supplied containing the definitions of the
 # DDLm attributes. A default reference dictionary is supplied.
 
-using Printf
+using Printf,Dates
 
 export DDLm_Dictionary
 export find_category,get_categories,get_set_categories
@@ -47,6 +47,7 @@ export rename_category!, rename_name!   #Rename category and names throughout
 export get_julia_type_name,get_dimensions
 export conform_capitals
 export add_definition!    #add new definitions
+export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
 
 # Editing
@@ -210,7 +211,7 @@ keys(d::DDLm_Dictionary) = begin
     return Iterators.flatten((native,extra))
 end
 
-haskey(d::DDLm_Dictionary,k::String) = lowercase(k) in keys(d)
+haskey(d::DDLm_Dictionary,k::AbstractString) = lowercase(k) in keys(d)
 
 """
     getindex(d::DDLm_Dictionary,k)
@@ -946,13 +947,40 @@ update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true) = begin
 end
 
 """
-If there is only one value for an attribute there is no need to specify the
+If there is only one value, or none, for an attribute there is no need to specify the
 value it is replacing.
 """
 update_dict!(d::DDLm_Dictionary,dname,attr,new_val) = begin
     old_val = get_attribute(d,dname,attr)
-    if ismissing(old_val) || length(old_val) != 1
-        throw(error("Cannot replace a value for $dname/$attr (missing/ambiguous)"))
+    if ismissing(old_val)
+        dcat,dobj = split(attr,".")
+        dcat = Symbol(dcat[2:end])
+        dobj = Symbol(dobj)
+        underlying = as_jdict(d)
+        if !haskey(underlying,dcat)
+            underlying[dcat] = DataFrame(:master_id=>[lowercase(dname)])
+        end
+        if !(dobj in propertynames(underlying[dcat]))
+            insertcols!(underlying[dcat],(dobj=>missing))
+        end
+        
+        # Is there a unique row for us?
+
+        check = filter(x->x.master_id == lowercase(dname),underlying[dcat],view=:true)
+        if size(check,1) == 1
+            check[!,dobj] = [new_val]
+        elseif size(check,1) == 0
+            @debug "Updating $dname $dcat.$dobj to $new_val"
+            push!(underlying[dcat],Dict(:master_id=>lowercase(dname),
+                                        dobj => new_val),
+                  cols=:subset)
+        else
+            throw(error("Ambiguous row for updating $attr in $dname"))
+        end
+        d.block[dcat] = groupby(underlying[dcat],:master_id)
+        return d
+    elseif length(old_val) != 1
+        throw(error("Cannot replace a value for $dname/$attr (ambiguous)"))
     end
     return update_dict!(d,dname,attr,old_val[],new_val)
 end
@@ -1020,6 +1048,42 @@ add_definition!(d::DDLm_Dictionary,new_def) = begin
         d.block[t] = groupby(updated[t],:master_id)
     end
     return d
+end
+
+"""
+    add_key!(ddlm_dict,key_name)
+
+Add an additional key data name `key_name` to dictionary `ddlm_dict`. `key_name` should
+have the form `_<cat>.<obj>`
+"""
+add_key!(ddlm_dict::DDLm_Dictionary,key_name) = begin
+    cat,obj = split(key_name,".")
+    cat = cat[2:end]
+    if !haskey(ddlm_dict,cat)
+        throw(error("Category $cat does not exist"))
+    end
+    if haskey(ddlm_dict[cat],:category_key) && key_name in ddlm_dict[cat][:category_key].name
+        @debug "Adding key that already exists to $cat: $key_name"
+        return
+    end
+    underlying = as_jdict(ddlm_dict)
+    if haskey(underlying,:category_key)
+        push!(underlying[:category_key],Dict(:master_id=>lowercase(cat),
+                                         :name=>key_name,))
+    else
+        underlying[:category_key] = DataFrame(:master_id=>[lowercase(cat)],
+                                              :name=>[key_name])
+    end
+    ddlm_dict.block[:category_key] = groupby(underlying[:category_key],:master_id)
+    # register the update
+    include_date(ddlm_dict,cat)
+end
+
+"""
+    Set _definition.update to today
+"""
+include_date(ddlm_dict,dataname) = begin
+    update_dict!(ddlm_dict,dataname,"_definition.update",today())
 end
 
 """
@@ -1160,6 +1224,7 @@ add_head_category!(df,head_name) = begin
     new_info = Dict("_name.object_id"=>hn,"_name.category_id"=>hn)
     update_row!(df,new_info,"master_id",hn)
 end
+
 
 """
 All DDLm categories.

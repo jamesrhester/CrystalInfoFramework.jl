@@ -141,7 +141,7 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
         elseif prefix != ""
             return delim*apply_prefix_protocol(tgtval,prefix=prefix)*delim
         end
-        println("Not pretty for $tgtval")
+        @debug "Not pretty for $tgtval"
     end
     return delim*tgtval*delim
 end
@@ -569,7 +569,7 @@ calc_ideal_spacing(colwidths) = begin
             indent = loop_align
         end
         if calc_col > length(colwidths)
-            println("WARNING: calc_col > num of cols!")
+            @warn "calc_col > num of cols!"
             return
         end
         interim = [indent]
@@ -969,7 +969,7 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
             ck = filter(row -> !occursin("master_id",row.name),ck)
             cat_info[:category_key] = ck
         end
-        println("Output definition for $one_cat")
+        @debug "Output definition for $one_cat"
         show_one_def(io,uppercase(one_cat),cat_info)
         #
         #  Definitions in the categories
@@ -977,7 +977,7 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
         items = sort_item_names(ddlm_dic,one_cat)
         for one_item in items
             one_def = ddlm_dic[one_item]
-            println("$one_item")
+            @debug one_item
             if one_def[:name].object_id[] == "master_id" continue end
             show_one_def(io,one_item[2:end],one_def) # no underscore
         end
@@ -989,7 +989,7 @@ show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
         if !(c in keys(top_level)) continue end
         if nrow(top_level[c]) > 1
             write(io,"\n")
-            println("Formatting $c")
+            @debug "Formatting $c"
             show_loop(io,String(c),top_level[c],order=objs,reflow=true)
         end
     end
@@ -1004,14 +1004,14 @@ get_sorted_cats(d,cat) = begin
     cc = get_categories(d)
     catinfo = sort!([(c,get_parent_category(d,c)) for c in cc])
     filter!(x->x[1]!=x[2] && x[1] != cat,catinfo)
-    println("Catinfo: $catinfo")
+    @debug catinfo
     if length(catinfo) == 0 return [] end    #empty
     sorted = recurse_sort(cat,catinfo)
     if length(sorted) != length(catinfo)
         orig = [x[1] for x in catinfo]
         orphans = setdiff(orig,sorted)
         sort!(orphans)
-        println("Missing (must be foreign) categories after sort: $orphans")
+        @debug "Missing (must be foreign) categories after sort: $orphans"
         append!(sorted,orphans)
     end
     return sorted
@@ -1035,19 +1035,21 @@ sort_item_names(d,cat) = begin
     start_list = sort(get_names_in_cat(d,cat))
     # now find any su values
     sus = filter(start_list) do x
-        direct = :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] == "SU"
+        direct = :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] in ("SU","su")
         direct || haskey(d[x],:import) && check_import_block(d,x,:type,:purpose,"SU")
     end
+    @debug "All sus for $cat:" sus
+    @debug "Linked items:" [(x,d[x][:name].linked_item_id) for x in sus]
     links = map(x->(x,lowercase(d[x][:name].linked_item_id[])),sus)
     for (s,l) in links
         si = findfirst(isequal(s),start_list)
         li = findfirst(isequal(l),start_list)
         if isnothing(si)
-            println("WARNING: $s not found in item list $start_list")
+            @warn " $s not found in item list $start_list"
             continue
         end
         if isnothing(li)
-            println("WARNING: $l not found in item list $start_list")
+            @warn "$l not found in item list $start_list"
             continue
         end
         if si != li+1
@@ -1057,8 +1059,8 @@ sort_item_names(d,cat) = begin
             else
                 insert!(start_list,li+1,s)
             end
-            println("Moved $s,$l from positions $si, $li")
-            println("Cat list is now $start_list")
+            @debug "Moved $s,$l from positions $si, $li"
+            @debug "Cat list is now $start_list"
         end
     end
     return start_list
@@ -1105,7 +1107,7 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     for c in [:item_units_conversion,:item_units_list,:item_type_list,:dictionary_history,
               :sub_category,:category_group_list]
         if c in keys(ddl2_dic.block) && nrow(ddl2_dic[c]) > 0
-            println("Now printing $c")
+            @debug "Now printing $c"
             show_loop(io,String(c),ddl2_dic[c],implicits=implicit_info,reflow=true)
         end
     end

@@ -246,6 +246,13 @@ CatPacket(c::CifCategory,keydict) = get_row(c,keydict)
 
 get_category(c::CatPacket) = getfield(c,:source_cat)
 get_dictionary(c::CatPacket) = return get_dictionary(getfield(c,:source_cat))
+show(io::IO,cp::CatPacket) = begin
+    c = get_category(cp)
+    for n in names(c)
+        println(io,"$n: $(c[n][cp.id])")
+    end
+end
+
 
 iterate(c::CifCategory) = begin
     if length(c) == 0 return nothing end
@@ -730,7 +737,7 @@ end ==#
     for (tab,cols) in att_info
         if !(:master_id in propertynames(cols))
             @debug "Adding a master_id to $tab"
-            att_info[tab].master_id = dicname
+            att_info[tab].master_id = [dicname]
         end
         # master_id always lower case
         att_info[tab].master_id = lowercase.(att_info[tab].master_id)

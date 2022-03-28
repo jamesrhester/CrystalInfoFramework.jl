@@ -50,8 +50,14 @@ end
     @test t["_enumeration.default"][:type].purpose[] == "XXX"
     @test !update_dict!(t,"_units.code","_type.source","XXX","YYY")
     # what about changing the definition name
-    @test update_dict!(t,"_type.source","_definition.id","_type.saucy")
+    update_dict!(t,"_type.source","_definition.id","_type.saucy")
     @test t["_type.saucy"][:name].object_id[] == "source"
+    # what if this is a new column in a one-row category
+    update_dict!(t,"_type.contents","_definition.whatever","all new")
+    @test t["_type.contents"][:definition].whatever[] == "all new"
+    # what if this is an altogether new category
+    update_dict!(t,"_name.object_id","_newcat.whichever","hello")
+    @test t["_name.object_id"][:newcat].whichever[] == "hello"
     # adding a definition
     old_def = t["_definition.class"]
     new_def_name = "_onetwothree.four"
