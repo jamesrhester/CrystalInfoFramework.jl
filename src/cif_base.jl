@@ -639,7 +639,7 @@ default_options(s::AbstractPath;verbose=false) = begin
 end
 
 """
-    Cif(s::AbstractPath;verbose=false,native=false,version=0)
+    Cif(s::AbstractPath;verbose=false,native=true,version=0)
 
 Read in filename `s` as a CIF file. If `verbose` is true, print
 progress information during parsing. If `native` is `false`, use the
@@ -648,10 +648,14 @@ C-language parser provided by `cif_api_jll`. `version` may be `1`, `2` or
 `version` is only respected by the native parser. The `libcif` parser
 will always auto-detect.
 
-Note that the cif_api_jll parser is not currently working on Windows,
+Note that the cif_api parser is not currently working on Windows,
 so is disabled.
+
+Currently the native parser is around 3 times faster than the
+cif_api parser when compilation time is not accounted for, and
+uses 6-10 times as much memory.
 """
-Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
+Cif(s::AbstractPath;verbose=false,native=true,version=0) = begin
     ## get the full filename
     full = realpath(s)
     if !Sys.iswindows() && !native

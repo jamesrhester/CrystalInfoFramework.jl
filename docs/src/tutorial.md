@@ -25,6 +25,12 @@ value pair being a single-element array. The values in the arrays returned
 are either `String`, `Missing` (CIF `?`), `Nothing` (CIF `.`) or compound types
 `Dict` and `Array` which are only available for CIF2 syntax files.
 
+Option `native=false` to `Cif` will use the `cif_api` C parser instead of the
+Julia parser. The `cif_api` parser is faster and more memory-efficient for
+scripting use, whereas the native parser is faster if compilation time is
+less of a consideration (e.g. multiple files are being read in). The
+`cif_api` parser is not currently available on Windows systems.
+
 ### Loops
 
 Individual columns are returned when the data name is requested, as above.
