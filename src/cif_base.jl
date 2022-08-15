@@ -646,17 +646,23 @@ progress information during parsing. If `native` is `false`, use the
 C-language parser provided by `cif_api_jll`. `version` may be `1`, `2` or
 `0` (default) for auto-detected CIF version.
 `version` is only respected by the native parser. The `libcif` parser
-will always auto-detect.  
+will always auto-detect.
+
+Note that the cif_api_jll parser is not currently working on Windows,
+so is disabled.
 """
 Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
     ## get the full filename
     full = realpath(s)
-    if  !native
+    if !Sys.iswindows() && !native
         pathstring = URI(full).path
         p_opts = default_options(full,verbose=verbose)
         result = cif_tp_ptr(p_opts)
         ## the real result is in our user data context
         return Cif(p_opts.user_data.actual_cif,full,"")
+    end
+    if Sys.iswindows() && !native
+        @debug "Did not use cif_api on Windows"
     end
     full_contents = read(full,String)
     Cif(full_contents,verbose=verbose,version=version,source=full)
