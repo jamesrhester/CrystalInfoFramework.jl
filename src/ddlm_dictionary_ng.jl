@@ -45,13 +45,14 @@ export is_category
 export find_head_category,add_head_category!
 export rename_category!, rename_name!   #Rename category and names throughout
 export get_julia_type_name,get_dimensions
-export conform_capitals
+export conform_capitals!  #Capitalise according to style guide
 export add_definition!    #add new definitions
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
 
 # Editing
 export update_dict! #Update dictionary contents
+export make_cats_uppercase! #Conform to style guide
 
 # Displaying
 import Base.show
@@ -1083,7 +1084,7 @@ end
     Set _definition.update to today
 """
 include_date(ddlm_dict,dataname) = begin
-    update_dict!(ddlm_dict,dataname,"_definition.update",today())
+    update_dict!(ddlm_dict,dataname,"_definition.update","$(today())")
 end
 
 """
@@ -1340,9 +1341,9 @@ resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache) = begin
 end
 
 get_import_info(original_dir,import_entry) = begin
-    #println("Now processing $import_entry")
+    @debug "Now processing $import_entry"
     url = fix_url(import_entry["file"],original_dir)
-    #println("URI is $(url.scheme), $(url.path)")
+    @debug "URI is $(url.scheme), $(url.path)"
     if url.scheme != "file"
         @debug "Looking in dir $original_dir, URI = $url"
         @error "Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])"
@@ -1772,30 +1773,71 @@ end
 # have the first letter capitalised. We choose to match the case provided
 # in the ddl dictionary.
 """
-    conform_capitals(d::DDLm_Dictionary,ref_dic)
+    conform_capitals!(d::DDLm_Dictionary,ref_dic)
 
 Check and convert if necessary all values in `d` to match
-the capitalisation of the values listed for that attribute in `ref_dic`.
+the capitalisation of the values listed for that attribute in `ref_dic`, or
+else have an initial capital letter if of type 'Code'.
 """
-conform_capitals(d::DDLm_Dictionary,ref_dic) = begin
+conform_capitals!(d::DDLm_Dictionary,ref_dic) = begin
     for (c,v) in d.block
         all_vals = parent(v)
         objs = propertynames(all_vals)
         for o in objs
             ref_def = ref_dic["_$c.$o"]
             @debug "Processing _$c.$o"
-            if ref_def[:type].contents[] != "Code" continue end
-            if !haskey(ref_def,:enumeration_set) || size(ref_def[:enumeration_set],1) == 0 continue end
-            poss_vals = ref_def[:enumeration_set].state
-            all_vals[!,o] = map(all_vals[!,o]) do x
-                if !ismissing(x) && !(x in poss_vals)
-                    myval = findfirst(y->lowercase(x)==lowercase(y), poss_vals)
-                    @debug "$x -> $(poss_vals[myval])"
-                    poss_vals[myval]
-                else
-                    x
+            if "contents" in names(ref_def[:type]) && ref_def[:type].contents[] != "Code" continue end
+            if !haskey(ref_def,:enumeration_set) || size(ref_def[:enumeration_set],1) == 0
+
+                # Single capital letter at front
+
+                all_vals[!,o] .= map(all_vals[!,o]) do x
+                    if !ismissing(x) && length(x) > 0
+                        uppercase(x[1])*x[2:end]
+                    else
+                        x
+                    end
+                end
+            else
+                poss_vals = ref_def[:enumeration_set].state
+                all_vals[!,o] .= map(all_vals[!,o]) do x
+                    if !ismissing(x) && !(x in poss_vals)
+                        myval = findfirst(y->lowercase(x)==lowercase(y), poss_vals)
+                        if isnothing(myval)
+                            @warn "Value $x not found for _$c.$o"
+                            x
+                        else
+                            @debug "$x -> $(poss_vals[myval])"
+                            poss_vals[myval]
+                        end
+                    else
+                        x
+                    end
                 end
             end
         end
     end
+end
+
+"""
+    make_cats_uppercase!(d::DDLm_Dictionary)
+
+This will change all category-valued items in `d` to be fully uppercase.
+"""
+make_cats_uppercase!(d::DDLm_Dictionary) = begin
+    
+    # First definition.id
+    
+    transform!(parent(d.block[:definition]),:id => ByRow(x -> '.' in x ? x : uppercase(x)) => :id)
+    
+    # Now categories
+
+    all_cats = get_categories(d)
+    for one_cat in all_cats
+        info = d[one_cat]
+        @debug "Making $one_cat cat/obj uppercase"
+        update_dict!(d,one_cat,"_name.category_id",uppercase(info[:name].category_id[]))
+        update_dict!(d,one_cat,"_name.object_id",uppercase(info[:name].object_id[]))
+    end
+    
 end

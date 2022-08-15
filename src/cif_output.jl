@@ -114,6 +114,9 @@ result in a single-line data value.
 
 If `loop`, multi-line values should be indented for presentation in a loop,
 if `pretty` is true.
+
+As a simple heuristic, the string is assumed to be pre-formatted if at least
+one line contains a sequence of 5 '#' characters.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=false,kwargs...) = begin
     tgtval = val
@@ -132,7 +135,9 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
         throw(error("$val cannot be formatted using CIF1 syntax"))
     end
     if delim == "\n;"
-        if pretty   #
+        
+        is_preformat = match(r"#####",tgtval) != nothing
+        if pretty && !is_preformat  #
             if loop == :short indent = loop_align - 1
             elseif loop == :long indent = text_indent + loop_indent + 1
             else indent = text_indent
@@ -168,19 +173,18 @@ format_for_cif(val::Union{Array,Dict};indent=value_col,level=1,kwargs...) = begi
         result = format_compound(val;ideal=true,indent=indent,level=level,kwargs...)
     catch e
         if level > 1
-            #println("At level $level, going up...")
+            @debug "At level $level, going up..."
             rethrow(e)
         end
-        #println("Got $e: trying smaller indent")
-        result = format_compound(val;indent=value_indent,level=level,kwargs...)
+        @debug "Level $level, got $e: trying smaller indent"
+        result = format_compound(val;ideal=false,indent=value_indent,level=level,kwargs...)
     end
     return result
 end
                               
-format_compound(val::Array;indent=value_col,max_length=line_length,level=1,
-               ideal=false,kwargs...) = begin
+format_compound(val::Array;indent=value_col,max_length=line_length,level=1,ideal=false,kwargs...) = begin
     outstring = IOBuffer()
-    #println("Array indent is $indent")
+    @debug "Format array" indent level ideal
     if level > 2
         write(outstring,"\n"*' '^(indent + level))
     end
@@ -188,7 +192,7 @@ format_compound(val::Array;indent=value_col,max_length=line_length,level=1,
     did_new_line = false
     close_new_line = false               
     for (i,item) in enumerate(val)
-        value = format_for_cif(item;level=level+1,max_length=max_length,indent=indent)
+        value = format_for_cif(item;level=level+1,max_length=max_length,indent=indent,ideal=ideal)
         if '\n' in value
             line_pos = length(value) - findlast(isequal('\n'),value)
             write(outstring, value)
@@ -239,19 +243,22 @@ end
 
 # If `ideal` is true, raise an error if a smaller indent would improve the
 # layout.
-format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,
-               ideal=false,kwargs...) = begin
+format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,ideal=false,kwargs...) = begin
                    outstring = IOBuffer()
-    #println("Dict indent is $indent")
+    @debug "format dict:" indent level ideal
     write(outstring,"{")
     line_pos = indent
-    for (k,v) in val
-        mini_val = "'$k':$(format_for_cif(v))  "
+    key_order = sort(collect(keys(val)))
+    for (cnt,k) in enumerate(key_order)
+        v = val[k]
+        mini_val = "'$k':$(format_for_cif(v))"
+        need_space = cnt > 1 ? min_whitespace : 0
         if '\n' in mini_val
-            line_pos = length(mini_val) - findlast(isequal('\n'),mini_val)
-            write(outstring, mini_val)
+            line_pos = length(mini_val) - findlast(isequal('\n'),mini_val) + need_space
+            write(outstring, ' '^need_space)
+            write(outstring,mini_val)
         else
-            if length(mini_val) + line_pos + 1 > line_length
+            if length(mini_val) + line_pos + 1 + need_space > line_length
                 if ideal && level > 1
                     throw(error("Pos $line_pos, value $mini_val, choose a better indent"))
                 end
@@ -259,12 +266,13 @@ format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,
                 write(outstring," "^(indent+level-1)*mini_val)
                 line_pos = length(mini_val)+indent+level-1
             else
+                write(outstring, ' '^need_space)
                 write(outstring, mini_val)
-                line_pos = line_pos + length(mini_val)
+                line_pos = line_pos + length(mini_val)+ need_space
             end
         end
     end
-    return String(take!(outstring)[1:(end-2)])*'}'
+    return String(take!(outstring))*'}'
 end
 
 """
@@ -281,6 +289,8 @@ or ASCII equations.
 format_cif_text_string(value::AbstractString,indent;width=line_length,justify=false,prefix="",kwargs...) = begin
     # catch pathological all whitespace values
     if match(r"^\s+$",value) !== nothing return "\n;$value\n;" end
+    # catch empty string
+    if value == "" return "''" end
     if occursin("\n",value)
         lines = split(value,"\n")
     else
@@ -789,8 +799,10 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
         write(io,fullname)
         next_pos = indents[1] + length(fullname) + min_whitespace
         if next_pos < indents[2] next_pos = indents[2] end
+        
         # Compound values may have internal newlines if they start at value_col,
         # so we check if the other indent fixes this
+
         if cl in semis delim="\n;" else delim = nothing end
         lwidth = layout_length(this_val,delim=delim)[1]
         if lwidth + next_pos - 1 <= line_length
@@ -803,6 +815,8 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
             if val_as_string[1] == '\n'
                 write(io,val_as_string*"\n")
             elseif lwidth <= line_length - value_indent + 1 || !reflow
+                write(io,"\n"*" "^(value_indent-1)*val_as_string*"\n")
+            elseif this_val isa Vector || this_val isa Dict #already laid out for us
                 write(io,"\n"*" "^(value_indent-1)*val_as_string*"\n")
             else
                 write(io,format_cif_text_string(this_val,text_indent;pretty=reflow,justify=justify)*"\n")
@@ -909,13 +923,13 @@ const ddlm_toplevel_order = (:dictionary => (:title,:class,:version,:date,:uri,:
                         )
 
 """
-    show(io::IO,MIME("text/cif"),ddlm_dic::DDLm_Dictionary;header="")
+    show(io::IOContext,MIME("text/cif"),ddlm_dic::DDLm_Dictionary;header="")
 
 Output `ddlm_dic` in CIF format. `header` contains text that will
 be output in a comment box at the top of the file, which will replace
 any header comment stored in `ddlm_dic`.
 """
-show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
+show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
     dicname = ddlm_dic[:dictionary].title[]
     #
     # Header
@@ -1073,11 +1087,15 @@ end
 #
 
 """
-    show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
+    show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
 
-Output `ddl2_dic` in CIF format.
+Output `ddl2_dic` in CIF format. `IOContext` can be used to control the
+output layout using the following keywords:
+
+    strict: follow the IUCr layout rules
+    
 """
-show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
+show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     dicname = ddl2_dic[:dictionary].title[]
     write(io,"#")
     write(io,"""
@@ -1113,3 +1131,12 @@ show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     end
 end
 
+"""
+    show(io::IO,::MIME"text/cif",ddl2_dic::AbstractCifDictionary)
+    
+Output `ddl2_dic` to `IO` in CIF format
+"""
+show(io::IO,x::MIME"text/cif",ddl2_dic::AbstractCifDictionary;strict=false,kwargs...) = begin
+    ic = IOContext(io,:strict=>strict)
+    show(ic,x,ddl2_dic;kwargs...)
+end
