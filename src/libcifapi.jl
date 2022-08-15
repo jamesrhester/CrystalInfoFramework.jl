@@ -24,7 +24,7 @@ cif_destroy!(x) =  begin
     ##error_string = "$q: Finalizing CIF object $x"
     ##t = @task println(error_string)
     ##schedule(t)
-    val = ccall((:cif_destroy,"libcif"),Cint,(Ptr{cif_tp},),x.handle)
+    val = ccall((:cif_destroy,libcif),Cint,(Ptr{cif_tp},),x.handle)
     if val != 0
         error(error_codes[val])
     end
@@ -72,7 +72,7 @@ Return the block code of the referenced container as a string
 """
 get_block_code(b::cif_container_tp_ptr) = begin
     s = Uchar(0)
-    val = ccall((:cif_container_get_code,"libcif"),Cint,(cif_container_tp_ptr,Ptr{Cvoid}),b,Ref(s))
+    val = ccall((:cif_container_get_code,libcif),Cint,(cif_container_tp_ptr,Ptr{Cvoid}),b,Ref(s))
     if val != 0
         error(error_codes[val])
     end
@@ -99,7 +99,7 @@ end
 Base.String(t::cif_value_tp_ptr) = begin
    #Get the textual representation
    s = Uchar(0)
-   val = ccall((:cif_value_get_text,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),t.handle,Ref(s))
+   val = ccall((:cif_value_get_text,libcif),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),t.handle,Ref(s))
    if val != 0
        error(error_codes[val])
    end
@@ -115,7 +115,7 @@ end
 Determine the syntactical type of the data value.
 """
 get_syntactical_type(t::cif_value_tp_ptr) = begin
-    val_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),t.handle)
+    val_type = ccall((:cif_value_kind,libcif),Cint,(Ptr{cif_value_tp},),t.handle)
     if val_type == 0 || val_type == 1 return typeof(t)
     elseif val_type == 2 cif_list
     elseif val_type == 3 cif_table
@@ -140,7 +140,7 @@ List the data names in C data structure `l` corresponding to a CIF loop
 """
 Base.keys(l::Ptr{cif_loop_tp}) = begin
     ukeys = Uchar_list(0)
-    val = ccall((:cif_loop_get_names,"libcif"),Cint,(Ptr{cif_loop_tp},Ptr{Cvoid}),l,Ref(ukeys))
+    val = ccall((:cif_loop_get_names,libcif),Cint,(Ptr{cif_loop_tp},Ptr{Cvoid}),l,Ref(ukeys))
     if val != 0
         error(error_codes[val])
     end
@@ -180,12 +180,12 @@ end
 # These routines copy lists and tables from C to Julia
 
 cif_list(cv::cif_value_tp_ptr) = begin
-    cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
+    cif_type = ccall((:cif_value_kind,libcif),Cint,(Ptr{cif_value_tp},),cv.handle)
     if cif_type != 2
         error("$val is not a cif list value")
     end
     elctptr = Ref{Cint}(0)
-    val = ccall((:cif_value_get_element_count,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cint}),cv.handle,elctptr)
+    val = ccall((:cif_value_get_element_count,libcif),Cint,(Ptr{cif_value_tp},Ptr{Cint}),cv.handle,elctptr)
     if val != 0
         error(error_codes[val])
     end
@@ -193,7 +193,7 @@ cif_list(cv::cif_value_tp_ptr) = begin
     so_far = Vector()
     for el_num in 1:elct
         new_element = cif_value_tp_ptr(0)
-        val = ccall((:cif_value_get_element_at,"libcif"),Cint,(Ptr{cif_value_tp},Cint,Ptr{cif_value_tp_ptr}),cv.handle,el_num-1,Ref(new_element))
+        val = ccall((:cif_value_get_element_at,libcif),Cint,(Ptr{cif_value_tp},Cint,Ptr{cif_value_tp_ptr}),cv.handle,el_num-1,Ref(new_element))
         if val != 0
             error(error_codes[val])
         end
@@ -211,7 +211,7 @@ cif_list(cv::cif_value_tp_ptr) = begin
 end
 
 cif_table(cv::cif_value_tp_ptr) = begin
-    cif_type = ccall((:cif_value_kind,"libcif"),Cint,(Ptr{cif_value_tp},),cv.handle)
+    cif_type = ccall((:cif_value_kind,libcif),Cint,(Ptr{cif_value_tp},),cv.handle)
     if cif_type != 3
         error("$val is not a cif table value")
     end
@@ -237,7 +237,7 @@ Base.keys(ct::cif_value_tp_ptr) = begin
     ukeys = Uchar_list(0)
     #q = time_ns()
     #println("$q: accessing keys for $(ct.handle.handle)")
-    val = ccall((:cif_value_get_keys,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle,Ref(ukeys))
+    val = ccall((:cif_value_get_keys,libcif),Cint,(Ptr{cif_value_tp},Ptr{Cvoid}),ct.handle,Ref(ukeys))
     if val != 0
         error(error_codes[val])
     end
@@ -273,7 +273,7 @@ Base.getindex(ct::cif_value_tp_ptr,key::AbstractString) = begin
     ukey = transcode(UInt16,key)
     append!(ukey,0)
     new_element = cif_value_tp_ptr(0)
-    val = ccall((:cif_value_get_item_by_key,"libcif"),Cint,(Ptr{cif_value_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
+    val = ccall((:cif_value_get_item_by_key,libcif),Cint,(Ptr{cif_value_tp},Ptr{UInt16},Ptr{cif_value_tp_ptr}),
         ct.handle,ukey,Ref(new_element))
     if val == 73
         throw(KeyError(key))

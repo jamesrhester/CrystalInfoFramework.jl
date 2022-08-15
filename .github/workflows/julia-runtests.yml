@@ -17,10 +17,6 @@ jobs:
             julia-arch: x86
 
     steps:
-      - uses: actions/checkout@v2
-      - name: install C parsing library
-        if: matrix.os == 'ubuntu-latest'
-        uses: ./.github/actions/cifapi_action
       - uses: julia-actions/setup-julia@latest
         with:
            version: ${{ matrix.julia-version }}

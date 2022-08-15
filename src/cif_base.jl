@@ -643,8 +643,7 @@ end
 
 Read in filename `s` as a CIF file. If `verbose` is true, print
 progress information during parsing. If `native` is `false`, use the
-C-language parser provided by `libcif`.  If `libcif` is not available,
-the native Julia parser will be used. `version` may be `1`, `2` or
+C-language parser provided by `cif_api_jll`. `version` may be `1`, `2` or
 `0` (default) for auto-detected CIF version.
 `version` is only respected by the native parser. The `libcif` parser
 will always auto-detect.  
@@ -652,17 +651,15 @@ will always auto-detect.
 Cif(s::AbstractPath;verbose=false,native=false,version=0) = begin
     ## get the full filename
     full = realpath(s)
-    if find_library("libcif") != "" && !native
+    if  !native
         pathstring = URI(full).path
         p_opts = default_options(full,verbose=verbose)
         result = cif_tp_ptr(p_opts)
         ## the real result is in our user data context
         return Cif(p_opts.user_data.actual_cif,full,"")
-    else
-        if (!native) println("WARNING: using native parser as libcif not found on system.") end
-        full_contents = read(full,String)
-        Cif(full_contents,verbose=verbose,version=version,source=full)
     end
+    full_contents = read(full,String)
+    Cif(full_contents,verbose=verbose,version=version,source=full)
 end
 
 """
@@ -732,7 +729,7 @@ cif_tp_ptr(p_opts::cif_parse_options)=begin
     dpp = cif_tp_ptr(0)   #value replaced by C library
     ## Debugging: do we have good values in our parse options context?
     ## println("User context is $(p_opts.user_data)")
-    val=ccall((:cif_parse,"libcif"),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
+    val=ccall((:cif_parse,libcif),Cint,(FILE,Ref{cif_parse_options},Ref{cif_tp_ptr}),fptr,p_opts,dpp)
     close(fptr)
     close(f)
     finalizer(cif_destroy!,dpp)
