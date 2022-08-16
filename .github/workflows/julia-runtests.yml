@@ -1,12 +1,21 @@
 name: Run tests
 
-on: [push, pull_request]
-
+on: 
+  push:
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+      
+  pull_request:
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+      
+  workflow_dispatch:
+  
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    env:
-            LD_LIBRARY_PATH: ${{ github.workspace }}/lib:/usr/lib:/lib:/lib64
     strategy:
       matrix:
         julia-version: ['1', 'nightly']
