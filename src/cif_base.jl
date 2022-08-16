@@ -652,8 +652,10 @@ Note that the cif_api parser is not currently working on Windows,
 so is disabled.
 
 Currently the native parser is around 3 times faster than the
-cif_api parser when compilation time is not accounted for, and
-uses 6-10 times as much memory.
+cif_api parser when compilation time is not included, and
+uses 6-10 times as much memory. However, from a cold start
+(e.g. in a standalone script) the cif_api parser is around 
+30% faster.
 """
 Cif(s::AbstractPath;verbose=false,native=true,version=0) = begin
     ## get the full filename

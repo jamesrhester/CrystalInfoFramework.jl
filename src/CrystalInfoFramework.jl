@@ -23,8 +23,7 @@ using DataFrames
 using FilePaths   #easy cross-platform URI
 using URIParser
 using Lerche # for native parser
-using cif_api_jll # for cif API parser 
-using Libdl  #to find C library if present
+using cif_api_jll # for cif API parser
 
 # **Exports**
 
