@@ -139,6 +139,7 @@ Remove the value of `s` from `b`
 """
 delete!(b::CifContainer,s) = begin
     delete!(get_data_values(b),lowercase(s))
+    #TODO remove loop information too?
 end
 
 # ***Nested CIF containers***
@@ -252,8 +253,8 @@ end
 """
     add_to_loop!(b::CifContainer, tgt, newname)
 
-Add dataname `tgt` to the loop containing newname. Values for `tgt` must already
-be present (e.g. by calling `b[tgt]=values`) and have the same length as other 
+Add dataname `newname` to the loop containing `tgt`. Values for `newname` must already
+be present (e.g. by calling `b[newname]=values`) and have the same length as other 
 values in the loop.
 """
 add_to_loop!(b::CifContainer, tgt, newname) = begin
@@ -279,7 +280,7 @@ previously assigned to
 other loops are transferred to the new loop. All data attached to `names` 
 should have the same length.
 """
-create_loop!(b::CifContainer,names) = begin
+create_loop!(b::CifContainer, names) = begin
     l = unique(length.([b[n] for n in names]))
     if length(l) > 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
@@ -289,6 +290,41 @@ create_loop!(b::CifContainer,names) = begin
     # drop empty loops
     set_loop_names(b,filter!(x->!isempty(x),get_loop_names(b)))
     push!(get_loop_names(b),names)
+end
+
+"""
+    drop_row!(b::CifContainer, name, loc)
+
+Drop the row with index `loc` from the loop containing `name` in
+`b`. This is an internal routine and is not part
+of the public API, as officially loops have no defined order.
+"""
+drop_row!(b::CifContainer, name, loc) = begin
+
+    all_names = [l for l in get_loop_names(b) if name in l]
+    if length(all_names) != 1
+        throw(error("No unique loop found for $name"))
+    end
+
+    all_names = all_names[]
+    if length(b[all_names[1]]) == 1
+        if loc == 1
+            for a in all_names
+                delete!(b,a)
+            end
+        else
+            throw(error("Request to drop row > 1 for one-row loop"))
+        end
+    elseif length(b[all_names[1]]) >= loc
+        for a in all_names
+            b[a] = vcat(b[a][1:loc-1], b[a][loc+1:end])
+        end
+        @debug "Dropped row $loc from loop containing $name"
+    else
+        @error "Request to drop beyond end of loop" loc length(b[all_names[1]]) name
+        throw(error("Request to drop row $loc > length of loop containing $name"))
+    end
+            
 end
 
 # **CIF files**
@@ -307,10 +343,10 @@ struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
 end
 
 Cif{V,T}() where V where T = begin
-    return Cif(Dict{String,T}(),p"","")
+    return Cif(Dict{String,T}(), p"", "")
 end
 
-Cif() = Cif{CifValue,CifBlock{CifValue}}
+Cif() = Cif{ CifValue, CifBlock{CifValue} }
 
 """
     keys(c::Cif)

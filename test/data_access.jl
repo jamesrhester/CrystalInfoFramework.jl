@@ -28,6 +28,7 @@ end
 
 # Looped value tests
 @testset "Looped values" begin
+    
     for native = (true,false)
         b = prepare_block("simple_loops.cif","simple_loops",native=native)
         l = get_loop(b,"_col2")
@@ -36,7 +37,9 @@ end
             push!(vals,String(p[:_col2]))
         end
         @test Set(vals) == Set(["v1","v2","v3"])
+
         # do it again as this has failed in the past
+
         m = get_loop(b,"_scalar_a")
         vals = []
         for p in eachrow(l)
@@ -49,11 +52,15 @@ end
             push!(vals,String(q[:_scalar_a]))
         end
         @test vals == ["a"]
+
         # test loop lookup
+
         p = b[Dict("_col2"=>"v3","_col3"=>"12.5(2)")]
         @test size(p,1) == 1
         @test p[!,"_col1"][1] == "3"
+
         # create a new loop
+
         create_loop!(b,["_col1","_single"])
         df = get_loop(b,"_col1")
         @test "_single" in names(df)
@@ -61,6 +68,27 @@ end
         add_to_loop!(b,"_col1","_col2")
         df = get_loop(b,"_col3")
         @test !("_col2" in names(df))
+
+        # drop a specified value (not part of API)
+
+        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        g = indexin(["1"], b["_col1"])[]
+        CrystalInfoFramework.drop_row!(b, "_col1", g)
+        @test setdiff(b["_col2"],["v2","v3"]) == []
+
+        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        g = indexin(["v2"],b["_col2"])[]
+        CrystalInfoFramework.drop_row!(b, "_col3", g)
+        @test setdiff(b["_col1"],["1","3"]) == [] 
+
+        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        g = indexin(["12.5(2)"],b["_col3"])[]
+        CrystalInfoFramework.drop_row!(b, "_col2", g)
+        @test setdiff(b["_col1"],["1","2"]) == [] 
+
+        CrystalInfoFramework.drop_row!(b, "_scalar_a", 1)
+        @test !haskey(b, "_scalar_b")
+        @test !haskey(b, "_scalar_a")
     end
 end
 

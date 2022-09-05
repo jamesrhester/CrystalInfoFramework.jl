@@ -699,6 +699,27 @@ get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString) = begin
 end
 
 """
+    get_dataname_children(d::DDLm_Dictionary, dataname::AbstractString)
+
+Return a list of all datanames that have `dataname` as a direct or indirect
+parent. `dataname` is the first entry in the list.
+"""
+get_dataname_children(d::DDLm_Dictionary, dataname::AbstractString) = begin
+    
+    full_list = [dataname]
+    next_level = full_list
+    while next_level != []
+        for nl in next_level
+            selector = map( x -> !isnothing(x) && x == nl, d[:name][!,:linked_item_id])
+            append!(next_level, d[:name][selector,:master_id])
+        end
+        push!(full_list, next_level)
+    end
+
+    return full_list
+end
+
+"""
     get_default(d::DDLm_Dictionary,s)
 
 Return the default value for `s` or `missing` if none defined. 

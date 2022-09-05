@@ -12,15 +12,15 @@ prepare_block(filename,blockname;native=false) = begin
 end
 
 
-include("creation.jl")
+#include("creation.jl")
 include("data_access.jl")
-include("caseless_test.jl")
-include("native_parser.jl")
-include("save_frames.jl")
-include("dictionaries.jl")
-include("output.jl")
+#include("caseless_test.jl")
+#include("native_parser.jl")
+#include("save_frames.jl")
+#include("dictionaries.jl")
+#include("output.jl")
 
 
 # Test DataContainers
 
-include("dc_base.jl")
+#include("dc_base.jl")
