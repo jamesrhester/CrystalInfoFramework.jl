@@ -38,6 +38,7 @@ which_delimiter(value::AbstractString) = begin
     # deal with simple ones first
     if length(value) == 0 return ("'","2.1.2") end
     if occursin("\n", value) return ("\n;","2.1.3") end
+    if length(value) == 1 && value[1] in ['.','?'] return ("'","2.1.2") end
     needs_delimiter = match(r"[][{}]",String(value)) !== nothing ||
         value[1] in ['\'','"','_',';','$','#']
     needs_delimiter = needs_delimiter || match(r"\s",String(value)) !== nothing
@@ -915,7 +916,7 @@ The recommended order for presenting DDLm dictionary-level information in a DDL
 dictionary file as a tuple of (category => Tuple{object_id,...},...). Exposed
 to allow checking software easy access.
 """
-const ddlm_toplevel_order = (:dictionary => (:title,:class,:version,:date,:uri,:ddl_conformance,
+const ddlm_toplevel_order = (:dictionary => (:title,:formalism,:class,:version,:date,:uri,:ddl_conformance,
                                         :namespace),
                         :description => (:text,),
                         :dictionary_valid => (:scope,:option,:attributes),
