@@ -110,7 +110,7 @@ CIF dictionaries are created by passing the dictionary file name to
 
 A ``DataSource`` is any data source returning an array of values when
 supplied with a string.  A CIF ``Block`` conforms to this specification.
-`` are defined in submodule ``CrystalInfoFramework.DataContainer``.
+``DataSource``s are defined in submodule ``CrystalInfoFramework.DataContainer``.
 
 A CIF dictionary can be used to obtain data with correct Julia type from
 a ``DataSource`` that uses data names defined in the dictionary by 
