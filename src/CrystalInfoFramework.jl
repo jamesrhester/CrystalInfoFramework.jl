@@ -55,6 +55,7 @@ include("cif_dic.jl")
 include("caseless_strings.jl")
 include("ddlm_dictionary_ng.jl")
 include("ddl2_dictionary_ng.jl")
+include("data_with_dictionary.jl")
 include("cif_output.jl")
 
 """

@@ -42,6 +42,9 @@ end
     end
     @test lookup_default(t,"_atom_type.atomic_mass",dummy_packet("Ag")) == "107.868"
     @test "radius_contact" in as_data(t)["_name.object_id"]
+    c = get_dataname_children(t,"_atom_site.label")
+    @test "_atom_site_aniso.label" in c
+    @test "_geom_hbond.atom_site_label" in c
 end
 
 @testset "Dictionary updating" begin

@@ -35,6 +35,7 @@ export has_default_methods,remove_methods!
 export get_def_meth,get_def_meth_txt,has_def_meth    #Methods for calculating defaults
 export get_loop_categories, get_dimensions, get_single_keyname
 export get_ultimate_link
+export get_dataname_children   #get all datanames this is a parent for
 export get_default,lookup_default
 export get_dic_name
 export get_cat_class
@@ -54,6 +55,12 @@ export check_import_block #inspect an import block
 export update_dict! #Update dictionary contents
 export make_cats_uppercase! #Conform to style guide
 
+# With data
+export has_category   # check if a data block has a category
+export count_rows     # how many rows in a category in a datablock
+export add_child_keys! # add any missing keys
+export make_set_loops! # make sure block loops everything
+    
 # Displaying
 import Base.show
 
@@ -709,11 +716,13 @@ get_dataname_children(d::DDLm_Dictionary, dataname::AbstractString) = begin
     full_list = [dataname]
     next_level = full_list
     while next_level != []
+        new_level = []
         for nl in next_level
             selector = map( x -> !isnothing(x) && x == nl, d[:name][!,:linked_item_id])
-            append!(next_level, d[:name][selector,:master_id])
+            append!(new_level, d[:name][selector,:master_id])
         end
-        push!(full_list, next_level)
+        append!(full_list, new_level)
+        next_level = new_level
     end
 
     return full_list
