@@ -1459,7 +1459,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
                     if length(dupls) > 0
 #                       println("For $k handling duplicate defs $dupls")
                         if if_dupl == "Exit"
-                            throw(error("Keys $dupls duplicated when importing from $block at $location in category $k"))
+                            throw(error("Keys $dupls duplicated when importing from $block at $location in category '$k' for definition '$definition'"))
                         end
                         if if_dupl == "Ignore"
                             select!(import_def[k],Not(dupls))

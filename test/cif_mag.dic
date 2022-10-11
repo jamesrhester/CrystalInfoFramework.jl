@@ -869,7 +869,6 @@ _name.object_id                         label
 loop_
   _alias.definition_id                  '_atom_site_rotation_label'
 _import.get [{"save":atom_site_id "file":templ_attr.cif}]
-_definition.update                      2018-07-18
 
 save_
 

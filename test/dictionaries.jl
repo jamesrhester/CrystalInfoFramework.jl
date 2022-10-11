@@ -24,18 +24,18 @@ end
     # Test child names
     t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
     @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
-    @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label"])
+    @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label","_atom_site.diffrn_id","_atom_site.id"])
     @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
     @test "cell" in get_set_categories(t)
     @test "geom_bond" in get_loop_categories(t)
-    @test get_single_keyname(t,"atom_site") == "label"
+    @test get_single_keyname(t,"audit_support") == "id"
     @test_throws Exception get_single_keyname(t,"geom_bond")
-    @test ("atom_site","_atom_site.label") in get_single_key_cats(t)
+    @test ("citation","_citation.id") in get_single_key_cats(t)
     @test get_ultimate_link(t,"_geom_bond.atom_site_label_1") == "_atom_site.label"
     @test get_default(t,"_geom_angle.publ_flag") == "no"
     @test ismissing(get_default(t,"_space_group_symop.T")) 
-    @test get_dimensions(t,"model_site","adp_eigen_system") == [4,3]
-    @test CrystalInfoFramework.get_container_type(t,"_model_site.adp_eigen_system") == "Array"
+    @test get_dimensions(t,"model_site","adp_eigenvectors") == [3,3]
+    @test CrystalInfoFramework.get_container_type(t,"_model_site.adp_eigenvalues") == "Array"
     @test find_head_category(t[:name]) == "cif_core"
     struct dummy_packet
         symbol::CaselessString
@@ -44,7 +44,7 @@ end
     @test "radius_contact" in as_data(t)["_name.object_id"]
     c = get_dataname_children(t,"_atom_site.label")
     @test "_atom_site_aniso.label" in c
-    @test "_geom_hbond.atom_site_label" in c
+    @test "_geom_hbond.atom_site_label_a" in c
 end
 
 @testset "Dictionary updating" begin
