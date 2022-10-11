@@ -3,6 +3,7 @@
 #                                                                        #
 #  CIF CORE DICTIONARY                                                   #
 #                                                                        #
+# Note this version altered from canonical version for testing purposes. #
 ##########################################################################
 
 data_CORE_DIC
@@ -3063,6 +3064,8 @@ save_DIFFRN_RADIATION
 ;
     _name.category_id             DIFFRN
     _name.object_id               DIFFRN_RADIATION
+    loop_
+      _category_key.name         '_diffrn_radiation.diffrn_id'
 
 save_
 
@@ -3087,6 +3090,25 @@ save_diffrn_radiation.collimation
          '0.3 mm double-pinhole'
          '0.5 mm'
          'focusing mirrors'
+
+save_
+
+save_diffrn_radiation.diffrn_id
+
+    _definition.id                '_diffrn_radiation.diffrn_id'
+    _definition.update            2022-05-25
+    _description.text
+;
+    A pointer to the diffraction measurement that this wavelength value
+    refers to.
+;
+    _name.category_id             diffrn_radiation
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_diffrn.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
 
 save_
 
@@ -3296,7 +3318,10 @@ save_DIFFRN_RADIATION_WAVELENGTH
 ;
     _name.category_id             DIFFRN_RADIATION
     _name.object_id               DIFFRN_RADIATION_WAVELENGTH
-    _category_key.name            '_diffrn_radiation_wavelength.id'
+    loop_
+        _category_key.name
+        '_diffrn_radiation_wavelength.diffrn_id'
+        '_diffrn_radiation_wavelength.id'
 
 save_
 
@@ -3355,6 +3380,25 @@ save_diffrn_radiation_wavelength.determination
              'Estimated  e.g. from monochromator angle or time of flight'
          refined
              'Refined using a standard crystal with known cell parameters'
+
+save_
+
+save_diffrn_radiation_wavelength.diffrn_id
+
+    _definition.id                '_diffrn_radiation_wavelength.diffrn_id'
+    _definition.update            2022-05-25
+    _description.text
+;
+    A pointer to the diffraction measurement that this wavelength value
+    refers to.
+;
+    _name.category_id             diffrn_radiation_wavelength
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_diffrn.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
 
 save_
 
@@ -5613,6 +5657,7 @@ save_REFLN
          '_refln.index_h'
          '_refln.index_k'
          '_refln.index_l'
+         '_refln.diffrn_id'
 
 save_
 
@@ -5879,6 +5924,25 @@ save_refln.d_spacing
 ;
     _refln.d_spacing = 1 / (2 * _refln.sin_theta_over_lambda)
 ;
+
+save_
+
+save_refln.diffrn_id
+
+    _definition.id                '_refln.diffrn_id'
+    _definition.update            2022-05-25
+    _description.text
+;
+    A pointer to the diffraction conditions used for the measurement
+    to which these results relate.
+;
+    _name.category_id             refln
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_diffrn.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
 
 save_
 
@@ -19322,7 +19386,10 @@ save_ATOM_SITE
 ;
     _name.category_id             ATOM
     _name.object_id               ATOM_SITE
-    _category_key.name            '_atom_site.label'
+    loop_
+       _category_key.name           
+        '_atom_site.label'
+        '_atom_site.diffrn_id'
 
 save_
 
@@ -19754,6 +19821,25 @@ save_atom_site.description
     _type.container               Single
     _type.contents                Text
     _description_example.case     'Ag/Si disordered'
+
+save_
+
+save_atom_site.diffrn_id
+
+    _definition.id                '_atom_site.diffrn_id'
+    _definition.update            2022-05-25
+    _description.text
+;
+    A pointer to the diffraction conditions used for the measurement
+    to which these results relate.
+;
+    _name.category_id             atom_site
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_diffrn.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
 
 save_
 
@@ -20581,7 +20667,10 @@ save_ATOM_SITE_ANISO
 ;
     _name.category_id             ATOM_SITE
     _name.object_id               ATOM_SITE_ANISO
-    _category_key.name            '_atom_site_aniso.label'
+    loop_
+        _category_key.name            
+    '_atom_site_aniso.label'
+    '_atom_site_aniso.diffrn_id'
 
 save_
 
@@ -20792,6 +20881,25 @@ save_atom_site_aniso.b_33_su
     _name.linked_item_id          '_atom_site_aniso.B_33'
 
     _import.get                   [{'file':templ_attr.cif  'save':aniso_BIJ_su}]
+
+save_
+
+save_atom_site_aniso.diffrn_id
+
+    _definition.id                '_atom_site_aniso.diffrn_id'
+    _definition.update            2022-05-25
+    _description.text
+;
+    A pointer to the diffraction conditions used for the measurement
+    to which these results relate.
+;
+    _name.category_id             atom_site_aniso
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_atom_site.diffrn_id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
 
 save_
 

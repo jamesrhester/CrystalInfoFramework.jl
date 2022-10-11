@@ -37,8 +37,7 @@ any_name_in_cat(block, catname, dict) = get_loop_names(block, catname, dict)[1]
     get_dropped_keys(block, catname, dict)
 
 Return a list of key data names that are dropped in `catname` in `block`
-as determined by `dict`. These will all be children of keys in `Set`
-categories 
+as determined by `dict`.
 """
 get_dropped_keys(block, catname, dict) = begin
 
@@ -49,11 +48,9 @@ get_dropped_keys(block, catname, dict) = begin
     all_keys = get_keys_for_cat(dict, catname)
 
     for ak in all_keys
-        ultimate = get_ultimate_link(ak)
+        ultimate = get_ultimate_link(dict, ak)
 
-        # Does it belong to a Set category?
-        
-        if is_set_category(find_category(ultimate, dict)) && !haskey(block, ak)
+        if !haskey(block, ak)
             push!(dropped_keys, ak)
         end
     end
@@ -66,7 +63,7 @@ end
     add_dropped_keys!(block, catname, dict)
 
 Add back any key data names that have been dropped due to being
-unambiguous.
+unambiguous. The ultimate parent values must already be present.
 """
 add_dropped_keys!(block, catname, dict) = begin
 
@@ -77,9 +74,11 @@ add_dropped_keys!(block, catname, dict) = begin
     keylist = get_dropped_keys(block, catname, dict)
     ultimates = get_ultimate_link.(Ref(dict), keylist)
 
+    @debug "Ultimate keys for $catname" ultimates
+    
     for (u,k) in zip(ultimates, keylist)
         if !haskey(block, u)
-            @debug "Dropped key is missing" u
+            @warn "Dropped key is missing, can't update children" u
             continue
         end
 
@@ -99,7 +98,8 @@ end
     add_child_keys!(block, k, dict)
 
 Add all child keys of `k` to `block` if missing. The value to use for the
-key will be `block[k]`, which must have a single, unique value.
+key will be `block[k]`, which must have a single, unique value. Non-key
+child data names are *not* added if missing.
 """
 add_child_keys!(block, k, dict) = begin
 
@@ -112,24 +112,31 @@ add_child_keys!(block, k, dict) = begin
     all_names = get_dataname_children(dict, k)
 
     for an in all_names
+
+        cat = find_category(dict, an)
+
+        # an must be a key data name
+
+        if !(an in get_keys_for_cat(dict, cat))
+            continue
+        end
+
         if haskey(block, an)
-
-            # If an is a key data name make sure it is consistent
-
-            cat = find_category(dict, an)
-            if an in get_keys_for_cat(dict, cat)
-                if length(unique(block[an])) != 1 || block[an][1] != new_val
-                    throw(error("Contradictory values for $an: should be $new_val, found $(block[an][1])"))
-                else
-                    continue
-                end
+            
+            # Make sure an is consistent if present
+            
+            if length(unique(block[an])) == 1 && block[an][1] == new_val
+                continue
             end
+            
+            @error "Contradictory values for $an: should be $new_val, found $(block[an][1])"
+
         else
 
             # Fill in the values
 
             @debug "Adding value for $an" new_val
-            cat = find_category(dict, an)
+            
             if has_category(block, cat, dict)
                 num_rows = count_rows(block, cat, dict)
                 block[an] = fill(new_val, num_rows)
@@ -164,22 +171,50 @@ make_set_loops!(block,dict) = begin
 end
 
 """ 
+    verify_rows!(base, addition, keynames)
+
 Check that there are no rows in `addition` that contradict
 anything in `base` for joint values of `keynames`. If identical keys
 lead to identical rows, remove. It is assumed that each of the blocks
 are already consistent.
 
+If `keynames` is empty, use `loop_key` to access the loop.
+
 TODO: caseless compare
 """
-verify_rows!(base, addition, keynames) = begin
+verify_rows!(base, addition, keynames; loop_key = "") = begin
 
-    all_names = get_loop_names(base, keynames[1])
-    base_key_vals = zip(getindex.(Ref(base), keynames))
-    add_key_vals = zip(getindex.(Ref(base), keynames))
-    if isdisjoint(base_key_vals, add_key_vals) return end
-    common_vals = intersect(base_key_vals, add_key_vals)
-    base_index = indexin(common_vals, base_key_vals)
-    add_index = indexin(common_vals, add_key_vals)
+    # Sanity check
+
+    if length(keynames) == 0 && length(base[loop_key]) > 1
+        @error "Cannot merge category with no key data names, containing $loop_key and length > 1"
+        throw(error("Cannot merge category with no key data names, containing $loop_key and length > 1 ($(base[loop_key]))"))
+    end
+    
+    if length(keynames) > 0
+
+        base_key_vals = collect(zip(getindex.(Ref(base), keynames)...))
+        add_key_vals = collect(zip(getindex.(Ref(addition), keynames)...))
+
+        @debug "Key values to check" keynames base_key_vals add_key_vals
+    
+        if isdisjoint(base_key_vals, add_key_vals)
+            return true
+        end
+
+        common_vals = intersect(base_key_vals, add_key_vals)
+        base_index = indexin(common_vals, base_key_vals)
+        add_index = indexin(common_vals, add_key_vals)
+
+        @debug "Common values" common_vals
+
+    else
+        
+        base_index = add_index = 1
+
+    end
+
+    all_names = get_loop_names(base, length(keynames) > 0 ? keynames[1] : loop_key)
 
     # Check all entries
     
@@ -195,8 +230,13 @@ verify_rows!(base, addition, keynames) = begin
 
         @debug "Found duplicate row for $keynames" bi ai
         
-        drop_row!(addition, ai)
+        drop_row!(addition, first(all_names), ai)
 
     end
-            
+
+    return haskey(addition, first(all_names))
 end
+
+"""
+
+"""

@@ -69,6 +69,24 @@ get_loop(b::CifContainer,s) = begin
     return df
 end
 
+"""
+    get_loop_names(b::CifContainer,n::AbstractString)
+
+Return all names in the loop that also contains `n`.
+"""
+get_loop_names(b::CifContainer,n::AbstractString) = begin
+
+    loop_names = [l for l in get_loop_names(b) if n in l]
+
+    if length(loop_names) > 1
+        error("More than one loop contains data name $n")
+    elseif length(loop_names) == 0
+        return []
+    end
+
+    loop_names[]
+end
+
 length(c::CifContainer) = length(keys(c))
 
 """

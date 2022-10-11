@@ -535,8 +535,9 @@ end
 """
     get_set_categories(d::DDLm_Dictionary)
 
-Return all categories that may only have one row. For Reference dictionaries defining
-DDLm attributes, only `dictionary` is considered a Set category.
+Return all categories that may only have one row in a single data block. 
+For Reference dictionaries defining DDLm attributes, only `dictionary` 
+is considered a Set category.
 """
 get_set_categories(d::DDLm_Dictionary) = begin
     if d[:dictionary].class[] == "Instance"
@@ -549,8 +550,8 @@ end
 """
     get_loop_categories(d::DDLm_Dictionary)
 
-Return all categories that may have multiple rows. For Reference dictionaries defining
-DDLm attributes, only `dictionary` is not a Loop category.
+Return all categories that may have multiple rows in a single data block. For 
+Reference dictionaries defining DDLm attributes, only `dictionary` is not a Loop category.
 """
 get_loop_categories(d::DDLm_Dictionary) = begin
     if d[:dictionary].class[] == "Instance"
@@ -660,7 +661,7 @@ category. This latter case corresponds to a split single
 category.
 """
 get_single_key_cats(d::DDLm_Dictionary) = begin
-    candidates = get_loop_categories(d)
+    candidates = get_categories(d)
     k = [(c,get_keys_for_cat(d,c)[]) for c in candidates if length(get_keys_for_cat(d,c)) == 1]
     filter!(k) do x
         linkval = d[x[2]][:name][!,:linked_item_id][]
@@ -1588,7 +1589,7 @@ check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
     if get(spec,"mode","Contents") == "Full" return false end
     templ_file_name = joinpath(Path(d.import_dir),spec["file"])
     if !(templ_file_name in keys(d.cached_imports))
-        println("Warning: cannot find $templ_file_name when checking imports for $name")
+        println("Warning: cannot find $templ_file_name when checking $cat.$obj is $val for $name")
         return false
     end
     templates = d.cached_imports[templ_file_name]
