@@ -1056,7 +1056,7 @@ add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def::Dict{Symbol,DataF
     defname = lowercase(new_def[:definition].id[])
     for (k,df) in new_def
         if !haskey(all_dict_info,k)
-            all_dict_info[k] = tablename
+            all_dict_info[k] = DataFrame()
         end
         df[!,:master_id] = fill(defname,nrow(df))
         all_dict_info[k] = vcat(all_dict_info[k],df,cols=:union)
