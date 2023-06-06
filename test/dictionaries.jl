@@ -140,6 +140,7 @@ end
     @test "_units.master_id" in get_keys_for_cat(t,"units")
     @test get_linked_name(t,"_method.master_id") == "_definition.master_id"
     @test "dictionary_audit" in CrystalInfoFramework.find_top_level_cats(t)
+    @test nothing in get_enums(t)["_definition.class"]
 end
 
 @testset "DDL2 dictionaries" begin

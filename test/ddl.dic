@@ -263,16 +263,9 @@ save_definition.class
                   loopable list). These items may be referenced
                   as a class of items in a dREL methods expression.
 ;
-              Ref-loop
-;                 A category containing one item that identifies the
-                  a category of items that is repeated in a sequence
-                  of save frames. The item, which is specifies as a
-                  as a Ref-table value (see type.container), is looped.
-                  This construction is for loop categories that contain
-                  child categories.
-                  If in the instance file, the child items have only
-                  one set of values, the Ref-loop item need not be used
-                  and child items need not be placed in a save frame.
+              . 
+;                 Inserted in order to test that periods are
+                  correctly recognised.
 ;
     _enumeration.default         Datum
 
