@@ -669,7 +669,7 @@ with the list of values as a dictionary.
 """
 
 get_enums(d::DDLm_Dictionary) = begin
-    res = Dict{String,Array{String,1}}()
+    res = Dict{String,Array{Union{Nothing,String},1}}()
     for k in keys(d)
         v = d[k]
         if haskey(v,:enumeration_set) && nrow(v[:enumeration_set])>0
