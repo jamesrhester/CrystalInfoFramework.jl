@@ -87,22 +87,25 @@ DDLm_Dictionary(c::Cif;kwargs...) = begin
 end
 
 """
-    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false,cache_imports=false)
+    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports="None",
+    cache_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
-extra debugging information during reading.`ignore_imports = true` will ignore
-any `import` attributes. `cache_imports` will store the contents of imported
+extra debugging information during reading.`ignore_imports = :None` will ignore
+any `import` attributes. Other options are `:Full` and `:Contents` to ignore
+imports with the respective `mode`, and `:all` to ignore all imports.
+`cache_imports` will store the contents of imported
 files (`Contents` mode only) but will not merge the contents into the
 importing definition.
 
-Setting `ignore_imports` to `false` (the default) merges all information in
+Setting `ignore_imports` to :None (the default) merges all information in
 imported files into the dictionary, replacing the `import` attribute.
 
 By default imports are cached, even if they are not
 merged. `cache_imports` can be set to `false` to completely ignore any
 import attributes.
 
-`cache_imports` is ignored if `ignore_imports` is `false`.
+`cache_imports` is ignored if `ignore_imports` is :None.
 
 If a non-absolute location for imported dictionaries is specified, they are
 searched for relative to the same directory as the importing dictionary,
@@ -119,7 +122,7 @@ DDLm_Dictionary(a::String;kwargs...) = begin
     DDLm_Dictionary(Path(a);kwargs...)
 end
 
-DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="",cache_imports=true,import_dir="") = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -163,11 +166,11 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="",cache_imports=true,im
     cache = Dict()
     # process imports
     if import_dir == "" import_dir = dirname(b.original_file) end
-    if cache_imports || !ignore_imports
+    if cache_imports || ignore_imports != :All
         cache = import_cache(all_dict_info,import_dir)
     end
-    if !ignore_imports
-        resolve_imports!(all_dict_info,import_dir,cache)
+    if ignore_imports != :All
+        resolve_imports!(all_dict_info,import_dir,cache, ignore_imports)
     end
     # Apply default values if not a template dictionary
     if all_dict_info[:dictionary][!,:class][] != "Template"
@@ -1326,17 +1329,29 @@ import_cache(d,original_dir) = begin
 end
 
 """
-    resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache)
+    resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache, ignore)
 
 Replace all `_import.get` statements with the contents of the imported dictionary.
-`cache` contains a list of pre-imported files.
+`cache` contains a list of pre-imported files. `ignore` is the type of imports
+to ignore.
 """
-resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache) = begin
+resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache, ignore) = begin
     if !haskey(d,:import) return d end
-    resolve_templated_imports!(d,search_dir,cache)
-    new_c = resolve_full_imports!(d,search_dir)
-    # remove all imports
-    delete!(d,:import)
+    if ignore != :Contents
+        resolve_templated_imports!(d,search_dir,cache)
+        for i in eachrow(d[:import])
+            filter!(e -> get(e, "mode", "Contents") != "Contents", i.get)
+        end
+        filter!(row -> !isempty(row.get), d[:import])
+    end
+    if ignore != :Full
+        new_c = resolve_full_imports!(d,search_dir)
+        for i in eachrow(d[:import])
+            filter!(e -> get(e, "mode", "Contents") != "Full", i.get)
+        end
+        filter!(row -> !isempty(row.get), d[:import])
+    end
+    @debug "Imports now" d[:import]
     return d
 end
 

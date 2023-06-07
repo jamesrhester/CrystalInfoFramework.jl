@@ -45,10 +45,10 @@ Lerche.visit_tokens(t::TreeToCif) = false
 end
 
 strip_string(ss::String) = begin
-    if length(ss) < 6 return ss[2:end-1] end
-    if ss[1:3] == "'''" || ss[1:3] == "\"\"\""
-        return ss[4:end-3] end
-    return ss[2:end-1]
+    if length(ss) < 6 return ss[2:thisind(ss,end-1)] end
+    if ss[1:thisind(ss,3)] == "'''" || ss[1:thisind(ss,3)] == "\"\"\""
+        return ss[4:thisind(ss,end-3)] end
+    return ss[2:thisind(ss,end-1)]
 end
 
 unfold(sa) = begin
