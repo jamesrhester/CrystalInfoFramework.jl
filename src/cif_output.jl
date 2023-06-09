@@ -681,7 +681,8 @@ const ddlm_attribute_order = (:definition => (:id,:scope,:class),
                          :enumeration_set => (:state,:detail),
                          :enumeration => (:default,),
                          :units => (:code,),
-                         :description_example => (:case,:detail),
+                              :description_example => (:case,:detail),
+                              :enumeration_default => (:index, :value),
                          :import => (:get,),
                          :method => (:purpose,:expression)
                          )

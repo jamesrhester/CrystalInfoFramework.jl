@@ -1565,25 +1565,22 @@ check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
     x = d[name]
     if !haskey(x,:import) || nrow(x[:import])!=1 return false end
     spec = x[:import].get[]
-    if length(spec) > 1
-        println("Warning: cannot introspect multiple imports")
-        return false
-    end
-    spec = spec[]
-    if get(spec,"mode","Contents") == "Full" return false end
-    templ_file_name = joinpath(Path(d.import_dir),spec["file"])
-    if !(templ_file_name in keys(d.cached_imports))
-        println("Warning: cannot find $templ_file_name when checking imports for $name")
-        return false
-    end
-    templates = d.cached_imports[templ_file_name]
-    target_block = templates[spec["save"]]
-    # Find what we care about
-    if haskey(target_block,cat)
-        df = target_block[cat]
-        if obj in propertynames(df)
-            v = df[:,obj]
-            return length(v) == 1 && v[] == val
+    for one_spec in spec
+        if get(one_spec,"mode","Contents") == "Full" continue end
+        templ_file_name = joinpath(Path(d.import_dir), one_spec["file"])
+        if !(templ_file_name in keys(d.cached_imports))
+            println("Warning: cannot find $templ_file_name when checking imports for $name")
+            continue
+        end
+        templates = d.cached_imports[templ_file_name]
+        target_block = templates[one_spec["save"]]
+        # Find what we care about
+        if haskey(target_block,cat)
+            df = target_block[cat]
+            if obj in propertynames(df)
+                v = df[:,obj]
+                return val in v
+            end
         end
     end
     return false

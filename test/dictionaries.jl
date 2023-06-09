@@ -98,6 +98,9 @@ end
     ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=:All)
     @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
     @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
+    # Check enums
+    ud = DDLm_Dictionary(joinpath(@__PATH__,"small_core_test.dic"), ignore_imports=:All)
+    @test check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_default.index","Mn4+")
 end
 
 @testset "Function-related tests for DDLm" begin
