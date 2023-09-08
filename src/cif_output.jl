@@ -978,15 +978,17 @@ show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
     end
     for one_cat in all_cats
         if one_cat == head continue end
-        cat_info = ddlm_dic[one_cat]
-        # Remove "master_id" as an explicit key
-        ck = cat_info[:category_key]
-        if nrow(ck) > 0
-            ck = filter(row -> !occursin("master_id",row.name),ck)
-            cat_info[:category_key] = ck
+        if haskey(ddlm_dic, one_cat)
+            cat_info = ddlm_dic[one_cat]
+            # Remove "master_id" as an explicit key
+            ck = cat_info[:category_key]
+            if nrow(ck) > 0
+                ck = filter(row -> !occursin("master_id",row.name),ck)
+                cat_info[:category_key] = ck
+            end
+            @debug "Output definition for $one_cat"
+            show_one_def(io,uppercase(one_cat),cat_info)
         end
-        @debug "Output definition for $one_cat"
-        show_one_def(io,uppercase(one_cat),cat_info)
         #
         #  Definitions in the categories
         #
@@ -1017,8 +1019,8 @@ end
 # them. We add them at the end until we have a standard for how they
 # should be presented.
 get_sorted_cats(d,cat) = begin
-    cc = get_categories(d)
-    catinfo = sort!([(c,get_parent_category(d,c)) for c in cc])
+    cc = get_categories(d, referred = true)
+    catinfo = sort!([(c,get_parent_category(d,c, default_cat = cat)) for c in cc])
     filter!(x->x[1]!=x[2] && x[1] != cat,catinfo)
     @debug catinfo
     if length(catinfo) == 0 return [] end    #empty

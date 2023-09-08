@@ -433,11 +433,21 @@ is_category(d::DDLm_Dictionary,name) = begin
 end
 
 """
-    get_categories(d::DDLm_Dictionary)
+    get_categories(d::DDLm_Dictionary, referred=false)
 
-List all categories defined in DDLm Dictionary `d`
+List all categories defined in DDLm Dictionary `d`. If `referred` is `true`, categories
+for which data names are defined, but no category is defined, are also included.
 """
-get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}; referred = false) = begin
+    defed_cats = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+    if !referred return defed_cats end
+    more_cats = unique!(lowercase.(d[:name].category_id))
+    # remove dictionary name if that is referred to by the Head category
+    head_cat = find_head_category(d)
+    up_cat = get_parent_category(d, head_cat)
+    drop = head_cat == up_cat ? [] : [up_cat]
+    return setdiff(union(defed_cats, more_cats), drop)
+end
 
 """
     get_cat_class(d,catname)
@@ -588,15 +598,21 @@ get_dict_funcs(d::DDLm_Dictionary) = begin
 end
 
 """
-    get_parent_category(d::DDLm_Dictionary,child)
+    get_parent_category(d::DDLm_Dictionary,child; default_cat = nothing)
 
-Find the parent category of `child` according to `d`.
+Find the parent category of `child` according to `d`. `default_cat` is the
+category to use if no parent is specified (for example, the category information
+is contained in a dictionary that is not imported).
 """
-get_parent_category(d::DDLm_Dictionary,child) = begin
+get_parent_category(d::DDLm_Dictionary,child; default_cat = nothing) = begin
     try
         lowercase(d[child][:name][!,:category_id][])
     catch
-        return child
+        if isnothing(default_cat)
+            return child
+        else
+            return default_cat
+        end
     end
 end
 
