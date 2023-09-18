@@ -1292,6 +1292,32 @@ fix_url(s::String,parent) = begin
     return URI(s)
 end
 
+# Following code copied from URIs/uris.jl. For some reason
+# this function was not recognised during precompilation
+
+const absent = SubString("absent", 1, 0)
+
+function URIs.URI(p::AbstractPath; query=absent, fragment=absent)
+    if isempty(p.root)
+        throw(ArgumentError("$p is not an absolute path"))
+    end
+
+    b = IOBuffer()
+    print(b, "file://")
+
+    if !isempty(p.drive)
+        print(b, "/")
+        print(b, p.drive)
+    end
+
+    for s in p.segments
+        print(b, "/")
+        print(b, URIs.escapeuri(s))
+    end
+
+    return URIs.URI(URIs.URI(String(take!(b))); query=query, fragment=fragment)
+end
+
 """
     to_path(::URI)
 
