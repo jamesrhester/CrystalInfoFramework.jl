@@ -45,10 +45,10 @@ Lerche.visit_tokens(t::TreeToCif) = false
 end
 
 strip_string(ss::String) = begin
-    if length(ss) < 6 return ss[2:end-1] end
-    if ss[1:3] == "'''" || ss[1:3] == "\"\"\""
-        return ss[4:end-3] end
-    return ss[2:end-1]
+    if length(ss) < 6 return ss[2:thisind(ss,end-1)] end
+    if ss[1:thisind(ss,3)] == "'''" || ss[1:thisind(ss,3)] == "\"\"\""
+        return ss[4:thisind(ss,end-3)] end
+    return ss[2:thisind(ss,end-1)]
 end
 
 unfold(sa) = begin
@@ -134,17 +134,28 @@ end
     # count data names
     boundary = findfirst(x->!isa(x,Token),args)
     name_list = String.(args[2:boundary-1])
-    value_list = args[boundary:end]
+
+    for i in 1:length(name_list)
+        if any(x->isuppercase(x), name_list[i])
+            name_list[i] = lowercase(name_list[i])
+        end
+    end
+    
+    value_list = @view args[boundary:end]
     nrows,m = divrem(length(value_list),length(name_list))
     if m!=0 throw(error("Number of values in loop containing $(name_list[1]) is not a multiple of number of looped names")) end
     new_vals = reshape(value_list,length(name_list),:)
     per_name = permutedims(new_vals,[2,1])
-    Dict{String,Array{CifValue,1}}(zip(lowercase.(name_list),eachcol(per_name)))
+    Dict{String,Array{CifValue,1}}(zip(name_list,eachcol(per_name)))
 end
 
 @inline_rule scalar_item(t::TreeToCif,dataname,datavalue) = begin
     if !ismissing(datavalue)
-        String(dataname) => CifValue[datavalue]
+        if any(x->isuppercase(x), dataname)
+            String(lowercase(dataname)) => CifValue[datavalue]
+        else
+            String(dataname) => CifValue[datavalue]
+        end
     end
 end
 
@@ -187,8 +198,9 @@ end
 
 add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
     k,v = data_item
-    if !haskey(cb,k)
-        cb[lowercase(k)] = v
+    @assert !any(x->isuppercase(x), k)
+    if !(k in keys(cb))
+        cb[k] = v
     else
         throw(error("Duplicate item name $k"))
     end

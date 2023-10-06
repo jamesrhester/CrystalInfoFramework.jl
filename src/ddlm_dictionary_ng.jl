@@ -94,22 +94,25 @@ DDLm_Dictionary(c::Cif;kwargs...) = begin
 end
 
 """
-    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports=false,cache_imports=false)
+    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports="None",
+    cache_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
-extra debugging information during reading.`ignore_imports = true` will ignore
-any `import` attributes. `cache_imports` will store the contents of imported
+extra debugging information during reading.`ignore_imports = :None` will ignore
+any `import` attributes. Other options are `:Full` and `:Contents` to ignore
+imports with the respective `mode`, and `:all` to ignore all imports.
+`cache_imports` will store the contents of imported
 files (`Contents` mode only) but will not merge the contents into the
 importing definition.
 
-Setting `ignore_imports` to `false` (the default) merges all information in
+Setting `ignore_imports` to :None (the default) merges all information in
 imported files into the dictionary, replacing the `import` attribute.
 
 By default imports are cached, even if they are not
 merged. `cache_imports` can be set to `false` to completely ignore any
 import attributes.
 
-`cache_imports` is ignored if `ignore_imports` is `false`.
+`cache_imports` is ignored if `ignore_imports` is :None.
 
 If a non-absolute location for imported dictionaries is specified, they are
 searched for relative to the same directory as the importing dictionary,
@@ -126,7 +129,7 @@ DDLm_Dictionary(a::String;kwargs...) = begin
     DDLm_Dictionary(Path(a);kwargs...)
 end
 
-DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="",cache_imports=true,import_dir="") = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin
     all_dict_info = Dict{Symbol,DataFrame}()
     # Namespace
     nspace = get(b,"_dictionary.namespace",[""])[]
@@ -170,11 +173,11 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=false,header="",cache_imports=true,im
     cache = Dict()
     # process imports
     if import_dir == "" import_dir = dirname(b.original_file) end
-    if cache_imports || !ignore_imports
+    if cache_imports || ignore_imports != :All
         cache = import_cache(all_dict_info,import_dir)
     end
-    if !ignore_imports
-        resolve_imports!(all_dict_info,import_dir,cache)
+    if ignore_imports != :All
+        resolve_imports!(all_dict_info,import_dir,cache, ignore_imports)
     end
     # Apply default values if not a template dictionary
     if all_dict_info[:dictionary][!,:class][] != "Template"
@@ -437,11 +440,21 @@ is_category(d::DDLm_Dictionary,name) = begin
 end
 
 """
-    get_categories(d::DDLm_Dictionary)
+    get_categories(d::DDLm_Dictionary, referred=false)
 
-List all categories defined in DDLm Dictionary `d`
+List all categories defined in DDLm Dictionary `d`. If `referred` is `true`, categories
+for which data names are defined, but no category is defined, are also included.
 """
-get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}) = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}; referred = false) = begin
+    defed_cats = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+    if !referred return defed_cats end
+    more_cats = unique!(lowercase.(d[:name].category_id))
+    # remove dictionary name if that is referred to by the Head category
+    head_cat = find_head_category(d)
+    up_cat = get_parent_category(d, head_cat)
+    drop = head_cat == up_cat ? [] : [up_cat]
+    return setdiff(union(defed_cats, more_cats), drop)
+end
 
 """
     get_cat_class(d,catname)
@@ -593,15 +606,21 @@ get_dict_funcs(d::DDLm_Dictionary) = begin
 end
 
 """
-    get_parent_category(d::DDLm_Dictionary,child)
+    get_parent_category(d::DDLm_Dictionary,child; default_cat = nothing)
 
-Find the parent category of `child` according to `d`.
+Find the parent category of `child` according to `d`. `default_cat` is the
+category to use if no parent is specified (for example, the category information
+is contained in a dictionary that is not imported).
 """
-get_parent_category(d::DDLm_Dictionary,child) = begin
+get_parent_category(d::DDLm_Dictionary,child; default_cat = nothing) = begin
     try
         lowercase(d[child][:name][!,:category_id][])
     catch
-        return child
+        if isnothing(default_cat)
+            return child
+        else
+            return default_cat
+        end
     end
 end
 
@@ -677,7 +696,7 @@ with the list of values as a dictionary.
 """
 
 get_enums(d::DDLm_Dictionary) = begin
-    res = Dict{String,Array{String,1}}()
+    res = Dict{String,Array{Union{Nothing,String},1}}()
     for k in keys(d)
         v = d[k]
         if haskey(v,:enumeration_set) && nrow(v[:enumeration_set])>0
@@ -1304,6 +1323,32 @@ fix_url(s::String,parent) = begin
     return URI(s)
 end
 
+# Following code copied from URIs/uris.jl. For some reason
+# this function was not recognised during precompilation
+
+const absent = SubString("absent", 1, 0)
+
+function URIs.URI(p::AbstractPath; query=absent, fragment=absent)
+    if isempty(p.root)
+        throw(ArgumentError("$p is not an absolute path"))
+    end
+
+    b = IOBuffer()
+    print(b, "file://")
+
+    if !isempty(p.drive)
+        print(b, "/")
+        print(b, p.drive)
+    end
+
+    for s in p.segments
+        print(b, "/")
+        print(b, URIs.escapeuri(s))
+    end
+
+    return URIs.URI(URIs.URI(String(take!(b))); query=query, fragment=fragment)
+end
+
 """
     to_path(::URI)
 
@@ -1357,17 +1402,29 @@ import_cache(d,original_dir) = begin
 end
 
 """
-    resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache)
+    resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache, ignore)
 
 Replace all `_import.get` statements with the contents of the imported dictionary.
-`cache` contains a list of pre-imported files.
+`cache` contains a list of pre-imported files. `ignore` is the type of imports
+to ignore.
 """
-resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache) = begin
+resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache, ignore) = begin
     if !haskey(d,:import) return d end
-    resolve_templated_imports!(d,search_dir,cache)
-    new_c = resolve_full_imports!(d,search_dir)
-    # remove all imports
-    delete!(d,:import)
+    if ignore != :Contents
+        resolve_templated_imports!(d,search_dir,cache)
+        for i in eachrow(d[:import])
+            filter!(e -> get(e, "mode", "Contents") != "Contents", i.get)
+        end
+        filter!(row -> !isempty(row.get), d[:import])
+    end
+    if ignore != :Full
+        new_c = resolve_full_imports!(d,search_dir)
+        for i in eachrow(d[:import])
+            filter!(e -> get(e, "mode", "Contents") != "Full", i.get)
+        end
+        filter!(row -> !isempty(row.get), d[:import])
+    end
+    @debug "Imports now" d[:import]
     return d
 end
 
@@ -1581,25 +1638,22 @@ check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
     x = d[name]
     if !haskey(x,:import) || nrow(x[:import])!=1 return false end
     spec = x[:import].get[]
-    if length(spec) > 1
-        println("Warning: cannot introspect multiple imports")
-        return false
-    end
-    spec = spec[]
-    if get(spec,"mode","Contents") == "Full" return false end
-    templ_file_name = joinpath(Path(d.import_dir),spec["file"])
-    if !(templ_file_name in keys(d.cached_imports))
-        println("Warning: cannot find $templ_file_name when checking $cat.$obj is $val for $name")
-        return false
-    end
-    templates = d.cached_imports[templ_file_name]
-    target_block = templates[spec["save"]]
-    # Find what we care about
-    if haskey(target_block,cat)
-        df = target_block[cat]
-        if obj in propertynames(df)
-            v = df[:,obj]
-            return length(v) == 1 && v[] == val
+    for one_spec in spec
+        if get(one_spec,"mode","Contents") == "Full" continue end
+        templ_file_name = joinpath(Path(d.import_dir), one_spec["file"])
+        if !(templ_file_name in keys(d.cached_imports))
+            println("Warning: cannot find $templ_file_name when checking imports for $name")
+            continue
+        end
+        templates = d.cached_imports[templ_file_name]
+        target_block = templates[one_spec["save"]]
+        # Find what we care about
+        if haskey(target_block,cat)
+            df = target_block[cat]
+            if obj in propertynames(df)
+                v = df[:,obj]
+                return val in v
+            end
         end
     end
     return false

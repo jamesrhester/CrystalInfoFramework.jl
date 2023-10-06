@@ -1132,6 +1132,175 @@ loop_
 
 save_
 
+save_STRUCTURE
+
+    _definition.id                STRUCTURE
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2012-11-20
+    _description.text
+;
+    The DICTIONARY group encompassing the CORE STRUCTURE data items defined
+    and used within the Crystallographic Information Framework (CIF).
+;
+    _name.category_id             CIF_CORE
+    _name.object_id               STRUCTURE
+
+save_
+
+save_ATOM
+
+    _definition.id                ATOM
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2012-11-20
+    _description.text
+;
+    The CATEGORY of data items used to describe atomic information
+    used in crystallographic structure studies.
+;
+    _name.category_id             STRUCTURE
+    _name.object_id               ATOM
+
+save_
+
+save_ATOM_TYPE
+
+    _definition.id                ATOM_TYPE
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2021-06-29
+    _description.text
+;
+    The CATEGORY of data items used to describe atomic type information
+    used in crystallographic structure studies.
+;
+    _name.category_id             ATOM
+    _name.object_id               ATOM_TYPE
+    _category_key.name            '_atom_type.symbol'
+    _method.purpose               Evaluation
+    _method.expression
+;
+    typelist  = List()
+
+    Loop  a  as  atom_site  {
+       type = AtomType ( a.label )
+       If( type not in typelist )  typelist ++= type
+     }
+     For type in typelist {
+                             atom_type(.symbol         = type,
+                                       .number_in_cell = '?'   )
+     }
+;
+
+save_
+
+save_atom_type.symbol
+
+    _definition.id                '_atom_type.symbol'
+    _alias.definition_id          '_atom_type_symbol'
+    _definition.update            2021-10-27
+    _description.text
+;
+    The identity of the atom specie(s) representing this atom type.
+    Normally this code is the element symbol followed by the charge
+    if there is one. The symbol may be composed of any character except
+    an underline or a blank, with the proviso that digits designate an
+    oxidation state and must be followed by a + or - character.
+;
+    _name.category_id             atom_type
+    _name.object_id               symbol
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Word
+
+    loop_
+      _description_example.case
+         Mg
+         Cu2+
+         dummy
+         FeNi
+
+save_
+
+save_ATOM_TYPE_SCAT
+
+    _definition.id                ATOM_TYPE_SCAT
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2021-06-29
+    _description.text
+;
+    The CATEGORY of data items used to describe atomic scattering
+    information used in crystallographic structure studies.
+;
+    _name.category_id             ATOM_TYPE
+    _name.object_id               ATOM_TYPE_SCAT
+    _category_key.name            '_atom_type_scat.symbol'
+
+save_
+
+save_atom_type_scat.cromer_mann_a1
+
+    _definition.id                '_atom_type_scat.Cromer_Mann_a1'
+
+    loop_
+      _alias.definition_id
+         '_atom_type_scat_Cromer_Mann_a1'
+         '_atom_type.scat_Cromer_Mann_a1'
+
+    _name.category_id             atom_type_scat
+    _name.object_id               Cromer_Mann_a1
+
+    _import.get
+        [
+         {'file':templ_attr.cif  'save':cromer_mann_coeff}
+         {'file':templ_enum.cif  'save':cromer_mann_a1}
+        ]
+
+save_
+
+save_atom_type_scat.cromer_mann_a2
+
+    _definition.id                '_atom_type_scat.Cromer_Mann_a2'
+
+    loop_
+      _alias.definition_id
+         '_atom_type_scat_Cromer_Mann_a2'
+         '_atom_type.scat_Cromer_Mann_a2'
+
+    _name.category_id             atom_type_scat
+    _name.object_id               Cromer_Mann_a2
+
+    _import.get
+        [
+         {'file':templ_attr.cif  'save':cromer_mann_coeff}
+         {'file':templ_enum.cif  'save':cromer_mann_a2}
+        ]
+
+save_
+
+save_atom_type_scat.symbol
+
+    _definition.id                '_atom_type_scat.symbol'
+    _alias.definition_id          '_atom_type_scat_symbol'
+    _definition.update            2021-10-27
+    _description.text
+;
+    The identity of the atom specie(s) representing this atom type.
+    See _atom_type.symbol for further details.
+;
+    _name.category_id             atom_type_scat
+    _name.object_id               symbol
+    _name.linked_item_id          '_atom_type.symbol'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Word
+
+save_
+
 loop_
   _dictionary_audit.version
   _dictionary_audit.date

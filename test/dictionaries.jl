@@ -98,9 +98,12 @@ end
 end
 
 @testset "Introspecting imports" begin
-    ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=true)
+    ud = DDLm_Dictionary(joinpath(@__PATH__,"cif_mag.dic"),ignore_imports=:All)
     @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
     @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
+    # Check enums
+    ud = DDLm_Dictionary(joinpath(@__PATH__,"small_core_test.dic"), ignore_imports=:All)
+    @test check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_default.index","Mn4+")
 end
 
 @testset "Function-related tests for DDLm" begin
@@ -143,6 +146,7 @@ end
     @test "_units.master_id" in get_keys_for_cat(t,"units")
     @test get_linked_name(t,"_method.master_id") == "_definition.master_id"
     @test "dictionary_audit" in CrystalInfoFramework.find_top_level_cats(t)
+    @test nothing in get_enums(t)["_definition.class"]
 end
 
 @testset "DDL2 dictionaries" begin

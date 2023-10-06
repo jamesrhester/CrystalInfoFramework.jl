@@ -20,10 +20,11 @@
 
 module CrystalInfoFramework
 using DataFrames
+using URIs
 using FilePaths   #easy cross-platform URI
-using URIParser
 using Lerche # for native parser
 using cif_api_jll # for cif API parser
+using PrecompileTools #for fast startup
 
 # **Exports**
 
@@ -75,7 +76,12 @@ import Base: isless
 include("DataContainer/Types.jl")
 include("DataContainer/DataSource.jl")
 include("DataContainer/Relations.jl")
+end
 
+#
+@compile_workload begin
+    c = Cif(joinpath(@__PATH__,"../test/nick1.cif"), native=true)
+    d = DDLm_Dictionary(joinpath(@__PATH__,"../test/ddl.dic"), ignore_imports=true)
 end
 
 end
