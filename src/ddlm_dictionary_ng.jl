@@ -397,7 +397,7 @@ Find the canonical name referenced by `cat.obj` in `d`, searching also child
 categories according to DDLm semantics. Note that the head category may not 
 have a category associated with it.
 """
-find_name(d::DDLm_Dictionary,cat,obj) = begin
+find_name(d::DDLm_Dictionary, cat, obj) = begin
     catcol = d[:name][!,:category_id]
     selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),catcol)
     pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
@@ -648,8 +648,9 @@ end
     get_child_categories(d::DDLm_Dictionary,parent)
 
 Find the child categories of `parent` according to `d`.
+TODO: more than one level down.
 """
-get_child_categories(d::DDLm_Dictionary,parent) = begin
+get_child_categories(d::DDLm_Dictionary, parent) = begin
     [c for c in get_categories(d) if get_parent_category(d,c) == lowercase(parent)]
 end
 

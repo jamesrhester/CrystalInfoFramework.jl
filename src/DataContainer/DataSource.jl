@@ -1,13 +1,50 @@
-
 # *DataSources and Relational Data Sources*
 
 # A DataSource is a generic source of data that is capable
-# only of providing an array of values indexed by name.
+# only of providing an array of values indexed by a name
+# drawn from a namespace.
 
 # **Exports**
 export get_assoc_index, get_all_associated_indices
 export get_assoc_value, get_all_associated_values
 export get_namespaces
+
+#=
+
+Namespaces
+
+All objects supporting namespaces should define two methods on themselves:
+select_namespace(x, nspace) and get_namespaces(x). select_namespace filters x so
+that only those parts of the object relating to nspace are returned.
+
+=#
+
+"""
+    @namespacify f(a....)
+
+Define two methods for the function f, one which takes a namespace argument
+and one which doesn't.
+
+"""
+macro namespacify(ex)
+    show(ex)
+    @capture(ex, f_(args__) = body_)
+    quote
+        $(esc(f))($(args...), nspace) =
+            begin
+                $(args[begin]) = select_namespace($(args[begin]), nspace)
+                $body
+            end
+        $(esc(f))($(args...)) = begin
+            nspace = get_namespaces($(args[begin]))
+            if length(nspace) != 1
+                throw(error("Please select namespace, choices are $nspace"))
+            end
+            $(esc(f))($(args...), nspace[])
+        end
+          
+    end 
+end
 
 """
 get_namespaces(x)
@@ -15,16 +52,25 @@ get_namespaces(x)
 Return the designators for the namespaces from which the names used to
 access the data are drawn.
 """
-get_namespaces(x) = [""]
-select_namespace(x,s) = x
+get_namespaces(x) = [nothing]
+
+"""
+    select_namespace(x, y)
+
+Return an object containing only data relating to namespace `y`. `nothing`
+will return x unchanged.
+"""
+select_namespace(x, ::Nothing) = x
+
 
 """
 Return the index into `other_name` for position `index` of the array returned
 for `name`, which is mapped from `other_name`. If there is no such mapping, error.  
 """
-get_assoc_index(x,n,i,o) = get_assoc_index(DataSource(x),x,n,i,o)
-get_assoc_index(::IsNotDataSource,x,n,i,o) = error("$(typeof(x)) is not a DataSource")
-get_assoc_index(::IsDataSource,x,n,i,o) = begin
+@namespacify get_assoc_index(x, n, i, o) = get_assoc_index(DataSource(x), x, n, i, o)
+
+get_assoc_index(::IsNotDataSource, x, n, i, o) = error("$(typeof(x)) is not a DataSource")
+get_assoc_index(::IsDataSource, x, n, i, o) = begin
     if !haskey(x,n) return missing end
     name_len = length(x[n])
     if !haskey(x,o) return missing end
@@ -34,14 +80,14 @@ get_assoc_index(::IsDataSource,x,n,i,o) = begin
     return missing
 end
 
-get_assoc_value(x,n,i,o) = get_assoc_value(DataSource(x),x,n,i,o)
+@namespacify get_assoc_value(x,n,i,o) = get_assoc_value(DataSource(x),x,n,i,o)
 get_assoc_value(::IsDataSource,x,n,i,o) = x[o][get_assoc_index(IsDataSource(),x,n,i,o)]
 
 """
 Get all values of `o` associated with `n` such that the ith entry of `n`
 corresponds to the ith entry of `o`.
 """
-get_all_associated_indices(x,n,o) = get_all_associated_indices(DataSource(x),x,n,o)
+@namespacify get_all_associated_indices(x,n,o) = get_all_associated_indices(DataSource(x),x,n,o)
 
 """
 Default method: return all associated values of `other_name` assuming that like
@@ -58,7 +104,7 @@ get_all_associated_indices(::IsDataSource,ds,name::String,other_name::String) = 
     return []
 end
 
-get_all_associated_values(x,n,o) =
+@namespacify get_all_associated_values(x,n,o) =
     (get_assoc_value(x,n,i,o) for i in get_all_associated_indices(x,n,o))
 
 # == Dict methods == #
@@ -253,15 +299,11 @@ end
 get_dictionary(t::TypedDataSource) = t.dict
 get_datasource(t::TypedDataSource) = t.data
 get_namespaces(t::TypedDataSource) = [get_dic_namespace(get_dictionary(t))]
-select_namespace(t::TypedDataSource,nspace) = begin
+select_namespace(t::TypedDataSource, nspace) = begin
     if nspace != get_namespaces(t)[]
         throw(KeyError(t))
     end
     t
-end
-
-select_namespace(t::NamespacedTypedDataSource,nspace) = begin
-    t.data[nspace]
 end
 
 """
@@ -303,13 +345,9 @@ getindex(t::TypedDataSource,s::AbstractString) = begin
     actual_type = convert_to_julia(refdict,s,raw_val)
 end
 
-Base.getindex(t::TypedDataSource,s,n) = t[s]  #no namespaces
+Base.getindex(t::TypedDataSource, s, n) = t[s]  #single namespace
 
-Base.getindex(t::NamespacedTypedDataSource,s::AbstractString,n::AbstractString) = begin
-    select_namespace(t,n)[s]
-end
-
-Base.get(t::TypedDataSource,s::AbstractString,default) = begin
+Base.get(t::TypedDataSource,s::AbstractString, default) = begin
     try
         t[s]
     catch KeyError
@@ -321,7 +359,7 @@ end
 iterate(t::TypedDataSource) = iterate(get_datasource(t))
 iterate(t::TypedDataSource,s) = iterate(get_datasource(t),s)
 
-haskey(t::TypedDataSource,s::AbstractString) = begin
+haskey(t::TypedDataSource, s::AbstractString) = begin
     actual_data = get_datasource(t)
     # go through all aliases
     ref_dic = get_dictionary(t)
@@ -348,7 +386,7 @@ Return the index of the value in `t[other_name]` corresponding to `name[i]`.
 If `other_name` has linked key values they will also be checked if `name` is missing.
 The intended use is for `other_name` to be a linked key data name.
 """
-get_assoc_index(t::TypedDataSource,name,index,other_name) = begin
+get_assoc_index(t::TypedDataSource, name, index, other_name) = begin
     # find the right names
     ds = get_datasource(t)
     dict = get_dictionary(t)
@@ -371,7 +409,7 @@ get_assoc_index(t::TypedDataSource,name,index,other_name) = begin
     return get_assoc_index(ds,raw_name[1],index,raw_other[1])
 end
 
-get_all_associated_indices(t::TypedDataSource,name,other_name) = begin
+get_all_associated_indices(t::TypedDataSource, name, other_name) = begin
     # find the right names
     ds = get_datasource(t)
     dict = get_dictionary(t)

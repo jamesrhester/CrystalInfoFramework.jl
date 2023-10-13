@@ -72,17 +72,12 @@ MultiDataSource(x) = MultiDataSource(x,Dict{String,Any}())
     TypedDataSource(data,dictionary)
 
 A `TypedDataSource` is a `DataSource` that returns items with the correct type
-and aliases resolved, as specified in the associated CIF dictionary.
+and aliases resolved, as specified in the associated CIF dictionary. The
+dictionary also provides a namespace.
 """
-struct TypedDataSource{T} <: DataSource
+struct TypedDataSource{T} <: NamespacedDataSource
     data::T
     dict::AbstractCifDictionary
-end
-
-# ***With namespaces***
-
-struct NamespacedTypedDataSource <: NamespacedDataSource
-    data::Dict{String,TypedDataSource}
 end
 
 # == Relations ==
@@ -109,11 +104,40 @@ abstract type Row end
 # are separated here and they are allowed to be different.  Keys and
 # values still refer to the items stored in the container itself.
 
+#=
+
+A collection of named tables
+
+=#
+
+#=
+
+Interface for a relational container:
+
+has_category(arc, cat_name, (namespace))
+
+haskey(arc, key, (namespace))
+
+get(arc, key, (namespace)) <= take account of single-row categories
+
+get_corresponding(arc, row, cat, (nspace))
+   Find the row in `cat` corresponding to `row`, based on data name
+   links.
+
+get_dictionary(arc, (nspace))
+  Return a dictionary describing the contents of arc
+
+=#
+
 abstract type AbstractRelationalContainer <: NamespacedDataSource end
+
+# Sample implementation
 
 struct RelationalContainer{T} <: AbstractRelationalContainer
     data::Dict{String,T}    #usually values are TypedDataSource
     dicts::Dict{String,V} where {V<:AbstractCifDictionary}
+    name_to_catobj::Dict{String, Dict{String, Tuple(Symbol, Symbol)}}
+    catobj_to_name::Dict{String, Dict{Tuple(Symbol, Symbol), String}}
 end
 
 # == Cif Categories == #
@@ -136,22 +160,6 @@ struct CatPacket <: Row
     source_cat::CifCategory
 end
 
-# **Legacy Category**
-
-# A LegacyCategory is missing keys, so very little can be done
-# for it until the keys are generated somehow. We store the
-# data names that are available.
-
-struct LegacyCategory <: CifCategory
-    name::String
-    column_names::Array{Symbol,1}
-    rawdata
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    dictionary::AbstractCifDictionary
-    namespace::String
-end
-
 # **DDLm Categories**
 
 # DDLm classifies relations into Set categories,
@@ -159,24 +167,6 @@ end
 # child Loop categories.
 
 abstract type DDLmCategory <: CifCategory end
-    
-# ***Set Categories***
-# A SetCategory has a single row and no keys, which means
-# that access via key values is impossible, but unambiguous
-# values are available. Child categories do not exist.
-
-struct SetCategory <: DDLmCategory
-    name::String
-    column_names::Array{Symbol,1}
-    rawdata
-    present::Array{Symbol,1}
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    dictionary::DDLm_Dictionary
-    namespace::String
-end
-
-DataSource(::SetCategory) = IsDataSource()
 
 # ***Loop Category***
 #
@@ -185,15 +175,11 @@ DataSource(::SetCategory) = IsDataSource()
 # with the parent category using the keys.
 
 struct LoopCategory <: CifCategory
-    name::String
-    column_names::Array{Symbol,1}
-    keys::Array{Symbol,1}
-    rawdata
-    name_to_object::Dict{String,Symbol}
-    object_to_name::Dict{Symbol,String}
-    child_categories::Array{LoopCategory,1}
-    dictionary::AbstractCifDictionary
+    name::Symbol
     namespace::String
+    column_names::Array{Symbol,1}
+    children::Array{DDLmCategory, 1}
+    container::AbstractRelationalContainer
 end
 
 DataSource(LoopCategory) = IsDataSource()
