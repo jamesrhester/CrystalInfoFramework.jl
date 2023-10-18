@@ -92,21 +92,21 @@ end
 abstract type Relation end
 abstract type Row end
 
-# A RelationalContainer models a system of interconnected tables conforming
-# the relational model, with an eye on the functional representation and
-# category theory.   Dictionaries are used to establish inter-category links
-# and category keys. Any alias and type information is ignored. If this
-# information is relevant, the data source must handle it (e.g. by using
-# a TypedDataSource).
-#
-# Although it is expected that the dictionary for each namespace will
-# be identical in both the `TypedDataSource` and the dictionary, they
-# are separated here and they are allowed to be different.  Keys and
-# values still refer to the items stored in the container itself.
+#==
 
-#=
+ A RelationalContainer models a system of interconnected tables
+ conforming the relational model, with an eye on the functional
+ representation and category theory.  Dictionaries are used to
+ establish inter-category links and category keys. Any alias and type
+ information is ignored. If this information is relevant, the data
+ source must handle it (e.g. by using a TypedDataSource).
 
-A collection of named tables
+ Although it is expected that the dictionary for each namespace will
+ be identical in both the `TypedDataSource` and the dictionary, they
+ are separated here and they are allowed to be different.  Keys and
+ values still refer to the items stored in the container itself.
+
+ A collection of named tables
 
 =#
 
@@ -136,8 +136,8 @@ abstract type AbstractRelationalContainer <: NamespacedDataSource end
 struct RelationalContainer{T} <: AbstractRelationalContainer
     data::Dict{String,T}    #usually values are TypedDataSource
     dicts::Dict{String,V} where {V<:AbstractCifDictionary}
-    name_to_catobj::Dict{String, Dict{String, Tuple(Symbol, Symbol)}}
-    catobj_to_name::Dict{String, Dict{Tuple(Symbol, Symbol), String}}
+    name_to_catobj::Dict{String, Dict{String, Tuple{Symbol, Symbol}}}
+    catobj_to_name::Dict{String, Dict{Tuple{Symbol, Symbol}, String}}
 end
 
 # == Cif Categories == #
@@ -178,7 +178,7 @@ struct LoopCategory <: CifCategory
     name::Symbol
     namespace::String
     column_names::Array{Symbol,1}
-    children::Array{DDLmCategory, 1}
+    children::Array{CifCategory, 1}
     container::AbstractRelationalContainer
 end
 

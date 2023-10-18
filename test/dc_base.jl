@@ -24,6 +24,12 @@ prepare_sources() = begin
     return (cdic,data)
 end
 
+prepare_rc() = begin
+    cdic, data = prepare_sources()
+    ddata = TypedDataSource(data, cdic)
+    RelationalContainer(ddata, cdic) 
+end
+
 @testset "Test simple dict as DataSource" begin
     testdic = Dict("a"=>[1,2,3],"b"=>[4,5,6],"c"=>[0],"d"=>[11,12])
     @test get_assoc_index(testdic,"b",3,"a") == 3
@@ -130,49 +136,50 @@ end
     @test length(q) == length(t["_atom_site_fract_x"]) #aliases
 end
 
+
+@testset "Test construction of RelationalContainers from Datasources and dictionaries" begin
+    my_rc = prepare_rc()
+    # loops
+    @test length(get_category(my_rc, "atom_type")[:atomic_mass]) == 3
+    # sets
+    @test get_category(my_rc, "cell")[:volume][] == 635.3
+end
+
 @testset "Test construction of a CifCategory" begin
-    cdic,data = prepare_sources()
-    atom_cat = LoopCategory("atom_site",data,cdic)
+    my_rc = prepare_rc()
+    atom_cat = LoopCategory(my_rc, "atom_site")
     @test get_key_datanames(atom_cat) == [:label]
     # Test getting a particular value
-    mypacket = CatPacket(3,atom_cat)
-    @test get_value(mypacket,:fract_x) == ".2501(5)"
+    mypacket = CatPacket(3, atom_cat)
+    @test get_value(mypacket, :fract_x) == ".2501(5)"
     # Test relation interface
-    @test get_value(atom_cat,Dict(:label=>"o2"),:fract_z) == ".2290(11)"
+    @test get_value(atom_cat, Dict(:label=>"o2"), :fract_z) == ".2290(11)"
     # Test missing data
-    empty_cat = LoopCategory("diffrn_orient_refln",data,cdic)
+    empty_cat = LoopCategory(my_rc, "diffrn_orient_refln")
     # Test set category
-    set_cat = SetCategory("cell",data,cdic)
+    set_cat = LoopCategory(my_rc, "cell")
     @test set_cat[:volume][] == "635.3(11)"
     # Test getting a key value
     @test atom_cat["o2"].fract_z == ".2290(11)"
 end
 
 @testset "Test child categories" begin
-    cdic,data = prepare_sources()
-    atom_cat = LoopCategory("atom_site",data,cdic)
+    
+    my_rc = prepare_rc()
+    atom_cat = LoopCategory(my_rc, "atom_site")
     @test get_value(atom_cat,Dict(:label=>"o2"),:u_11) == ".029(3)"
+
 end
 
 @testset "Test behaviour of plain CatPackets" begin
-    cdic,data  = prepare_sources()
-    atom_cat = LoopCategory("atom_site",data,cdic)
+    my_rc  = prepare_rc()
+    atom_cat = LoopCategory(my_rc, "atom_site")
     for one_pack in atom_cat
         @test !ismissing(one_pack.fract_x)
         if one_pack.label == "o2"
             @test one_pack.fract_z == ".2290(11)"
         end
     end
-end
-
-@testset "Test construction of RelationalContainers from Datasources and dictionaries" begin
-    cdic,data = prepare_sources()
-    ddata = TypedDataSource(data,cdic)
-    my_rc = RelationalContainer(ddata,cdic)
-    # loops
-    @test length(get_category(my_rc,"atom_type")[:atomic_mass]) == 3
-    # sets
-    @test get_category(my_rc,"cell")[:volume][] == 635.3
 end
 
 include("namespaces.jl")

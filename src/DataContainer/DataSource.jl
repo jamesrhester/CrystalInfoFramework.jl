@@ -19,23 +19,16 @@ that only those parts of the object relating to nspace are returned.
 
 =#
 
-"""
-    @namespacify f(a....)
-
-Define two methods for the function f, one which takes a namespace argument
-and one which doesn't.
-
-"""
 macro namespacify(ex)
-    show(ex)
+    # show(ex)
     @capture(ex, f_(args__) = body_)
     quote
-        $(esc(f))($(args...), nspace) =
+        Base.@__doc__ $(esc(f))($(args...), nspace) =
             begin
                 $(args[begin]) = select_namespace($(args[begin]), nspace)
                 $body
             end
-        $(esc(f))($(args...)) = begin
+        Base.@__doc__ $(esc(f))($(args...)) = begin
             nspace = get_namespaces($(args[begin]))
             if length(nspace) != 1
                 throw(error("Please select namespace, choices are $nspace"))

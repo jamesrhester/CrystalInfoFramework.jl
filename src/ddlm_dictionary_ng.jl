@@ -42,6 +42,7 @@ export get_cat_class
 export get_enums          #get all enumerated lists
 export get_attribute      #get value of particular attribute for a definition 
 export get_dic_namespace
+export get_child_categories # all child categories
 export is_category
 export find_head_category,add_head_category!
 export rename_category!, rename_name!   #Rename category and names throughout
@@ -415,6 +416,10 @@ find_name(d::DDLm_Dictionary, cat, obj) = begin
     throw(KeyError("$cat/$obj"))
 end
 
+find_name(d::DDLm_Dictionary, cat::Symbol, obj::Symbol) = begin
+    find_name(d, String(cat), String(obj))
+end
+
 """
     find_category(d::DDLm_Dictionary,dataname)
 
@@ -509,9 +514,9 @@ end
 List all category key data names for `cat` listed in `d`. If `aliases`, include alternative names
 for the key data names.
 """
-get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
+get_keys_for_cat(d::DDLm_Dictionary, cat;aliases=false) = begin
     loop_keys = lowercase.(d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name])
-    key_aliases = []
+    key_aliases = String[]
     if aliases
         for k in loop_keys
             append!(key_aliases,list_aliases(d,k))
@@ -519,6 +524,10 @@ get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false) = begin
     end
     append!(key_aliases,loop_keys)
     return key_aliases
+end
+
+get_keys_for_cat(d::DDLm_Dictionary, cat::Symbol; kwargs...) = begin
+    get_keys_for_cat(d, String(cat); kwargs...)
 end
 
 """
@@ -675,7 +684,7 @@ end
 """
     get_single_key_cats(d::DDLm_Dictionary)
 
-Return a list (category,keyname) for all categories that have
+Return a list (category, keyname) for all categories that have
 a single key, where that key is not a child key of another
 category. This latter case corresponds to a split single
 category.

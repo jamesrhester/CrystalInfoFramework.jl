@@ -69,6 +69,7 @@ module DataContainer
 
 using ..CrystalInfoFramework
 using DataFrames
+using MacroTools
 
 import Base: haskey,getindex,keys,show,iterate,length
 import Base: isless
