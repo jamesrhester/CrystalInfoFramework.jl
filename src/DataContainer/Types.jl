@@ -14,8 +14,8 @@
 
 export DataSource,MultiDataSource, TypedDataSource
 export IsDataSource
-export AbstractRelationalContainer,RelationalContainer,DDLmCategory, CatPacket
-export CifCategory, LegacyCategory, SetCategory, LoopCategory
+export AbstractRelationalContainer, RelationalContainer,DDLmCategory, CatPacket
+export NamespacedRC, CifCategory, LoopCategory
 
 # We implement DataSources as traits to allow them to be
 # grafted onto other file formats.
@@ -132,14 +132,38 @@ get_dictionary(arc, (nspace))
 abstract type AbstractRelationalContainer <: NamespacedDataSource end
 
 # Sample implementation
+"""
+Values in a `RelationalContainer` are accessed by name or symbol.
+In both cases the name/symbol belongs to a particular namespace. When
+accessed by symbol, parent-child relationships are recognised for
+both key and non-key data names. So, for example, if category
+`atom_site_aniso` is a child category of `atom_site`, then member
+`u11` of `atom_site_aniso` can be accessed as `:atom_site_aniso, :u_11`,
+`:atom_site, :u_11` and `"_atom_site_aniso.u_11"`.
 
+Similarly, if the
+key data name for both categories is `<cat name>.label`, then a
+particular row in either category can be indicated using all four
+forms: `:atom_site, :label`, `:atom_site_aniso, :label`, "_atom_site.label"
+or "_atom_site_aniso.label". This latter behaviour arises because of
+the equivalence of key data names.
+"""
 struct RelationalContainer{T} <: AbstractRelationalContainer
-    data::Dict{String,T}    #usually values are TypedDataSource
-    dicts::Dict{String,V} where {V<:AbstractCifDictionary}
-    name_to_catobj::Dict{String, Dict{String, Tuple{Symbol, Symbol}}}
-    catobj_to_name::Dict{String, Dict{Tuple{Symbol, Symbol}, String}}
+    data::T    #usually values are TypedDataSource
+    dict::AbstractCifDictionary
+    name_to_catobj::Dict{String, Tuple{Symbol, Symbol}}
+    catobj_to_name::Dict{Tuple{Symbol, Symbol}, String}
+    cache::Dict{String,String} #for storing implicit values
 end
 
+"""
+A NamespacedRC is a relational container where items are accessed by a
+thruple (namespace, category, object).
+"""
+struct NamespacedRC{T} <: AbstractRelationalContainer
+    relcons::Dict{String, RelationalContainer{T}}
+end
+              
 # == Cif Categories == #
 
 """

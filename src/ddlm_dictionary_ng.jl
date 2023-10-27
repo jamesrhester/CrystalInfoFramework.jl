@@ -722,7 +722,7 @@ end
 Find the ultimately-linked dataname for `dataname`, returning `dataname`
 if there are no links.
 """
-get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString) = begin
+get_ultimate_link(d::DDLm_Dictionary, dataname::AbstractString) = begin
     if haskey(d,dataname)
         #println("Searching for ultimate value of $dataname")
         if :linked_item_id in propertynames(d[dataname][:name])

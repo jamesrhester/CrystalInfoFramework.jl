@@ -148,7 +148,7 @@ save_
 """
 
 create_nspace_data() = begin
-    cdic,data = prepare_sources()
+    cdic, data = prepare_sources()
     # create data with a different definition
     if !isfile("second.cif")
         s = open("second.cif","w")
@@ -164,21 +164,21 @@ create_nspace_data() = begin
     sdata = first(Cif(p"second.cif")).second
     tdata = TypedDataSource(data,cdic)
     sdata = TypedDataSource(sdata,sdic)
-    RelationalContainer([tdata,sdata])
+    NamespacedRC([tdata,sdata])
 end
 
 @testset "Test namespace operations" begin
     nrc = create_nspace_data()
-    @test has_category(nrc,"atom_type","CifCore")
-    @test has_category(nrc,"atom_type","dodgy")
-    @test !has_category(nrc,"atom_site","dodgy")
+    @test DataContainer.has_category(nrc,"atom_type","CifCore")
+    @test DataContainer.has_category(nrc,"atom_type","dodgy")
+    @test !DataContainer.has_category(nrc,"atom_site","dodgy")
     @test get_data(nrc,"dodgy")["_atom_type.symbol"] == ["Oxygen","Carbon","Hydrogen"]
     @test get_data(nrc,"dodgy")["_cell.length_a"] == ["A"]
     @test haskey(nrc,"_atom_type.symbol","dodgy")
     c = get_category(nrc,"atom_site","CifCore")
     println("$c")
     @test haskey(c,"_atom_site.label")
-    @test get_key_datanames(c) == [:label]
+    @test get_key_datanames(c) == [:label, :diffrn_id]
     @test c["o2"].fract_z == 0.2290
 end
 

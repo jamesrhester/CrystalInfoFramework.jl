@@ -6,7 +6,7 @@ export generate_index, generate_keys
 export get_key_datanames, get_value, get_all_datanames, get_name, current_row
 export get_category, has_category, first_packet, construct_category, get_data
 export get_dictionary, get_packets
-export select_namespace, get_namespaces
+export select_namespace, get_namespaces, find_namespace
 using CrystalInfoFramework:DDL2_Dictionary, DDLm_Dictionary
 
 get_key(row::Row) = begin
@@ -15,6 +15,14 @@ get_key(row::Row) = begin
     [get_value(row, k) for k in kd]
 end
 
+#==
+
+Implementation note: keep track of difference between symbols
+and strings for accessing Relations. Strings are not parent-child
+aware. The methods themselves are responsible for determining
+which string to use to access the underlying DataSource.
+
+==#
 """
     get_value(r::Relation, k::Dict, name)
 
@@ -22,7 +30,7 @@ Given a Julia dictionary `k` containing values of
 the keys, provide the corresponding value
 of dataname `name`. 
 """
-get_value(r::Relation, k::Dict, name) = begin
+get_value(r::Relation, k::Dict{Symbol, V} where V, name) = begin
     key_order = get_key_datanames(r)
     numkeys = length(key_order)
     if Set(keys(k)) != Set(key_order)
@@ -37,7 +45,7 @@ get_value(r::Relation, k::Dict, name) = begin
     return missing
 end
 
-get_row(r::Relation, k::Dict) = begin
+get_row(r::Relation, k::Dict{Symbol, V} where V) = begin
     key_order = get_key_datanames(r, drop_same = true)
     numkeys = length(key_order)
     if Set(keys(k)) != Set(key_order)
@@ -61,51 +69,55 @@ end
 
 Base.getproperty(r::Row, obj::Symbol) = get_value(r, obj)
 
-# **General Relational Containers**
-#
-# A relational container may contain data covered by more than one
-# dictionary. However, any given data source may only be described
-# by a single dictionary. We store these together and disambiguate
-# them using namespaces.
+#== **Relational Containers**
 
-RelationalContainer(data, dict::AbstractCifDictionary) = begin
-    nspace = get_dic_namespace(dict)
-    RelationalContainer(Dict(nspace=>data),Dict(nspace=>dict))
-end
+We define RCs with more than one namespace.
+==#
 
 RelationalContainer(data) = begin
     dict = get_dictionary(data)
-    nspace = get_dic_namespace(dict)
-    RelationalContainer(nspace=>data,nspace=>dict)
+    RelationalContainer(data, dict)
 end
 
-RelationalContainer(data::Array) = begin
+RelationalContainer(data, dict::AbstractCifDictionary) = begin
+
+    present = keys(data)
+    cache = Dict{String, String}()
+        
+    # Include Set category keys that are missing
+    
+    add_set_cat_keys!(dict, data, present, cache)
+
+    # Include implicit values
+        
+    expand_by_linked!(dict, data, cache, present)
+        
+    info = collect((Symbol(find_category(dict, a)), Symbol(find_object(dict, a))) for a in present)
+    n_to_objs = Dict(zip(present, info))
+
+    # Parent categories can also resolve child category objects
+    
+    expand_by_parents!(dict, info)
+    
+    canonical_names = (find_name(dict, first(i), last(i)) for i in info)
+    objs_to_n = Dict{Tuple{Symbol, Symbol}, String}(zip(info, canonical_names))
+
+    RelationalContainer(data, dict, n_to_objs, objs_to_n, cache)
+end
+
+NamespacedRC(data::Array) = begin
     dics = get_dictionary.(data)
     names = get_dic_namespace.(dics)
-    RelationalContainer(Dict(zip(names,data)),Dict(zip(names,dics)))
+    NamespacedRC(Dict(zip(names,data)),Dict(zip(names,dics)))
 end
 
-RelationalContainer(data::Dict, dicts::Dict) = begin
-    n_to_objs = Dict{String, Dict{String, Tuple{Symbol, Symbol}}}()
-    objs_to_n = Dict{String, Dict{Tuple{Symbol, Symbol}, String}}()
-    for (n,d) in dicts
-        present = keys(data[n])
+NamespacedRC(data::Dict{String, T}, dicts::Dict) where T = begin
 
-        # Include Set category keys that are missing
-
-        add_set_cat_keys!(d, data[n], present)
-
-        # Include implicit values
-        
-        expand_by_linked!(d, data[n], present)
-        
-        info = ((Symbol(find_category(d, a)), Symbol(find_object(d, a))) for a in present)
-        n_to_objs[n] = Dict(zip(present, info))
-        canonical_names = (find_name(d, first(i), last(i)) for i in info)
-        objs_to_n[n] = Dict(zip(info, canonical_names))
+    nrc = Dict{String, RelationalContainer{T}}()
+    for n in keys(data)
+        nrc[n] = RelationalContainer(data[n], dicts[n])
     end
-
-    RelationalContainer(data, dicts, n_to_objs, objs_to_n)
+    NamespacedRC(nrc)
 end
 
 """
@@ -113,7 +125,7 @@ end
 
 Add key data names for Set categories that have a single row or are missing.
 """
-add_set_cat_keys!(dict, data, start) = begin
+add_set_cat_keys!(dict, data, start, cache) = begin
     ss = get_set_categories(dict)
     filter!(ss) do x
         l = get_keys_for_cat(dict, x)
@@ -123,14 +135,17 @@ add_set_cat_keys!(dict, data, start) = begin
             false
         else
             present = intersect(get_names_in_cat(dict, x), keys(data))
+            @debug "Found datanames for $x" present
             length(present) == 0 || length(data[first(present)]) == 1
         end
     end
 
     extra_keys = [get_keys_for_cat(dict, x)[] for x in ss]
 
+    @debug "Creating single-valued keys" extra_keys
+    
     for k in extra_keys
-        data[k] = ["unique"]
+        cache[k] = "unique"
     end
     
     append!(start, extra_keys)
@@ -144,14 +159,32 @@ Expand data name list `start` to include any data names that are
 children of single-valued data names that are present. TODO: parents
 as well.
 """
-expand_by_linked!(dict, data, start::Array) = begin
+expand_by_linked!(dict, data, cache, start::Array) = begin
     extra = []
     for one_name in start
-        if length(data[one_name]) != 1 continue end
-        gdc = get_dataname_children(dict, one_name)
-        append!(extra, filter(x -> !(x in start), gdc))
+        if one_name in keys(cache) || length(data[one_name]) == 1
+            gdc = get_dataname_children(dict, one_name)
+            append!(extra, filter(x -> !(x in start), gdc))
+        end
     end
     append!(start, extra)
+end
+
+"""
+    expand_by_parents!(dict, start::Array)
+
+Add parent categories to the list of (cat, obj) tuples in `start`
+"""
+expand_by_parents!(dict, start) = begin
+    for (cat, obj) in start
+        c = String(cat)
+        if is_loop_category(dict, c)
+            p = get_parent_category(dict, c)
+            if is_loop_category(dict, p)
+                push!(start, (Symbol(p), obj))
+            end
+        end
+    end    
 end
 
 """
@@ -159,56 +192,53 @@ select_namespace(r::RelationalContainer,s::String)
 
 Return a RelationalContainer with data items from namespace `s` only
 """
-select_namespace(r::RelationalContainer, s::AbstractString) = begin
-    RelationalContainer(Dict(s=>r.data[s]), Dict(s=>r.dicts[s]), Dict(s => r.name_to_catobj[s]),
-                        Dict(s => r.catobj_to_name[s]))
+select_namespace(r::NamespacedRC, s::AbstractString) = begin
+    r.relcons[s]
 end
 
+select_namespace(r::RelationalContainer, s::AbstractString) = r
+
 """
-find_namespace(r::AbstractRelationalContainer,s::AbstractString)
+find_namespace(r::AbstractRelationalContainer, s::AbstractString)
 
 Return the namespace in `r` that contains items from the category `s`.
 Raise an error if not found.
 """
 find_namespace(r::AbstractRelationalContainer, s::AbstractString) = begin
     n = get_namespaces(r)
-    if length(n) > 1
-        # Work out the namespace
-        n = filter(x->x in get_categories(get_dictionary(r,x)),n)
-        if length(n) != 1
-            throw(KeyError(s))
-        end
+    # Work out the namespace
+    filter!(x -> s in get_categories(get_dictionary(r, x)), n)
+    if length(n) != 1
+        throw(KeyError(s))
     end
     first(n)
 end
 
 """
-get_category(r::RelationalContainer, s::String, nspace::String)
+get_category(r::AbstractRelationalContainer, s::String, nspace::String)
 
 Return a DDLmCategory described by `s` in namespace `nspace` constructed 
 from the contents of `r`
 """
 get_category(r::AbstractRelationalContainer, one_cat::AbstractString, nspace::String) = construct_category(r, one_cat, nspace)
 
-get_category(r::RelationalContainer, one_cat::AbstractString) = begin
+get_category(r::AbstractRelationalContainer, one_cat::AbstractString) = begin
     n = find_namespace(r, one_cat)     
     get_category(r, one_cat, n)
 end
 
-has_category(r::AbstractRelationalContainer, one_cat::AbstractString, nspace) = begin
+has_category(r::AbstractRelationalContainer, one_cat, nspace) = begin
     small_r = select_namespace(r, nspace)
     dict = get_dictionary(small_r, nspace)
-    if any(n-> haskey(get_data(small_r),n), get_names_in_cat(dict,one_cat))
-        return true
-    end
-    return false
+    one_cat = Symbol(one_cat)
+    any(x -> first(x)[1] == one_cat, small_r.catobj_to_name)
 end
 
 has_category(r::AbstractRelationalContainer, one_cat::AbstractString) = begin
     any(i -> has_category(r, one_cat, i), get_namespaces(r))
 end
 
-construct_category(r::RelationalContainer,one_cat::AbstractString) = begin
+construct_category(r::AbstractRelationalContainer, one_cat::AbstractString) = begin
 
     nspace = find_namespace(r, one_cat)
     construct_category(r, realcat, nspace)
@@ -236,32 +266,26 @@ construct_category(r::AbstractRelationalContainer, one_cat::AbstractString, nspa
     return missing
 end
 
-"""
-get_packets distinguishes between Set categories and Loop categories,
-returns Loop categories unchanged and returns a single packet
-for Set categories.  If a category is missing, an empty array is
-returned.
-"""
 get_packets(l::LoopCategory) = l
 get_packets(missing) = []
 
-keys(r::RelationalContainer) = begin
-    if length(r.data) == 1
-        return keys(get_data(r))
-    end
-    throw(error("Specify namespace for keys() of RelationalContainer"))
+keys(r::RelationalContainer) = Iterators.flatten((keys(get_data(r)), keys(r.cache)))
+
+haskey(r::AbstractRelationalContainer, k) = k in keys(r)
+haskey(r::AbstractRelationalContainer, k, n) = haskey(select_namespace(r, n), k)
+getindex(r::AbstractRelationalContainer, s...) = begin
+    nspace, cat, obj = s
+    select_namespace(r, nspace)[cat, obj]
 end
 
-haskey(r::AbstractRelationalContainer,k) = k in keys(r)
-haskey(r::AbstractRelationalContainer,k,n) = haskey(select_namespace(r,n),k)
-getindex(r::AbstractRelationalContainer, s, nspace) = select_namespace(r,nspace)[s]
-
-getindex(r::AbstractRelationalContainer, k) = begin
+# TODO: Decide on whether or not strings understand linked data names.
+getindex(r::RelationalContainer, k::AbstractString) = begin
 
     # If k is in the data, return that
 
     dta = get_data(r)
     if haskey(dta, k) return dta[k] end
+    if haskey(r.cache, k) return [r.cache[k]] end
 
     # Otherwise see if it is a child data name of something that is there and
     # single-valued
@@ -269,8 +293,10 @@ getindex(r::AbstractRelationalContainer, k) = begin
     d = get_dictionary(r)
     l = get_ultimate_link(d, k)
     if l != k
+        @debug "Resolving link" k l
         prt_val = r[l]   # key error if missing
         if length(prt_val) > 1
+            @debug "Fail" prt_val
             throw(KeyError(k))
         end
 
@@ -306,34 +332,39 @@ getindex(r::AbstractRelationalContainer, k) = begin
 end
 
 """
+    r[cat,obj]
+
+Returns a vector of values for (cat, obj) from `r`.
+"""
+getindex(r::RelationalContainer, cat::Symbol, obj::Symbol) = begin
+
+    name = r.catobj_to_name[cat, obj]
+    return r[name]
+    
+end
+
+"""
     get_dictionary(r::RelationalContainer)
 
 Return the dictionary describing `r`.
 """
-get_dictionary(r::RelationalContainer) = begin
-    @assert length(r.dicts) == 1
-    first(r.dicts).second
-end
-
-get_dictionary(r::RelationalContainer, nspace::String) = r.dicts[nspace]
+get_dictionary(r::RelationalContainer, args...) = r.dict
+get_dictionary(r::NamespacedRC, nspace::String) = get_dictionary(r.relcons[nspace])
     
-get_data(r::RelationalContainer) = begin
-    @assert length(r.data) == 1
-    first(r.data).second
-end
-
-get_data(r::RelationalContainer, nspace::AbstractString) = r.data[nspace]
+get_data(r::RelationalContainer) = r.data
+get_data(r::NamespacedRC, nspace::AbstractString) = get_data(r.relcons[nspace])
 
 get_all_datanames(r::RelationalContainer) = keys(r)
-get_all_datanames(r::RelationalContainer, nspace::AbstractString) = keys(get_data(r,nspace))
-get_namespaces(r::RelationalContainer) = keys(r.dicts)
-get_dicts(r::RelationalContainer) = r.dicts
+get_all_datanames(r::NamespacedRC, nspace::AbstractString) = keys(r.relcons[nspace])
+
+get_namespaces(r::RelationalContainer) = [get_dic_namespace(r.dict)]
+get_namespaces(r::NamespacedRC) = keys(r.relcons)
 
 # **Relational Containers**
 
-show(io::IO,r::RelationalContainer) = begin
-    println(io,"Relational container with data")
-    println(io,"Namespaces: $(keys(r.dicts))")
+show(io::IO,r::NamespacedRC) = begin
+    println(io,"Namespaced Relational container with data")
+    println(io,"Namespaces: $(keys(r.relcons))")
 end
 
 
@@ -464,10 +495,9 @@ show(io::IO, d::CifCategory) = begin
     print(io,"Length $(length(d))\n")
     df = DataFrame()
     small_r = get_container(d)
-    nspace = d.namespace
     catname = get_name(d)
     for n in d.column_names
-        nn = small_r.catobj_to_name[nspace][catname, n]
+        nn = small_r.catobj_to_name[catname, n]
         df[!,n] = small_r[nn]
     end
     show(io,df)
@@ -490,10 +520,11 @@ LoopCategory(container::AbstractRelationalContainer, catname::String, namespace:
 
     # Absorb dictionary information
 
-    dict = container.dicts[namespace]
+    small_r = select_namespace(container, namespace)
+    dict = get_dictionary(small_r)
     data_names = get_names_in_cat(dict, catname)
-    present = intersect(data_names, keys(container.name_to_catobj[namespace]))
-    present_objs = [container.name_to_catobj[namespace][x][2] for x in present]
+    present = intersect(data_names, keys(small_r.name_to_catobj))
+    present_objs = [small_r.name_to_catobj[x][2] for x in present]
     
     # Child categories
 
@@ -503,33 +534,35 @@ LoopCategory(container::AbstractRelationalContainer, catname::String, namespace:
 
 end
 
-LoopCategory(container::AbstractRelationalContainer, catname::String) = begin
-    n = get_namespace(container)
+LoopCategory(container, catname::String) = begin
+    n = get_namespaces(container)[]
     LoopCategory(container, catname, n)
 end
 
 length(d::LoopCategory) = begin
 
+    if length(d.column_names) == 0 return 0 end
+    
     dic = get_dictionary(d)
     ks = get_keys_for_cat(dic, get_name(d))
 
-    if length(ks) == 0   # Single-block Set category
-        return length(d.column_names) > 0 ? 1 : 0
-    end
+    if length(ks) == 0 return 1 end   # Single-block Set category
 
     cont = get_container(d)
-    return length(select_namespace(cont,d.namespace)[ks[1]])
+    return length(cont[ks[1]])
     
 end
 
 haskey(d::LoopCategory, n::Symbol) = begin
 
-    small_data = get_container(d)
-    haskey(small_data, get(d.object_to_name,n,"")) || any(x -> haskey(small_data, get(x.object_to_name, n, "")), d.children)
+    n in d.column_names || any(x -> n in x.column_names, d.children)
     
 end
 
-haskey(d::LoopCategory, n::AbstractString) = haskey(get_container(d), n)
+haskey(d::LoopCategory, n::AbstractString) = begin
+    small_r = get_container(d)
+    haskey(small_r, n)
+end
 
 get_container(d::LoopCategory) = select_namespace(d.container, d.namespace)
 
@@ -562,15 +595,15 @@ getindex(d::LoopCategory, name::Symbol) = begin
     
     small_r = get_container(d)
     cat_name = get_name(d)
-    
+
     if name in d.column_names
-        return small_r[small_r.catobj_to_name[d.namespace][(cat_name, name)]]
+        return small_r[cat_name, name]
     end
 
     for x in d.children
         cat_name = get_name(x)
         if name in x.column_names
-            return small_r[small_r.catobj_to_name[d.namespace][(cat_name,name)]]
+            return small_r[cat_name,name]
         end
     end
     throw(KeyError(name))
@@ -614,13 +647,12 @@ to a child category this will not in general be
 are used to look up the correct value 
 """
 get_value(d::LoopCategory, n::Int, colname::Symbol) = begin
-    nspace = d.namespace
-    arc = get_container(d)
-    small_r = select_namespace(arc, nspace)
+
+    small_r = get_container(d)
     cname = get_name(d)
 
-    if haskey(arc.catobj_to_name[nspace], (cname, colname))
-        aka = arc.catobj_to_name[nspace][cname, colname]
+    if haskey(small_r.catobj_to_name, (cname, colname))
+        aka = small_r.catobj_to_name[cname, colname]
         return small_r[aka][n]
     end
     
@@ -643,8 +675,7 @@ end
 
 get_value(d::LoopCategory, n::Int, colname::AbstractString) = begin
     arc = get_container(d)
-    n = d.namespace
-    return get_value(d, n, arc.name_to_catobj[n][colname][2])
+    return get_value(d, n, arc.name_to_catobj[colname][2])
 end
 
 # If we are given only a column name, we have to put all
@@ -670,35 +701,15 @@ it may be omitted.
 get_value(d::LoopCategory, k::Dict{String,V} where V, name::String) = begin
 
     arc = get_container(d)
-    n = d.namespace
 
     @debug "Searching for $name using $k in $(d.name)"
-
-    if !haskey(arc.name_to_catobj[n], name)
-        @debug "$name not found..."
-        cc = get_child_categories(d)
-        if length(cc) > 0
-            for c in cc
-                try
-                    return get_value(c, k, name)
-                catch e
-                    if e isa KeyError continue end
-                    throw(e)
-                end
-            end
-            throw(KeyError(name))
-        end
-    end
 
     key_order = get_key_datanames(d, drop_same=true)
     dic = get_dictionary(d)
     catname = get_name(d)
-    ckeys = [(ko, arc.catobj_to_name[n][catname,ko]) for ko in key_order]
-    linkvals = [(ko, get_linked_name(dic, ck)) for (ko, ck) in ckeys]
-    
-    @debug "Linkvals is $linkvals"
+    ckeys = [(ko, arc.catobj_to_name[catname,ko]) for ko in key_order]
 
-    linkvals = Dict((l[1] => k[l[2]]) for l in linkvals)
+    linkvals = Dict((l[1] => k[l[2]]) for l in ckeys)
 
     @debug "Getting row number for $linkvals in $(d.name)"
 
@@ -711,7 +722,7 @@ get_value(d::LoopCategory, k::Dict{String,V} where V, name::String) = begin
     end
     @debug "Row $rownum"
 
-    return select_namespace(arc, n)[name][rownum]
+    return arc[name][rownum]
 end
 
 """
@@ -723,15 +734,56 @@ of `k` as Symbols.
 get_value(d::LoopCategory, k::Dict{Symbol,V} where V, name::String) = begin
     catname = get_name(d)
     arc = get_container(d)
-    n = d.namespace
-    newdict = Dict((arc.catobj_to_name[n][catname,kk]=>v) for (kk,v) in k)
+    newdict = Dict((arc.catobj_to_name[catname,kk]=>v) for (kk,v) in k)
     return get_value(d, newdict, name)
 end
 
-get_value(d::LoopCategory, k::Dict, name::Symbol) = begin
-    n = d.namespace
+"""
+    get_value(l::LoopCategory, k::Dict{Symbol, V}, name::Symbol)
+
+Return the value of `name` where the key values are given by the contents
+of `k` as Symbols. This form of the method will treat child category
+object names as members of parent categories, so for example
+u_11 belongs to both atom_site_aniso and atom_site if atom_site_aniso
+is a child category of atom_site. Linked key data names are treated in
+the same way.
+"""
+get_value(d::LoopCategory, lookup::Dict{Symbol, V}, name::Symbol) where V = begin
+
     c = get_name(d)
-    get_value(d, k, get_container(d).catobj_to_name[n][c, name])
+    dict = get_dictionary(d)
+    arc = get_container(d)
+
+    true_name = arc.catobj_to_name[c, name]
+    true_cat = arc.name_to_catobj[true_name][1]
+
+    if true_cat != c
+
+        @debug "Searching in child category" true_cat
+
+        child_cat = filter(x -> get_name(x) == true_cat, d.children)[]
+        
+        # Translate the key data names
+
+        keydict = Dict{String, V}()
+        
+        kk = get_keys_for_cat(dict, true_cat)
+
+        for k in kk
+            ln = get_linked_name(dict, k) #parent name
+            obj = arc.name_to_catobj[ln][2]
+            if haskey(lookup, obj)
+                keydict[k] = lookup[obj]
+            end
+        end
+
+        @debug "Key names now" keydict
+        get_value(child_cat, keydict, true_name)
+    else
+    
+        get_value(d, lookup, true_name)
+
+    end
 end
 
 """
@@ -764,14 +816,13 @@ end
 """
    get_key_datanames(d::LoopCategory; drop_same = false)
 
-Return the key datanames for `d`. If `drop_same` is true, return only
+Return the key datanames for `d` as symbols. If `drop_same` is true, return only
 those key datanames that could take more than one value, i.e. their
 parent data names take more than one value.
 """
 get_key_datanames(d::LoopCategory; drop_same = false) = begin
     dic = get_dictionary(d)
     c = get_container(d)
-    n = d.namespace
     kk = get_keys_for_cat(dic, get_name(d))
     if drop_same
         filter!(kk) do k
@@ -780,7 +831,7 @@ get_key_datanames(d::LoopCategory; drop_same = false) = begin
         end
     end
     
-    [c.name_to_catobj[n][t][2] for t in kk]
+    [c.name_to_catobj[t][2] for t in kk]
 end
 
 get_dictionary(d::LoopCategory) = get_dictionary(get_container(d))
@@ -792,8 +843,9 @@ keys(d::LoopCategory) = get_object_names(d)
 Given the category name, return an array of loop categories that are children
 of the supplied category
 """
-create_children(container, name::AbstractString, namespace) = begin
-    dict = container.dicts[namespace]
+create_children(container::AbstractRelationalContainer, name::AbstractString, namespace) = begin
+    small_r = select_namespace(container, namespace)
+    dict = get_dictionary(small_r)
     child_names = CrystalInfoFramework.get_child_categories(dict, name)
     return [LoopCategory(container, c, namespace) for c in child_names]
 end
@@ -803,16 +855,16 @@ Create a DataFrame from a Loop Category. Child categories are ignored. If `canon
 is true, canonical names are used instead of the default object names
 """
 DataFrames.DataFrame(l::LoopCategory; canonical=false) = begin
-    nspace = l.namespace
+    
     arc = get_container(l)
     catname = get_name(l)
-    rawnames = [arc.catobj_to_name[nspace][catname,o] for o in l.column_names]
+    rawnames = [arc.catobj_to_name[catname,o] for o in l.column_names]
     @debug "Raw names for data frame" rawnames
     rawdata = [arc[r] for r in rawnames]
     if canonical
         DataFrames.DataFrame(rawdata, rawnames, copycols=false)
     else
-        objects = [arc.name_to_catobj[nspace][q][2] for q in rawnames]
+        objects = [arc.name_to_catobj[q][2] for q in rawnames]
         DataFrames.DataFrame(rawdata, objects, copycols=false)
     end
 end
