@@ -315,14 +315,14 @@ getindex(t::TypedDataSource,s::AbstractString) = begin
     try
         raw_val = ds[true_name]
     catch KeyError
-        println("Couldn't find $true_name")
+        @debug "Couldn't find $true_name"
         aliases = list_aliases(refdict,s;include_self=true)
         for a in aliases
             try
                 raw_val = ds[a]
                 break
             catch KeyError
-                println("And couldn't find $a")
+                @debug "And couldn't find" a
             end
         end
         if ismissing(raw_val)   #no joy
@@ -330,7 +330,7 @@ getindex(t::TypedDataSource,s::AbstractString) = begin
             if !ismissing(backup)
                 raw_val = backup
             else
-                println("Can't find $s")
+                @debug "Can't find $s"
                 throw(Base.KeyError(s))
             end
         end
