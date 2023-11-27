@@ -7,6 +7,7 @@ export get_key_datanames, get_value, get_all_datanames, get_name, current_row
 export get_category, has_category, first_packet, construct_category, get_data
 export get_dictionary, get_packets
 export select_namespace, get_namespaces, find_namespace
+export available_catobj
 using CrystalInfoFramework:DDL2_Dictionary, DDLm_Dictionary
 
 get_key(row::Row) = begin
@@ -93,7 +94,7 @@ RelationalContainer(data, dict::AbstractCifDictionary) = begin
     expand_by_linked!(dict, data, cache, present)
         
     info = collect((Symbol(find_category(dict, a)), Symbol(find_object(dict, a))) for a in present)
-    n_to_objs = Dict(zip(present, info))
+    n_to_objs = Dict{String, Tuple{Symbol, Symbol}}(zip(present, info))
 
     # Parent categories can also resolve child category objects
     
@@ -187,6 +188,14 @@ expand_by_parents!(dict, start) = begin
     end    
 end
 
+available_catobj(r::RelationalContainer) = begin
+    keys(r.catobj_to_name)
+end
+
+available_catobj(r::NamespacedRC) = begin
+    Iterators.flatten(available_catobj(x) for x in values(r.relcons))
+end
+
 """
 select_namespace(r::RelationalContainer,s::String)
 
@@ -231,7 +240,7 @@ has_category(r::AbstractRelationalContainer, one_cat, nspace) = begin
     small_r = select_namespace(r, nspace)
     dict = get_dictionary(small_r, nspace)
     one_cat = Symbol(one_cat)
-    any(x -> first(x)[1] == one_cat, small_r.catobj_to_name)
+    any(x -> first(x) == one_cat, available_catobj(small_r))
 end
 
 has_category(r::AbstractRelationalContainer, one_cat::AbstractString) = begin
@@ -266,16 +275,65 @@ construct_category(r::AbstractRelationalContainer, one_cat::AbstractString, nspa
     return missing
 end
 
+"""
+    get_packets(l::LoopCategory, match_packet::CatPacket)
+
+Return `l` containing only those packets for which key data name values match
+those in `match_packet` for kindred key data names.
+"""
+get_packets(l::LoopCategory, mp::CatPacket) = begin
+    l_dict = get_dictionary(l)
+    mp_dict = get_dictionary(mp)
+    equivs = find_kindred(mp_dict, l_dict)
+    filter(l) do one_packet
+        for (test_name, our_name) in equivs
+            if getproperty(one_packet,our_name) != getproperty(mp,test_name)
+                return false
+            end
+        end
+        return true
+    end
+        
+end
+
 get_packets(l::LoopCategory) = l
 get_packets(missing) = []
 
 keys(r::RelationalContainer) = Iterators.flatten((keys(get_data(r)), keys(r.cache)))
 
+keys(n::NamespacedRC) = begin
+    Iterators.flatten(keys(x) for (_,x) in n.relcons)
+end
+
+
 haskey(r::AbstractRelationalContainer, k) = k in keys(r)
 haskey(r::AbstractRelationalContainer, k, n) = haskey(select_namespace(r, n), k)
-getindex(r::AbstractRelationalContainer, s...) = begin
-    nspace, cat, obj = s
-    select_namespace(r, nspace)[cat, obj]
+
+getindex(r::AbstractRelationalContainer, nspace::AbstractString, cat::Symbol, obj::Symbol) = begin
+
+    small_r = select_namespace(r, nspace)
+    small_r[cat, obj]
+    
+end
+
+getindex(r::AbstractRelationalContainer, cat::Symbol, obj::Symbol) = begin
+
+    if length(get_namespaces(r)) != 1
+        throw(error("Namespace must be specified"))
+    end
+    
+    dict = get_dictionary(r)
+    name = find_name(dict, cat, obj)
+    r[name]
+
+end
+
+getindex(r::AbstractRelationalContainer, s) = begin
+
+    gn = get_namespaces(r)
+    n = length(gn) > 1 ? find_namespace(r, s) : first(gn)
+    return r[s, n]
+    
 end
 
 # TODO: Decide on whether or not strings understand linked data names.
@@ -389,7 +447,7 @@ get_mappings(d::AbstractCifDictionary, cat::String) = begin
 end
 
 # Useful for Set categories
-first_packet(c::CifCategory) = iterate(c)[1]
+first_packet(c::CifCategory) = first(iterate(c))
 
 # == CatPacket == #
 
@@ -401,9 +459,9 @@ get_category(c::CatPacket) = getfield(c, :source_cat)
 
 get_dictionary(c::CatPacket) = return get_dictionary(getfield(c, :source_cat))
 
-show(io::IO,cp::CatPacket) = begin
+show(io::IO, cp::CatPacket) = begin
     c = get_category(cp)
-    for n in c.column_names
+    for n in column_names(c)
         println(io,"$n: $(c[n][getfield(cp,:id)])")
     end
 end
@@ -487,6 +545,9 @@ getindex(d::CifCategory, dict::Dict{Symbol,V} where V) = begin
 end
 
 getindex(d::CifCategory, pairs...) = begin
+    if length(pairs) == 0 && length(d) == 1
+        return first(d)
+    end
     getindex(d, Dict(pairs))
 end
 
@@ -496,9 +557,8 @@ show(io::IO, d::CifCategory) = begin
     df = DataFrame()
     small_r = get_container(d)
     catname = get_name(d)
-    for n in d.column_names
-        nn = small_r.catobj_to_name[catname, n]
-        df[!,n] = small_r[nn]
+    for n in column_names(d)
+        df[!,n] = small_r[n]
     end
     show(io,df)
 end
@@ -523,31 +583,35 @@ LoopCategory(container::AbstractRelationalContainer, catname::String, namespace:
     small_r = select_namespace(container, namespace)
     dict = get_dictionary(small_r)
     data_names = get_names_in_cat(dict, catname)
-    present = intersect(data_names, keys(small_r.name_to_catobj))
-    present_objs = [small_r.name_to_catobj[x][2] for x in present]
+    present = intersect(data_names, keys(small_r))
+    present_objs = Symbol.(find_object(dict, x) for x in present)
     
     # Child categories
 
     child_cats = create_children(container, catname, namespace)
 
-    LoopCategory(Symbol(lowercase(catname)), namespace, present_objs, child_cats, container)
+    LoopCategory(Symbol(lowercase(catname)), namespace, present_objs, child_cats, Dict(), container)
 
 end
 
 LoopCategory(container, catname::String) = begin
-    n = get_namespaces(container)[]
+    n = first(get_namespaces(container))
     LoopCategory(container, catname, n)
 end
 
+"""
+   If a LoopCategory has no keys, then it is a single-block Set category,
+   which we assume always has length 1.
+"""
 length(d::LoopCategory) = begin
 
-    if length(d.column_names) == 0 return 0 end
-    
     dic = get_dictionary(d)
     ks = get_keys_for_cat(dic, get_name(d))
 
     if length(ks) == 0 return 1 end   # Single-block Set category
 
+    if length(column_names(d)) == 0 return 0 end
+    
     cont = get_container(d)
     return length(cont[ks[1]])
     
@@ -563,6 +627,8 @@ haskey(d::LoopCategory, n::AbstractString) = begin
     small_r = get_container(d)
     haskey(small_r, n)
 end
+
+column_names(d) = d.column_names
 
 get_container(d::LoopCategory) = select_namespace(d.container, d.namespace)
 
@@ -596,14 +662,24 @@ getindex(d::LoopCategory, name::Symbol) = begin
     small_r = get_container(d)
     cat_name = get_name(d)
 
-    if name in d.column_names
+    try
         return small_r[cat_name, name]
-    end
+    catch e
+        if !(e isa KeyError)
+            throw(e)
+        end
 
-    for x in d.children
-        cat_name = get_name(x)
-        if name in x.column_names
-            return small_r[cat_name,name]
+        if length(d.children) == 0
+            throw(e)
+        end
+        
+        for x in d.children
+            cat_name = get_name(x)
+            try
+                return small_r[cat_name,name]
+            catch e
+                continue
+            end
         end
     end
     throw(KeyError(name))
@@ -651,31 +727,37 @@ get_value(d::LoopCategory, n::Int, colname::Symbol) = begin
     small_r = get_container(d)
     cname = get_name(d)
 
-    if haskey(small_r.catobj_to_name, (cname, colname))
-        aka = small_r.catobj_to_name[cname, colname]
-        return small_r[aka][n]
-    end
-    
-    if length(d.children) == 0 throw(KeyError(colname)) end
-
-    # Handle the children recursively
-
-    pkeys_symb = get_key_datanames(d)
-    keyvals = Dict((p => get_value(d, n, p)) for p in pkeys_symb)
-    for c in d.children
-        try
-            return get_value(c, keyvals, colname)
-        catch e
-            if e isa KeyError continue end
+    try
+        return small_r[cname, colname][n]
+    catch e
+        if !(e isa KeyError)
             throw(e)
         end
+
+        if length(d.children) == 0
+            throw(KeyError(colname))
+        end
+            
+        # Handle the children recursively
+
+        pkeys_symb = get_key_datanames(d)
+        keyvals = Dict{Symbol, Any}((p => get_value(d, n, p)) for p in pkeys_symb)
+            
+        for c in d.children
+            try
+                return get_value(c, keyvals, colname)
+            catch e
+                if e isa KeyError continue end
+                throw(e)
+            end
+        end
     end
+        
     throw(KeyError(colname))
 end
 
 get_value(d::LoopCategory, n::Int, colname::AbstractString) = begin
-    arc = get_container(d)
-    return get_value(d, n, arc.name_to_catobj[colname][2])
+    get_container(d)[colname][n]
 end
 
 # If we are given only a column name, we have to put all

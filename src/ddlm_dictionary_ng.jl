@@ -399,6 +399,8 @@ categories according to DDLm semantics. Note that the head category may not
 have a category associated with it.
 """
 find_name(d::DDLm_Dictionary, cat, obj) = begin
+    cat = String(cat)
+    obj = String(obj)
     catcol = d[:name][!,:category_id]
     selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),catcol)
     pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]

@@ -127,6 +127,8 @@ get_corresponding(arc, row, cat, (nspace))
 get_dictionary(arc, (nspace))
   Return a dictionary describing the contents of arc
 
+available_catobj(arc)
+  List all cat,objs in container as tuples.
 =#
 
 abstract type AbstractRelationalContainer <: NamespacedDataSource end
@@ -194,7 +196,7 @@ abstract type DDLmCategory <: CifCategory end
 
 # ***Loop Category***
 #
-# A LoopCategory is a DDLmCategory with keys, and can have
+# A LoopCategory is a DDLmCategory, and can have
 # child categories whose columns are available for joining
 # with the parent category using the keys.
 
@@ -203,6 +205,7 @@ struct LoopCategory <: CifCategory
     namespace::String
     column_names::Array{Symbol,1}
     children::Array{CifCategory, 1}
+    selector::Dict{Symbol, Any}  #only these keys
     container::AbstractRelationalContainer
 end
 
