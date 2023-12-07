@@ -161,11 +161,19 @@ find_object(d::DDL2_Dictionary,dataname) = begin
 end
 
 """
-    get_categories(d::DDL2_Dictionary)
+    get_categories(d::DDL2_Dictionary; referred = false)
 
-List all categories defined in `d`
+List all categories defined in `d`. If `referred` is `true`, categories
+for which data names are defined, but no category is defined, are also included.
 """
-get_categories(d::DDL2_Dictionary) = d.block[:category][!,:id]
+get_categories(d::DDL2_Dictionary; referred = false) = begin
+
+    defed_cats = lowercase.(d.block[:category][!,:id])
+    if !referred return defed_cats end
+    more_cats = unique!(lowercase.(d[:item].category_id))
+    return union(defed_cats, more_cats)
+end
+
 get_set_categories(d::DDL2_Dictionary) = []
 get_loop_categories(d::DDL2_Dictionary) = get_categories(d)
 
@@ -455,7 +463,7 @@ const ddl2_type_mapping = Dict( "text" => String,
 
 get_julia_type_name(cdic::DDL2_Dictionary,cat::AbstractString,obj::AbstractString) = begin
     definition = cdic[find_name(cdic,cat,obj)]
-    type_index = definition[:item_type][!,:code][]
+    type_index = haskey(definition, :item_type) ? definition[:item_type][!,:code][] : "text"
     all_types = cdic[:item_type_list]
     type_base = all_types[all_types[!,:code] .== type_index,:primitive_code][]
     if type_index in keys(ddl2_type_mapping)

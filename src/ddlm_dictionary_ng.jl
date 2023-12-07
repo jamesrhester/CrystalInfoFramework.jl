@@ -793,6 +793,10 @@ further automatic derivation taking place.
 """
 remove_methods!(dict::DDLm_Dictionary) = begin
     dict.block[:method] = groupby(DataFrame([[]],[:master_id]),:master_id)
+    for k in keys(dict.func_defs)
+        delete!(dict.func_defs, k)
+        delete!(dict.func_text, k)
+    end
 end
 
 """
@@ -1554,8 +1558,9 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             new_head = d[:name][d[:name].master_id .== block_id,:].object_id[]
             # find duplicates
             all_defs = importee[:definition][!,:master_id]
-            #println("All visible defs: $all_defs")
-            dups = filter(x-> count(isequal(x),all_defs)>1,all_defs)
+            @debug "All imported defs:" all_defs
+            prior_defs = d[:definition][!,:master_id]
+            dups = filter(x-> count(isequal(x),all_defs)>0, prior_defs)
             if length(dups) > 0
                 @debug "Duplicated frames" dups
                 if if_dupl == "Replace"

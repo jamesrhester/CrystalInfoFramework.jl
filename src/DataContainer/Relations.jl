@@ -782,9 +782,9 @@ end ==#
     for (tab,cols) in att_info
         if !(:master_id in propertynames(cols))
             println("Adding a master_id to $tab")
-            att_info[tab].master_id = dicname
+            att_info[tab][!,:master_id] .= dicname
         end
     end
-    DDL2_Dictionary(att_info,nspace)
+    DDL2_Dictionary(att_info, nspace)
 end
 
