@@ -1330,9 +1330,9 @@ Really belongs in FilePaths.jl but for now this will work.
 """
 to_path(u::URI) = begin
     if Sys.iswindows()
-        Path(u.path[2:end])
+        Path(unescapeuri(u.path[2:end]))
     else
-        Path(u.path)
+        Path(unescapeuri(u.path))
     end
 end
 

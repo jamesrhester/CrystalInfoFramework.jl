@@ -90,7 +90,7 @@ end
     @test get_parent_category(ud,"structure") == "magnetic"
     # try importing through alternative directory, we've changed update date.
     uf = DDLm_Dictionary(joinpath(@__PATH__,"small_core_test.dic"),
-                         import_dir=joinpath(@__PATH__,"other_import_dir"))
+                         import_dir=joinpath(@__PATH__,"other import dir"))
     @test String(uf["_diffrn_orient_matrix.UB_11"][:definition][!,:update][]) == "2021-12-07" 
 end
 
