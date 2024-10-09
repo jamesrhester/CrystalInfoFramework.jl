@@ -117,7 +117,8 @@ If `loop`, multi-line values should be indented for presentation in a loop,
 if `pretty` is true.
 
 As a simple heuristic, the string is assumed to be pre-formatted if at least
-one line contains a sequence of 5 '#' characters.
+one line contains a sequence of 5 '#' characters, or five spaces not at
+the end of a line.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=false,kwargs...) = begin
     tgtval = val
@@ -138,6 +139,7 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
     if delim == "\n;"
         
         is_preformat = match(r"#####",tgtval) != nothing
+        is_preformat |= match(r"     ", tgtval) != nothing
         if pretty && !is_preformat  #
             if loop == :short indent = loop_align - 1
             elseif loop == :long indent = text_indent + loop_indent + 1
@@ -285,7 +287,7 @@ so that no lines are greater than `line_length`, and each line starts with
 If `justify` is true, each line will be filled as 
 close as possible to the maximum length and all spaces replaced by 
 a single space, which could potentially spoil formatting like centering, tabulation
-or ASCII equations.
+or ASCII equations. 
 """
 format_cif_text_string(value::AbstractString,indent;width=line_length,justify=false,prefix="",kwargs...) = begin
     # catch pathological all whitespace values
@@ -684,10 +686,20 @@ const ddlm_attribute_order = (:definition => (:id,:scope,:class),
                               :description_example => (:case,:detail),
                               :enumeration_default => (:index, :value),
                          :import => (:get,),
-                         :method => (:purpose,:expression)
+                              :method => (:purpose, :expression),
+                              :nx_mapping => (:details, ),
+                              :ddl2_sub_category => (:id, :name),
+                              :ddl2_sub_category_list => (:description, :id),
+                              :ddl2_category_group => (:id, ),
+                              :ddl2_regex_type => (:code, :primitive_code, :construct,
+                                                   :detail),
+                              :ddl2_category_group_list => (:id, :parent_id, :description),
+                              :ddl2_units_list => (:code, :detail),
+                              :ddl2_enumeration_range => (:minimum, :maximum),
+                              :ddl2_item_related => (:related_name, :function_code)
                          )
 
-const ddlm_no_justify = (:method,:description,:description_example) #do not reformat items in this category
+const ddlm_no_justify = (:method,:description,:description_example, :nx_mapping) #do not reformat items in this category
 const ddl2_no_justify = (:category,:category_examples,:item,:item_examples)
 # Always use semicolon delimiters
 const ddlm_semicolons = Dict(:description=>(:text,),:method=>(:expression,))
@@ -721,6 +733,7 @@ show_one_def(io,def_name,info_dic;implicits=[],ordering=ddlm_attribute_order) = 
     for (k,_) in ordering
         haskey(final_chance,k) ? final_chance[k] = final_chance[k]+1 : 0
     end
+    @debug "Before output" ordering final_chance leftover
     for chunk in ordering
         cat,objs = chunk
         if !haskey(info_dic,cat) continue end
@@ -845,7 +858,9 @@ show_loop(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
               rej_names = filter(x->split(x,".")[1]==cat,implicits)
               rej_names = map(x->split(x,".")[2],rej_names)
               append!(rej_names,["master_id","__blockname","__object_id"])
-              imp_reg = Regex("$(join(rej_names,"|^"))")
+              @debug "Ignoring" rej_names
+              imp_reg = Regex("^$(join(rej_names,"\$|^"))\$")
+              @debug "As a regex" imp_reg
               write(io,format_for_cif(df[!,Not(imp_reg)];catname=cat,indent=indents,order=order,
                                       pretty=reflow,justify=justify))
 end       
@@ -1115,7 +1130,7 @@ show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     top_level = ddl2_dic[:dictionary]
     show_set(io,"dictionary",top_level,implicits=implicit_info)
     # Now for the rest
-    all_cats = sort(get_categories(ddl2_dic))
+    all_cats = sort(get_categories(ddl2_dic, referred = true))
     for one_cat in all_cats
         cat_info = ddl2_dic[one_cat]
         show_one_def(io,one_cat,cat_info,implicits=implicit_info,ordering=())

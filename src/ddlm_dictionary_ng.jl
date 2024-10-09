@@ -836,6 +836,10 @@ further automatic derivation taking place.
 """
 remove_methods!(dict::DDLm_Dictionary) = begin
     dict.block[:method] = groupby(DataFrame([[]],[:master_id]),:master_id)
+    for k in keys(dict.func_defs)
+        delete!(dict.func_defs, k)
+        delete!(dict.func_text, k)
+    end
 end
 
 """
@@ -1369,9 +1373,9 @@ Really belongs in FilePaths.jl but for now this will work.
 """
 to_path(u::URI) = begin
     if Sys.iswindows()
-        Path(u.path[2:end])
+        Path(unescapeuri(u.path[2:end]))
     else
-        Path(u.path)
+        Path(unescapeuri(u.path))
     end
 end
 
@@ -1597,8 +1601,9 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             new_head = d[:name][d[:name].master_id .== block_id,:].object_id[]
             # find duplicates
             all_defs = importee[:definition][!,:master_id]
-            #println("All visible defs: $all_defs")
-            dups = filter(x-> count(isequal(x),all_defs)>1,all_defs)
+            @debug "All imported defs:" all_defs
+            prior_defs = d[:definition][!,:master_id]
+            dups = filter(x-> count(isequal(x),all_defs)>0, prior_defs)
             if length(dups) > 0
                 @debug "Duplicated frames" dups
                 if if_dupl == "Replace"
