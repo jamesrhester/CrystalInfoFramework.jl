@@ -16,7 +16,7 @@ my_block["_cell.length_a"]
 
 # output
 
-1-element Array{Union{Missing, Nothing, Dict{String,T}, Array{T,1}, String} where T,1}:
+1-element Vector{Union{Missing, Nothing, Dict{String, T}, Vector{T}, String} where T}:
  "11.520(12)"
 ```
 
@@ -126,7 +126,7 @@ that the datasource recognises the data names defined in the dictionary.
 
 A `DataSource` is any object returning an array of values when
 supplied with a string.  A CIF `Block` conforms to this
-specification, as does a simple `Dict{String,Any}`.  `DataSource`s 
+specification, as does a simple `Dict{String, Any}`.  `DataSource`s 
 are defined in submodule `CrystalInfoFramework.DataContainer`.
 
 A CIF dictionary can be used to obtain data with correct Julia type from
@@ -141,14 +141,15 @@ bd["_cell.length_a"]
 
 # output
 
-1-element Array{Float64,1}:
+1-element Vector{Float64}:
  11.52
 
 ```
 
 Note that the array elements are now `Float64` and that the standard
 uncertainty has been removed. Future improvements may use
-`Measurements.jl` to retain standard uncertainties.
+`Measurements.jl` to retain standard uncertainties. Meanwhile,
+SUs are available by appending `_su` to the data name.
 
 Dictionaries also allow alternative names for a data name to be
 recognised provided these are noted in the dictionary:
@@ -159,7 +160,7 @@ l = bd["_cell_length_a"] #no period in name
 
 # output
 
-1-element Array{Float64,1}:
+1-element Vector{Float64}:
  11.52
 
 ```
@@ -206,61 +207,46 @@ A `NamespacedTypedDataSource` includes data from multiple namespaces.
 Correctly-typed data for a particular namespace can then be obtained from 
 the object returned by `select_namespace(t::NamespacedTypedDataSource,nspace)`.
 
-## Cif Categories from DataSources
+## Relational containers
 
-A CIF category (a 'Relation' in the relational model) can be constructed
-from a `DataSource`, a CIF dictionary, and the CIF name of the category:
+CIF dictionaries organise data names into relations (tables). These relations
+are strictly conformant to the relational model. A `RelationalContainer` is
+an object created from a `DataSource` and CIF dictionary which provides a
+relational view of `DataSource`, that is, data are organised into tables
+according to the dictionary specifications.
+
+### Cif Categories
+
+A CIF category (a 'Relation' in the relational model) can be returned
+from a `RelationalContainer` given the category name:
 
 ```jldoctest nick1
-as = LoopCategory("atom_site",my_block,my_dict)
+
+rc = RelationalContainer(my_block, my_dict)  # Use DataSource to create RelationalContainer
+as = LoopCategory(rc, "atom_site")
 
 # output
 
 Category atom_site Length 10
-10×7 DataFrame. Omitted printing of 2 columns
-│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
-│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
-├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
-│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
-│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
-│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
-│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
-│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
-│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
-│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
-│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
-│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
-│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
-
+10×7 DataFrame
+ Row │ fract_x     fract_z     label       adp_type    u_iso_or_equiv  occupan ⋯
+     │ Cif Valu…?  Cif Valu…?  Cif Valu…?  Cif Valu…?  Cif Valu…?      Cif Val ⋯
+─────┼──────────────────────────────────────────────────────────────────────────
+   1 │ .5505(5)    .1605(11)   o1          Uani        .035(3)         1.00000 ⋯
+   2 │ .4009(5)    .2290(11)   o2          Uani        .033(3)         1.00000
+   3 │ .2501(5)    .6014(13)   o3          Uani        .043(4)         1.00000
+   4 │ .4170(7)    .4954(15)   c1          Uani        .029(4)         1.00000
+   5 │ .3145(7)    .6425(16)   c2          Uani        .031(5)         1.00000 ⋯
+   6 │ .2789(8)    .8378(17)   c3          Uani        .040(5)         1.00000
+   7 │ .3417(9)    .8859(18)   c4          Uani        .045(6)         1.00000
+   8 │ .4445(9)    .7425(18)   c5          Uani        .045(6)         1.00000
+   9 │ .4797(8)    .5487(17)   c6          Uani        .038(5)         1.00000 ⋯
+  10 │ .4549(7)    .2873(16)   c7          Uani        .029(4)         1.00000
+                                                               2 columns omitted
 ```
 
 where a category is either a `LoopCategory`, with one or more rows, or
-a `SetCategory`, which is restricted to a single row. Alternatively,
-a `TypedDataSource` can be used, in which case the dictionary used by
-the `TypedDataSource` is also used for category construction.
-
-```jldoctest nick1
-as = LoopCategory("atom_site",bd)
-
-# output
-
-Category atom_site Length 10
-10×7 DataFrame. Omitted printing of 2 columns
-│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
-│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
-├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
-│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
-│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
-│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
-│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
-│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
-│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
-│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
-│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
-│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
-│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
-
-```
+a `SetCategory`, which is restricted to a single row.
 
 `getindex` for CIF categories uses the indexing value as the *key value*
 for looking up a row in the category:
@@ -311,19 +297,19 @@ DataFrame(as)
 
 # output
 
-10×7 DataFrame. Omitted printing of 2 columns
-│ Row │ u_iso_or_equiv │ fract_x   │ fract_z   │ adp_type  │ occupancy │
-│     │ Cif Value…?    │ Cif Val…? │ Cif Val…? │ Cif Val…? │ Cif Val…? │
-├─────┼────────────────┼───────────┼───────────┼───────────┼───────────┤
-│ 1   │ .035(3)        │ .5505(5)  │ .1605(11) │ Uani      │ 1.00000   │
-│ 2   │ .033(3)        │ .4009(5)  │ .2290(11) │ Uani      │ 1.00000   │
-│ 3   │ .043(4)        │ .2501(5)  │ .6014(13) │ Uani      │ 1.00000   │
-│ 4   │ .029(4)        │ .4170(7)  │ .4954(15) │ Uani      │ 1.00000   │
-│ 5   │ .031(5)        │ .3145(7)  │ .6425(16) │ Uani      │ 1.00000   │
-│ 6   │ .040(5)        │ .2789(8)  │ .8378(17) │ Uani      │ 1.00000   │
-│ 7   │ .045(6)        │ .3417(9)  │ .8859(18) │ Uani      │ 1.00000   │
-│ 8   │ .045(6)        │ .4445(9)  │ .7425(18) │ Uani      │ 1.00000   │
-│ 9   │ .038(5)        │ .4797(8)  │ .5487(17) │ Uani      │ 1.00000   │
-│ 10  │ .029(4)        │ .4549(7)  │ .2873(16) │ Uani      │ 1.00000   │
-
+10×7 DataFrame
+ Row │ fract_x     fract_z     label       adp_type    u_iso_or_equiv  occupan ⋯
+     │ Cif Valu…?  Cif Valu…?  Cif Valu…?  Cif Valu…?  Cif Valu…?      Cif Val ⋯
+─────┼──────────────────────────────────────────────────────────────────────────
+   1 │ .5505(5)    .1605(11)   o1          Uani        .035(3)         1.00000 ⋯
+   2 │ .4009(5)    .2290(11)   o2          Uani        .033(3)         1.00000
+   3 │ .2501(5)    .6014(13)   o3          Uani        .043(4)         1.00000
+   4 │ .4170(7)    .4954(15)   c1          Uani        .029(4)         1.00000
+   5 │ .3145(7)    .6425(16)   c2          Uani        .031(5)         1.00000 ⋯
+   6 │ .2789(8)    .8378(17)   c3          Uani        .040(5)         1.00000
+   7 │ .3417(9)    .8859(18)   c4          Uani        .045(6)         1.00000
+   8 │ .4445(9)    .7425(18)   c5          Uani        .045(6)         1.00000
+   9 │ .4797(8)    .5487(17)   c6          Uani        .038(5)         1.00000 ⋯
+  10 │ .4549(7)    .2873(16)   c7          Uani        .029(4)         1.00000
+                                                               2 columns omitted
 ```

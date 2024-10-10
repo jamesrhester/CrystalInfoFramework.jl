@@ -82,7 +82,7 @@ end
 
 RelationalContainer(data, dict::AbstractCifDictionary) = begin
 
-    present = keys(data)
+    present = collect(keys(data))
     cache = Dict{String, String}()
         
     # Include Set category keys that are missing
@@ -558,7 +558,7 @@ show(io::IO, d::CifCategory) = begin
     small_r = get_container(d)
     catname = get_name(d)
     for n in column_names(d)
-        df[!,n] = small_r[n]
+        df[!,n] = small_r[catname, n]
     end
     show(io,df)
 end
