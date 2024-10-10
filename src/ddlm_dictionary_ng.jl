@@ -1341,11 +1341,11 @@ end
 Convert a file: URI to a path.
 """
 to_path(u::URI) = begin
-    if Sys.iswindows()
-        unescapeuri(u.path[2:end])
-    else
+    #if Sys.iswindows()
+    #    unescapeuri(u.path[2:end])
+    #else
         unescapeuri(u.path)
-    end
+    #end
 end
 
 """
