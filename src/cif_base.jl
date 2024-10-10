@@ -724,8 +724,13 @@ Cif(somepath; verbose=false, native=true, version=0) = begin
     if Sys.iswindows() && !native
         @debug "Did not use cif_api on Windows"
     end
-    full_contents = read(full, String)
-    cif_from_string(full_contents, verbose=verbose, version=version, source=full)
+    Cif(open(full), verbose = verbose, version = version, source = full)
+end
+
+Cif(io::IO; verbose = false, version = 0, source = nothing) = begin
+    full_contents = read(io, String)
+    if isnothing(source) source = "$io" end
+    cif_from_string(full_contents, verbose = verbose, version = version, source = source)
 end
 
 """
