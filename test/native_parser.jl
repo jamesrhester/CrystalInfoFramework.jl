@@ -15,28 +15,28 @@ const test_fail_cif2 = ["bad_data.cif"]
 @testset "Native parse CIF1 files" begin
     for tf in test_files_cif1
         println("Testing $tf")
-        Cif(joinpath(@__PATH__,"test_cifs",tf),native=true,version=1)
+        Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=1)
         @test true
     end
-    simple_data = Cif(joinpath(@__PATH__,"test_cifs","simple_data.cif"),native=true,version=1)
+    simple_data = Cif(joinpath(@__DIR__,"test_cifs","simple_data.cif"),native=true,version=1)
 end
 
 @testset "Native parse CIF2 files" begin
     for tf in test_files_cif2
         println("Testing $tf")
-        Cif(joinpath(@__PATH__,"test_cifs",tf),native=true,version=2)
+        Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=2)
         @test true
     end
 end
 
 @testset "Invalid CIF1 files" begin
     for tf in test_fail_cif1
-        @test_throws Exception Cif(joinpath(@__PATH__,"test_cifs",tf),native=true,version=1)
+        @test_throws Exception Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=1)
     end
 end
 
 @testset "Invalid CIF2 files" begin
     for tf in test_fail_cif2
-        @test_throws Exception Cif(joinpath(@__PATH__,"test_cifs",tf),native=true,version=2)
+        @test_throws Exception Cif(joinpath(@__DIR__,"test_cifs",tf),native=true,version=2)
     end
 end

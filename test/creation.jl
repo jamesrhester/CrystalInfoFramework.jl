@@ -1,7 +1,6 @@
 # Test CIF object creation and destruction
-# Now adapted for NativeCif
 
-testdir = @__PATH__
+testdir = @__DIR__
 
 @testset "Test simple CIF creation and destruction" begin
     

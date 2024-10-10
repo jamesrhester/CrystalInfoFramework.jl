@@ -24,7 +24,7 @@ whatever 25.1 "who dares wins and so forth" ababab
 """
 
 loadin() = begin
-    Cif(text_cif)   #native parser
+    cif_from_string(text_cif)   #native parser
 end
 
 @testset "Simple constructions" begin
@@ -32,7 +32,7 @@ end
     t = open("new_testoutput.cif","w")
     show(t,MIME("text/cif"),firstcif)
     close(t)
-    secondcif = Cif(p"new_testoutput.cif")
+    secondcif = Cif("new_testoutput.cif")
     old_b = firstcif["testblock"]
     new_b = secondcif["testblock"]
     for kv in ["_item1","_item2","_item3"]
@@ -64,6 +64,6 @@ end
 end
 
 @testset "Straight in and out" begin
-    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__PATH__,"nick1.cif")));true end
-    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__PATH__,"nick1.cif"),native=true));true end
+    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__DIR__,"nick1.cif")));true end
+    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__DIR__,"nick1.cif"),native=true));true end
 end

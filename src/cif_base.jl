@@ -191,11 +191,11 @@ A CIF data block or save frame containing no nested save frames.
 mutable struct Block{V} <: CifContainer{V}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
-    original_file::AbstractPath
+    original_file::AbstractString
 end
 
 Block{V}() where V = begin
-    Block(Vector{String}[],Dict{String,Vector{V}}(),p"")
+    Block(Vector{String}[],Dict{String,Vector{V}}(),"")
 end
 
 """
@@ -205,7 +205,7 @@ mutable struct CifBlock{V} <: NestedCifContainer{V}
     save_frames::Dict{String,Block{V}}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
     data_values::Dict{String,Vector{V}}
-    original_file::AbstractPath
+    original_file::AbstractString
 end
 
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
@@ -356,12 +356,12 @@ recording the source of the collection.
 """
 struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
     contents::Dict{String,T}
-    original_file::AbstractPath
+    original_file::AbstractString
     header_comments::String
 end
 
 Cif{V,T}() where V where T = begin
-    return Cif(Dict{String,T}(), p"", "")
+    return Cif(Dict{String,T}(), "", "")
 end
 
 Cif() = Cif{ CifValue, CifBlock{CifValue} }
@@ -472,7 +472,7 @@ get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_fi
 mutable struct cif_builder_context
     actual_cif::Dict{String,CifContainer{CifValue}}
     block_stack::Array{CifContainer{CifValue}}
-    filename::AbstractPath
+    filename::AbstractString
     verbose::Bool
 end
 
@@ -662,7 +662,7 @@ end
 
 # This sets up the callbacks and configures the cifapi parser.
 
-default_options(s::AbstractPath;verbose=false) = begin
+default_options(s::AbstractString;verbose=false) = begin
     handle_cif_start_c = @cfunction(handle_cif_start,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_cif_end_c = @cfunction(handle_cif_end,Cint,(cif_tp_ptr,Ref{cif_builder_context}))
     handle_block_start_c = @cfunction(handle_block_start,Cint,(cif_container_tp_ptr,Ref{cif_builder_context}))
@@ -693,7 +693,7 @@ default_options(s::AbstractPath;verbose=false) = begin
 end
 
 """
-    Cif(s::AbstractPath;verbose=false,native=true,version=0)
+    Cif(somepath; verbose=false, native=true, version=0)
 
 Read in filename `s` as a CIF file. If `verbose` is true, print
 progress information during parsing. If `native` is `false`, use the
@@ -711,33 +711,33 @@ uses 6-10 times as much memory. However, from a cold start
 (e.g. in a standalone script) the cif_api parser is around 
 30% faster.
 """
-Cif(s::AbstractPath;verbose=false,native=true,version=0) = begin
-    ## get the full filename
-    full = realpath(s)
+Cif(somepath; verbose=false, native=true, version=0) = begin
+    ## get the full filename and make sure we have a string.
+    full = convert(String, realpath(somepath))
     if !Sys.iswindows() && !native
         pathstring = URI(full).path
         p_opts = default_options(full,verbose=verbose)
         result = cif_tp_ptr(p_opts)
         ## the real result is in our user data context
-        return Cif(p_opts.user_data.actual_cif,full,"")
+        return Cif(p_opts.user_data.actual_cif, full ,"")
     end
     if Sys.iswindows() && !native
         @debug "Did not use cif_api on Windows"
     end
-    full_contents = read(full,String)
-    Cif(full_contents,verbose=verbose,version=version,source=full)
+    full_contents = read(full, String)
+    cif_from_string(full_contents, verbose=verbose, version=version, source=full)
 end
 
 """
-    Cif(s::AbstractString;verbose=false,version=0,source=p"")
+    cif_from_string(s::AbstractString; verbose=false, version=0, source="")
 
-Process contents of `s` as a CIF file using the native Julia parser.
+Process `s` as the text of a CIF file using the native Julia parser.
 If `verbose` is true, print progress information during parsing.
 `version` may be `1`, `2` or `0` (default) for auto-detected CIF
 version. If `source` is provided, it is a filesystem location to
 record as the source for `s`.
 """
-Cif(s::AbstractString;verbose=false,version=0,source=p"") = begin
+cif_from_string(s::AbstractString; verbose=false, version=0, source="") = begin
     if length(s) > 1 && s[1] == '\ufeff'
         s = s[(nextind(s,1)):end]
     end

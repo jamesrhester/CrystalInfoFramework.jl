@@ -31,7 +31,7 @@ already been processed.
 ==#
 
 struct TreeToCif <: Transformer
-    source_name::AbstractPath
+    source_name::AbstractString
     header_comments::AbstractString
 end
 

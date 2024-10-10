@@ -1,12 +1,11 @@
 name = "CrystalInfoFramework"
 uuid = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
 authors = ["James.Hester <jxh@ansto.gov.au>"]
-version = "0.6.3"
+version = "0.7.0"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-FilePaths = "8fc22ac5-c921-52a6-82fd-178b2807b824"
 Lerche = "d42ef402-04e6-4356-9f73-091573ea58dc"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
@@ -16,7 +15,6 @@ cif_api_jll = "6fcef0ae-1c05-5fc1-b206-1cf994addbad"
 
 [compat]
 DataFrames = "^1.1.0"
-FilePaths = "^0.8.0"
 Lerche = "^0.5.0"
 PrecompileTools = "1.2.0"
 URIs = "1.5.0"

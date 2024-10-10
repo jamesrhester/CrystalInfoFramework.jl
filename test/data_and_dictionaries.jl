@@ -1,8 +1,8 @@
 # Test combinations of data and dictionaries
 
 prepare_dd() = begin
-    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
-    n = first(Cif(joinpath(@__PATH__,"nick1.cif"))).second
+    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    n = first(Cif(joinpath(@__DIR__,"nick1.cif"))).second
     return t,n
 end
 
@@ -40,8 +40,8 @@ is_looped(b, n) = any(x -> n in x, CrystalInfoFramework.get_loop_names(b))
 end
 
 @testset "Merging blocks" begin
-    t = DDLm_Dictionary(joinpath(@__PATH__,"cif_core.dic"))
-    n = Cif(joinpath(@__PATH__,"nick1_mergeable.cif"))
+    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    n = Cif(joinpath(@__DIR__,"nick1_mergeable.cif"))
     println("About to merge blocks")
     merge_blocks!(n,t)
     f = first(n).second

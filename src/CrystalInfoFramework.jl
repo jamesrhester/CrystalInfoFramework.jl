@@ -21,7 +21,6 @@
 module CrystalInfoFramework
 using DataFrames
 using URIs
-using FilePaths   #easy cross-platform URI
 using Lerche # for native parser
 using cif_api_jll # for cif API parser
 using PrecompileTools #for fast startup
@@ -29,6 +28,7 @@ using PrecompileTools #for fast startup
 # **Exports**
 
 export CifValue,Cif,Block,CifBlock
+export cif_from_string
 export CifContainer, NestedCifContainer
 export get_frames,get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!
@@ -81,8 +81,8 @@ end
 
 #
 @compile_workload begin
-    c = Cif(joinpath(@__PATH__,"../test/nick1.cif"), native=true)
-    d = DDLm_Dictionary(joinpath(@__PATH__,"../test/ddl.dic"), ignore_imports=true)
+    c = Cif(joinpath(@__DIR__, "../test/nick1.cif"), native=true)
+    d = DDLm_Dictionary(joinpath(@__DIR__, "../test/ddl.dic"), ignore_imports=true)
 end
 
 end

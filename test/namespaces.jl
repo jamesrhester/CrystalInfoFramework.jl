@@ -160,8 +160,8 @@ create_nspace_data() = begin
         write(s,second_dic)
         close(s)
     end
-    sdic = DDLm_Dictionary(p"second.dic")
-    sdata = first(Cif(p"second.cif")).second
+    sdic = DDLm_Dictionary("second.dic")
+    sdata = first(Cif("second.cif")).second
     tdata = TypedDataSource(data,cdic)
     sdata = TypedDataSource(sdata,sdic)
     NamespacedRC([tdata,sdata])
@@ -176,7 +176,7 @@ end
     @test get_data(nrc,"dodgy")["_cell.length_a"] == ["A"]
     @test haskey(nrc,"_atom_type.symbol","dodgy")
     c = get_category(nrc,"atom_site","CifCore")
-    println("$c")
+    #println("$c")
     @test haskey(c,"_atom_site.label")
     @test get_key_datanames(c) == [:label, :diffrn_id]
     @test c["o2"].fract_z == 0.2290

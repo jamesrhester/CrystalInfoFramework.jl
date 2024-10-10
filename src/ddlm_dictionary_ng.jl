@@ -95,7 +95,7 @@ DDLm_Dictionary(c::Cif;kwargs...) = begin
 end
 
 """
-    DDLm_Dictionary(a::AbstractPath;verbose=false,ignore_imports="None",
+    DDLm_Dictionary(a; verbose=false, ignore_imports="None",
     cache_imports=false)
 
 Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
@@ -121,13 +121,9 @@ unless `import_dir` is specified, in which case the search is relative to
 that directory.
 
 """
-DDLm_Dictionary(a::AbstractPath;verbose=false,kwargs...) = begin
-    c = Cif(a,verbose=verbose,native=true) #Native to catch header comments
+DDLm_Dictionary(a; verbose=false, kwargs...) = begin
+    c = Cif(a, verbose=verbose, native=true) #Native to catch header comments
     DDLm_Dictionary(c;kwargs...)
-end
-
-DDLm_Dictionary(a::String;kwargs...) = begin
-    DDLm_Dictionary(Path(a);kwargs...)
 end
 
 DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin
@@ -1325,57 +1321,30 @@ const ddlm_categories = [
 Turn a possibly relative URL into an absolute one. Will probably fail if file
 component starts with "."
 """
-fix_url(s::String,parent) = begin
+fix_url(s::String, parent) = begin
     scheme = match(r"^[a-zA-Z]+:",s)
     if scheme == nothing
         if s[1]=='/'
-            return URI(Path(s))
+            return URI(path = s, scheme = "file")
         elseif s[1]=="."  # really shouldn't accept this
-            return URI(Path(joinpath(parent,s)))
+            return URI(path = joinpath(parent,s), scheme = "file")
         else
-            return URI(Path(joinpath(parent,s)))
+            return URI(path = joinpath(parent,s), scheme = "file")
         end
     end
     return URI(s)
 end
 
-# Following code copied from URIs/uris.jl. For some reason
-# this function was not recognised during precompilation
-
-const absent = SubString("absent", 1, 0)
-
-function URIs.URI(p::AbstractPath; query=absent, fragment=absent)
-    if isempty(p.root)
-        throw(ArgumentError("$p is not an absolute path"))
-    end
-
-    b = IOBuffer()
-    print(b, "file://")
-
-    if !isempty(p.drive)
-        print(b, "/")
-        print(b, p.drive)
-    end
-
-    for s in p.segments
-        print(b, "/")
-        print(b, URIs.escapeuri(s))
-    end
-
-    return URIs.URI(URIs.URI(String(take!(b))); query=query, fragment=fragment)
-end
-
 """
     to_path(::URI)
 
-Convert a file: URI to a Path.
-Really belongs in FilePaths.jl but for now this will work.
+Convert a file: URI to a path.
 """
 to_path(u::URI) = begin
     if Sys.iswindows()
-        Path(unescapeuri(u.path[2:end]))
+        unescapeuri(u.path[2:end])
     else
-        Path(unescapeuri(u.path))
+        unescapeuri(u.path)
     end
 end
 
@@ -1657,7 +1626,7 @@ check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
     spec = x[:import].get[]
     for one_spec in spec
         if get(one_spec,"mode","Contents") == "Full" continue end
-        templ_file_name = joinpath(Path(d.import_dir), one_spec["file"])
+        templ_file_name = joinpath(d.import_dir, one_spec["file"])
         if !(templ_file_name in keys(d.cached_imports))
             println("Warning: cannot find $templ_file_name when checking imports for $name")
             continue
