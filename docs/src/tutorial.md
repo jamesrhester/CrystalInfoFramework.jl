@@ -8,9 +8,9 @@ To open CIF file `demo.cif`, and read `_cell.length_a` from block `saly2_all_ani
 
 ```jldoctest nick1
 
-using CrystalInfoFramework, DataFrames, FilePaths
+using CrystalInfoFramework, DataFrames
 
-nc = Cif(p"demo.cif")
+nc = Cif("demo.cif")
 my_block = nc["saly2_all_aniso"]  #could also use first(nc).second
 my_block["_cell.length_a"]
 
@@ -116,7 +116,7 @@ dictionaries are published by the Protein Data Bank (wwPDB) and DDLm
 dictionaries are used by the IUCr.
 
 ```julia
-d = DDLm_Dictionary(p"cif_core.dic")
+d = DDLm_Dictionary("cif_core.dic")
 ```
 
 ### DataSources
@@ -135,7 +135,7 @@ creating a [`TypedDataSource`](@ref):
 
 ```jldoctest nick1
 using CrystalInfoFramework.DataContainer
-my_dict = DDLm_Dictionary(p"../test/cif_core.dic")
+my_dict = DDLm_Dictionary("../test/cif_core.dic")
 bd = TypedDataSource(my_block,my_dict)
 bd["_cell.length_a"]
 

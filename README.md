@@ -14,10 +14,11 @@ mmCIF dictionaries).
 
 ## Warning: pre-1.0 release
 
-Types, method names, and method signatures may change in later versions.
+Although some types and methods may change in later versions, in general
+the API has stabilised.
 
-If you see ways to improve the naming or architecture, 
-now is the time to raise an issue.
+If you see ways to improve the naming or architecture, now is the time
+to raise an issue.
 
 ## Installation
 
@@ -43,23 +44,21 @@ returned as 1-element Arrays. **This may change in the future**
 
 ### Reading
 
-``Cif`` objects are created by calling the ``Cif`` constructor with a file
-name. File names should be provided as ``FilePaths`` paths. These can be
-produced from strings be prepending the letter ``p`` once ``FilePaths`` is
-added. If a ``String`` is provided to the ``Cif`` constructor it will be
-interpreted as the contents of a CIF file. The optional argument `native`
-switches between the [C cif_api parser](https://github.com/COMCIFS/cif_api)
-(`native=false`, not currently available for
-Windows) and a native Julia parser (`native=true`, the default).
+``Cif`` objects are created by calling the ``Cif`` constructor with a
+file name.  The optional argument `native` switches between the 
+[C cif_api parser](https://github.com/COMCIFS/cif_api) (`native=false`,
+not currently available for Windows) and a native Julia parser
+(`native=true`, the default). A ``Cif`` can be created directly from a
+``String`` in CIF format by calling ``cif_from_string``.
 
 To open a file, and read ``_cell.length_a`` from block ``only_block``, 
 returning a one-element ``Array{String,1}``:
 
 ```julia
 
-julia> using CrystalInfoFramework, FilePaths
+julia> using CrystalInfoFramework
 
-julia> nc = Cif(p"my_cif.cif")
+julia> nc = Cif("my_cif.cif")
 ...
 julia> my_block = nc["only_block"]  #could also use first(nc).second
 ...
@@ -103,8 +102,7 @@ the length of the loop - this is checked.
 ## Dictionaries and DataSources
 
 CIF dictionaries are created by passing the dictionary file name to
-``DDLm_Dictionary`` or ``DDL2_Dictionary``. Either a ``FilePath`` or
-``String`` may be used to specify the file location.
+``DDLm_Dictionary`` or ``DDL2_Dictionary``.
 
 ## DataSources
 
