@@ -841,7 +841,8 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
 end
 
 """
-    show_loop(io,cat,df;implicits=[],indents=[text_indent,value_col],reflow=false,justify=false)
+    show_loop(io,cat,df;implicits=[], indents=[text_indent,value_col], order=(), reflow=false,
+justify=false)
 
 Format the contents of multi-row DataFrame `df` as a CIF loop.
  If `cat.col` appears in `implicits` then `col` is not output.
@@ -866,19 +867,25 @@ show_loop(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
 end       
 
 """
-    show(io::IO,::MIME"text/cif",c::Cif)
+    show(io::IO,::MIME"text/cif",c::Cif; ordering = [])
 
-Write the contents of `c` as a CIF file to `io`.
+Write the contents of `c` as a CIF file to `io`, ordering each of
+the CifContainers according to `ordering`.
 """
-show(io::IO,::MIME"text/cif",c::Cif) = begin
+show(io::IO,::MIME"text/cif",c::Cif; ordering=[]) = begin
+
     for k in keys(c)
         write(io,"data_$k\n")
-        show(io,MIME("text/cif"),c[k])
+        show(io,MIME("text/cif"),c[k], ordering=ordering)
     end
+
 end
 
 Base.show(io::IO,::MIME"text/cif",c::CifContainer;ordering=[]) = begin
     write(io,"\n")
+    if length(ordering) == 0
+        ordering = sort(collect(keys(c)))
+    end
     key_vals = setdiff(collect(keys(c)),get_loop_names(c)...)
     for k in ordering
         if k in key_vals

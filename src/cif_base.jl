@@ -211,6 +211,7 @@ end
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
 CifBlock(n::Block{V}) where V = CifBlock(Dict{String,Block{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
 CifBlock(f::CifBlock) = f
+CifBlock() = CifBlock(Block{CifValue}())
 
 # And a simple access API
 get_data_values(b::Block) = b.data_values
@@ -364,7 +365,7 @@ Cif{V,T}() where V where T = begin
     return Cif(Dict{String,T}(), "", "")
 end
 
-Cif() = Cif{ CifValue, CifBlock{CifValue} }
+Cif() = Cif{ CifValue, CifBlock{CifValue} }()
 
 """
     keys(c::Cif)
