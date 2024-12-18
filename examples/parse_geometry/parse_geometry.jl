@@ -34,7 +34,19 @@ function cif_geometry(file)
     return atoms, M' * fract
 end
 
-# Some data from the Crystallography Open Database (COD), ID 7706719
-file = "7706719.cif"
 
-atoms, geometry = cif_geometry(file)
+if abspath(PROGRAM_FILE) == @__FILE__
+    if length(ARGS) == 0
+
+        # Some data from the Crystallography Open Database (COD), ID 7706719
+	file = "7706719.cif"
+    else	
+        file = first(a)
+    end
+
+    atoms, geometry = cif_geometry(file)
+    println("Atoms from $file")
+    println(atoms)
+    println("\n Geometry:")
+    println(geometry)
+end
