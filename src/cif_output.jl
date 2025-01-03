@@ -872,7 +872,7 @@ end
 Write the contents of `c` as a CIF file to `io`, ordering each of
 the CifContainers according to `ordering`.
 """
-show(io::IO,::MIME"text/cif",c::Cif; ordering=[]) = begin
+Base.show(io::IO,::MIME"text/cif",c::Cif; ordering=[]) = begin
 
     for k in keys(c)
         write(io,"data_$k\n")
@@ -953,7 +953,7 @@ Output `ddlm_dic` in CIF format. `header` contains text that will
 be output in a comment box at the top of the file, which will replace
 any header comment stored in `ddlm_dic`.
 """
-show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
+Base.show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = begin
     dicname = ddlm_dic[:dictionary].title[]
     #
     # Header
@@ -1121,7 +1121,7 @@ output layout using the following keywords:
     strict: follow the IUCr layout rules
     
 """
-show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
+Base.show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
     dicname = ddl2_dic[:dictionary].title[]
     write(io,"#")
     write(io,"""
@@ -1158,11 +1158,11 @@ show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary) = begin
 end
 
 """
-    show(io::IO,::MIME"text/cif",ddl2_dic::AbstractCifDictionary)
+    show(io::IO,::MIME"text/cif",ddl_dic::AbstractCifDictionary;strict=false, kwargs...)
     
 Output `ddl2_dic` to `IO` in CIF format
 """
-show(io::IO,x::MIME"text/cif",ddl2_dic::AbstractCifDictionary;strict=false,kwargs...) = begin
+Base.show(io::IO,x::MIME"text/cif",ddl_dic::AbstractCifDictionary;strict=false,kwargs...) = begin
     ic = IOContext(io,:strict=>strict)
-    show(ic,x,ddl2_dic;kwargs...)
+    show(ic,x,ddl_dic;kwargs...)
 end

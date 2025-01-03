@@ -14,6 +14,7 @@ haskey(c::Cif,name)
 getindex(c::Cif,n)
 setindex!(c::Cif,v,n)
 show(io::IO,::MIME"text/plain",c::Cif)
+show(io::IO,::MIME"text/cif",c::Cif)
 ```
 
 ## CIF blocks
@@ -89,7 +90,7 @@ get_categories(d::DDLm_Dictionary)
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false)
 get_default(d::DDLm_Dictionary,s)
 lookup_default(dict::DDLm_Dictionary,dataname::String,cp)
-show(io::IO,::MIME"text/cif",ddlm_dic::DDLm_Dictionary)
+show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="")
 ```
 
 ### DDL2 Dictionaries
@@ -105,6 +106,6 @@ keys(d::DDL2_Dictionary)
 getindex(d::DDL2_Dictionary,k)
 get_categories(d::DDL2_Dictionary)
 get_default(d::DDL2_Dictionary,dataname)
-show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
+show(io::IOContext,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
 ```
 

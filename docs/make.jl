@@ -10,6 +10,7 @@ makedocs(sitename="CrystalInfoFramework documentation",
              "API" => "api.md"
              ],
          #doctest = :fix
+         warnonly = (:cross_references)
 	  )
 
 deploydocs(
