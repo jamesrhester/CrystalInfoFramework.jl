@@ -108,12 +108,3 @@ get_default(d::DDL2_Dictionary,dataname)
 show(io::IO,::MIME"text/cif",ddl2_dic::DDL2_Dictionary)
 ```
 
-### Data Sources
-
-Data from arbitrary file formats can be used as long as they
-return an array of values when provided with a string.
-
-```@docs
-DataSource
-TypedDataSource
-```

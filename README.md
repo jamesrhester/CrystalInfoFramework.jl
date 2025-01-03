@@ -20,6 +20,8 @@ the API has stabilised.
 If you see ways to improve the naming or architecture, now is the time
 to raise an issue.
 
+The current release will be the basis of the first stable release.
+
 ## Installation
 
 Once Julia is installed, it is sufficient to `add CrystalInfoFramework`
@@ -99,32 +101,10 @@ add_to_loop(my_block,"_old_item","_new_item")
 The number of values in the array assigned to ``_new_item`` must match
 the length of the loop - this is checked.
 
-## Dictionaries and DataSources
+## Dictionaries
 
 CIF dictionaries are created by passing the dictionary file name to
 ``DDLm_Dictionary`` or ``DDL2_Dictionary``.
-
-## DataSources
-
-A ``DataSource`` is any data source returning an array of values when
-supplied with a string.  A CIF ``Block`` conforms to this specification.
-``DataSource``s are defined in submodule ``CrystalInfoFramework.DataContainer``.
-
-A CIF dictionary can be used to obtain data with correct Julia type from
-a ``DataSource`` that uses data names defined in the dictionary by 
-creating a ``TypedDataSource``:
-
-```julia
-julia> using CrystalInfoFramework.DataContainer
-julia> my_dict = DDLm_Dictionary("cif_core.dic")
-julia> bd = TypedDataSource(my_block,my_dict)
-julia> l = bd["_cell.length_a"]
-1-element Array{Float64,1}:
- 11.52
-julia> l = bd["_cell_length_a"] #understand aliases
-1-element Array{Float64,1}:
- 11.52
-```
 
 ### Writing
 

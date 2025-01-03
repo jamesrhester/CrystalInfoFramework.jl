@@ -18,7 +18,3 @@ include("save_frames.jl")
 include("dictionaries.jl")
 include("data_and_dictionaries.jl")
 include("output.jl")
-
-# Test DataContainers
-
-include("dc_base.jl")

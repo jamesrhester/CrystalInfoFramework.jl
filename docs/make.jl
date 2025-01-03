@@ -1,5 +1,4 @@
 using Documenter, CrystalInfoFramework
-using CrystalInfoFramework.DataContainer
 
 makedocs(sitename="CrystalInfoFramework documentation",
 	  format = Documenter.HTML(
