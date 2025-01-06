@@ -146,15 +146,15 @@ end
     if m!=0 throw(error("Number of values in loop containing $(name_list[1]) is not a multiple of number of looped names")) end
     new_vals = reshape(value_list,length(name_list),:)
     per_name = permutedims(new_vals,[2,1])
-    Dict{String,Array{CifValue,1}}(zip(name_list,eachcol(per_name)))
+    Dict{String, Vector}(zip(name_list,eachcol(per_name)))
 end
 
 @inline_rule scalar_item(t::TreeToCif,dataname,datavalue) = begin
     if !ismissing(datavalue)
         if any(x->isuppercase(x), dataname)
-            String(lowercase(dataname)) => CifValue[datavalue]
+            String(lowercase(dataname)) => [datavalue]
         else
-            String(dataname) => CifValue[datavalue]
+            String(dataname) => [datavalue]
         end
     end
 end
@@ -165,8 +165,8 @@ end
 
 @rule save_frame(t::TreeToCif,args) = begin
     loop_list = Vector{Vector{String}}()
-    contents = Dict{String,Vector{CifValue}}()
-    b = Block{CifValue}(loop_list,contents,t.source_name)
+    contents = Dict{String,Vector}()
+    b = Block(loop_list,contents,t.source_name)
     for l in args[2:end-1]
         # println("Adding $l")
         add_to_block(l,b)
@@ -176,9 +176,9 @@ end
 end
 
 @rule dblock(t::TreeToCif,args) = begin
-    save_frames = Dict{String,Block{CifValue}}()
+    save_frames = Dict{String,Block}()
     loop_names = Vector{Vector{String}}()
-    data_values = Dict{String,Vector{CifValue}}()
+    data_values = Dict{String,Vector}()
     name = String(args[1])[6:end]
     cb = CifBlock(save_frames,loop_names,data_values,t.source_name)
     for data_item in args[2:end]
@@ -187,7 +187,7 @@ end
     name=>cb
 end
 
-add_to_block(data_item::Pair{String,T} where T<:CifContainer{CifValue},cb) = begin
+add_to_block(data_item::Pair{String,T} where T<:CifContainer,cb) = begin
     k,v = data_item
     if !haskey(cb.save_frames,k)
         cb.save_frames[k] = v
@@ -196,7 +196,7 @@ add_to_block(data_item::Pair{String,T} where T<:CifContainer{CifValue},cb) = beg
     end
 end
 
-add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
+add_to_block(data_item::Pair{String, <: Vector},cb) = begin
     k,v = data_item
     @assert !any(x->isuppercase(x), k)
     if !(k in keys(cb))
@@ -206,7 +206,7 @@ add_to_block(data_item::Pair{String,Array{CifValue,1}},cb) = begin
     end
 end
 
-add_to_block(data_item::Dict{String,Array{CifValue,1}},cb) = begin
+add_to_block(data_item::Dict{String, <: Vector},cb) = begin
     for nn in keys(data_item)
         if haskey(cb,nn) throw(error("Duplicate item name $nn")) end
     end
@@ -220,5 +220,5 @@ end
 add_to_block(::Nothing,cb) = cb
 
 @rule input(t::TreeToCif,args) = begin
-    Cif{CifValue,CifBlock{CifValue}}(Dict{String,CifBlock{CifValue}}(args),t.source_name,t.header_comments)
+    Cif{CifBlock}(Dict{String,CifBlock}(args),t.source_name,t.header_comments)
 end

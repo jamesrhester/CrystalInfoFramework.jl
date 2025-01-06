@@ -7,15 +7,6 @@
 # CIF1 allows only string/missing/null values, whereas CIF2 introduces both
 # "tables" and lists.
 
-"""
-The syntactical type of data held in a CIF file. A value is of type `String`,
-`Vector{CifValue}`, `Dict{String,CifValue}`, `Missing` or `Nothing`. In all
-cases the values returned for a given data name are in an 
-`Array{CifValue,1}`. 
-"""
-const CifValue = Union{String,Missing,Nothing,Vector{T},Dict{String,T}} where T
-Base.nameof(CifValue) = Symbol("Cif Value")
-
 # **CIF containers**
 #
 # CIF containers hold collections of CIF values, indexed by strings.
@@ -25,7 +16,7 @@ A `CifContainer` holds a series of one-dimensional arrays indexed by strings, an
 source of the data. Arrays are organised into groups, called "loops". Subtypes should
 implement `get_source_file` and `get_data_values`.
 """
-abstract type CifContainer{V} <: AbstractDict{String,V} end
+abstract type CifContainer <: AbstractDict{String, Any} end
 
 """
     get_source_file(c::CifContainer)
@@ -101,7 +92,7 @@ keys(b::CifContainer) = keys(get_data_values(b))
 
 Returns `true` if `b` contains a value for case-insensitive data name `s`
 """
-haskey(b::CifContainer{V} where V,s::String) = haskey(get_data_values(b),lowercase(s))
+haskey(b::CifContainer, s::String) = haskey(get_data_values(b),lowercase(s))
 
 """
     iterate(b::CifContainer)
@@ -115,7 +106,7 @@ iterate(b::CifContainer,s) = iterate(get_data_values(b),s)
     getindex(b::CifContainer,s::String)
 
 `b[s]` returns all values for case-insensitive data name `s` in 
-`b` as an `Array{CifValue,1}`
+`b` as an `Array`
 """
 getindex(b::CifContainer,s::String) = get_data_values(b)[lowercase(s)]
 
@@ -170,7 +161,7 @@ end
 A CIF container with nested blocks (save frames). Data names in the
 nested block are hidden.
 """
-abstract type NestedCifContainer{V} <: CifContainer{V} end
+abstract type NestedCifContainer <: CifContainer end
 
 """
     get_frames(c::NestedCifContainer)
@@ -188,30 +179,30 @@ function get_frames end
 """
 A CIF data block or save frame containing no nested save frames.
 """
-mutable struct Block{V} <: CifContainer{V}
+mutable struct Block <: CifContainer
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{V}}
+    data_values::Dict{String,Vector}
     original_file::AbstractString
 end
 
-Block{V}() where V = begin
-    Block(Vector{String}[],Dict{String,Vector{V}}(),"")
+Block() = begin
+    Block(Vector{String}[],Dict{String,Vector{String}}(),"")
 end
 
 """
 A CIF block potentially containing save frames. Save frames cannot be nested.
 """
-mutable struct CifBlock{V} <: NestedCifContainer{V}
-    save_frames::Dict{String,Block{V}}
+mutable struct CifBlock <: NestedCifContainer
+    save_frames::Dict{String,Block}
     loop_names::Vector{Vector{String}} #one loop is a list of datanames
-    data_values::Dict{String,Vector{V}}
+    data_values::Dict{String,Vector}
     original_file::AbstractString
 end
 
 Block(f::CifBlock) = Block(get_loop_names(f),get_data_values(f),get_source_file(f))
-CifBlock(n::Block{V}) where V = CifBlock(Dict{String,Block{V}}(),get_loop_names(n),get_data_values(n),n.original_file)
+CifBlock(n::Block) = CifBlock(Dict{String,Block}(),get_loop_names(n),get_data_values(n),n.original_file)
 CifBlock(f::CifBlock) = f
-CifBlock() = CifBlock(Block{CifValue}())
+CifBlock() = CifBlock(Block())
 
 # And a simple access API
 get_data_values(b::Block) = b.data_values
@@ -235,7 +226,7 @@ get_source_file(f::CifBlock) = f.original_file
 """
 A collection of CIF containers indexed by strings
 """
-abstract type CifCollection{V} <: AbstractDict{String,V} end
+abstract type CifCollection <: AbstractDict{String, CifContainer} end
 
 # When displaying a `CifCollection` a save frame is generated
 
@@ -355,17 +346,17 @@ end
 A CIF file consisting of a collection of `CifContainer` indexed by String and
 recording the source of the collection.
 """
-struct Cif{V,T <: CifContainer{V}} <: CifCollection{V}
+struct Cif{T <: CifContainer} <: CifCollection
     contents::Dict{String,T}
     original_file::AbstractString
     header_comments::String
 end
 
-Cif{V,T}() where V where T = begin
+Cif{T}() where T = begin
     return Cif(Dict{String,T}(), "", "")
 end
 
-Cif() = Cif{ CifValue, CifBlock{CifValue} }()
+Cif() = Cif{ CifBlock }()
 
 """
     keys(c::Cif)
@@ -453,11 +444,11 @@ get_header_comments(n::Cif) = n.header_comments
 # Obtaining save frames.
 
 """
-    get_frames(f::CifBlock{V})
+    get_frames(f::CifBlock)
 
 Return all nested CIF containers in `f` as a `Cif` object.
 """
-get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_file(f),"")
+get_frames(f::CifBlock) = Cif{Block}(f.save_frames,get_source_file(f),"")
 
 # **Interface to low-level C API**
 
@@ -471,8 +462,8 @@ get_frames(f::CifBlock{V}) where V = Cif{V,Block{V}}(f.save_frames,get_source_fi
 # verbose information.
 
 mutable struct cif_builder_context
-    actual_cif::Dict{String,CifContainer{CifValue}}
-    block_stack::Array{CifContainer{CifValue}}
+    actual_cif::Dict{String,CifContainer}
+    block_stack::Array{CifContainer}
     filename::AbstractString
     verbose::Bool
 end
@@ -528,7 +519,7 @@ handle_block_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("New blockname $(blockname)")
     end
-    newblock = Block{CifValue}()
+    newblock = Block()
     newblock.original_file = b.filename
     push!(b.block_stack,newblock)
     0
@@ -562,7 +553,7 @@ handle_frame_start(a::cif_container_tp_ptr,b)::Cint = begin
     if b.verbose
         println("Frame started: $blockname")
     end
-    newblock = Block{CifValue}()
+    newblock = Block()
     newblock.original_file = b.filename
     b.block_stack[end] = CifBlock(b.block_stack[end])
     push!(b.block_stack,newblock)
@@ -654,7 +645,7 @@ handle_item(a::Ptr{UInt16},b::cif_value_tp_ptr,c)::Cint = begin
     end
     lc_keyname = lowercase(keyname)
     if !(lc_keyname in keys(get_data_values(current_block)))
-        get_data_values(current_block)[lc_keyname]=[val]
+        get_data_values(current_block)[lc_keyname]=Union{Vector, Dict, String, Nothing, Missing}[val]
     else
         push!(get_data_values(current_block)[lc_keyname],val)
     end

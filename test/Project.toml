@@ -2,3 +2,4 @@
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Lerche = "d42ef402-04e6-4356-9f73-091573ea58dc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TidyTest = "ef104744-fcb3-4e7e-8bb2-6e95860d81ed"

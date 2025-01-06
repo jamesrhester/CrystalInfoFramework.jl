@@ -12,7 +12,7 @@ testdir = @__DIR__
 end
 
     @test begin
-    p=Cif{CifValue,CifBlock{CifValue}}()
+    p=Cif{CifBlock}()
     true    #if we succeed we are happy
 end
 
