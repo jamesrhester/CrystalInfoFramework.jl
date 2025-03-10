@@ -1,7 +1,7 @@
 name = "CrystalInfoFramework"
 uuid = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
 authors = ["James.Hester <jxh@ansto.gov.au>"]
-version = "0.8.0"
+version = "1.0.0-alpha"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"

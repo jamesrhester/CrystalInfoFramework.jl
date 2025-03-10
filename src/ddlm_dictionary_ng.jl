@@ -122,7 +122,7 @@ that directory.
 
 """
 DDLm_Dictionary(a; verbose=false, kwargs...) = begin
-    c = Cif(a, verbose=verbose, native=true) #Native to catch header comments
+    c = Cif(a, verbose=verbose)
     DDLm_Dictionary(c;kwargs...)
 end
 

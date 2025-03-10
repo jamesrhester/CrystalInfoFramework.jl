@@ -1,9 +1,8 @@
-# Data access tests, native and C parser
+# Data access tests
 
 # Simple value tests
 @testset "Simple data values" begin
-    for native in (true,false)
-        b = prepare_block("simple_data.cif","simple_data",native=native)
+        b = prepare_block("simple_data.cif","simple_data")
         @test b["_numb_su"] == ["0.0625(2)"]
         @test b["_unquoted_string"] == ["unquoted"]
         @test b["_text_string"] == ["text"]
@@ -23,14 +22,12 @@
         set_diff = setdiff(known_dnames, Set(keys(b)))
         println("Difference: $set_diff")
         @test length(set_diff) == 0
-    end
 end
 
 # Looped value tests
 @testset "Looped values" begin
-    
-    for native = (true,false)
-        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+
+        b = prepare_block("simple_loops.cif","simple_loops")
         l = get_loop(b,"_col2")
         vals = []
         for p in eachrow(l)
@@ -71,17 +68,17 @@ end
 
         # drop a specified value (not part of API)
 
-        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        b = prepare_block("simple_loops.cif","simple_loops")
         g = indexin(["1"], b["_col1"])[]
         CrystalInfoFramework.drop_row!(b, "_col1", g)
         @test setdiff(b["_col2"],["v2","v3"]) == []
 
-        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        b = prepare_block("simple_loops.cif","simple_loops")
         g = indexin(["v2"],b["_col2"])[]
         CrystalInfoFramework.drop_row!(b, "_col3", g)
         @test setdiff(b["_col1"],["1","3"]) == [] 
 
-        b = prepare_block("simple_loops.cif","simple_loops",native=native)
+        b = prepare_block("simple_loops.cif","simple_loops")
         g = indexin(["12.5(2)"],b["_col3"])[]
         CrystalInfoFramework.drop_row!(b, "_col2", g)
         @test setdiff(b["_col1"],["1","2"]) == [] 
@@ -89,49 +86,40 @@ end
         CrystalInfoFramework.drop_row!(b, "_scalar_a", 1)
         @test !haskey(b, "_scalar_b")
         @test !haskey(b, "_scalar_a")
-    end
 end
 
 # Test lists
 @testset "List values" begin
-    for native = (true,false)
-        b = prepare_block("list_data.cif","list_data",native=native)
+        b = prepare_block("list_data.cif","list_data")
         l = b["_digit_list"]
         #println("digit list is $l")
         @test l[1] == ["0","1","2","3","4","5","6","7","8","9"]
-    end
 end
 
 # Test tables
 @testset "Table values" begin
-    for native = (true,false)
-        b = prepare_block("table_data.cif","table_data",native=native)
+        b = prepare_block("table_data.cif","table_data")
         l = b["_type_examples"]
         @test l[1]["numb"]=="-123.4e+67(5)"
         @test l[1]["char"]=="char"
         @test "unknown" in keys(l[1])
-    end
 end
 
 # Test both at once!
 @testset "Lists and tables" begin
-    for native = (true,false)
-        b = prepare_block("table_list_data.cif","tl_data",native=native)
+        b = prepare_block("table_list_data.cif","tl_data")
         l = b["_import.get"]
         @test ismissing(l[1][1]["block"])
         @test l[1][2]["c"]=="whatever"
         q = b["_list_in_table"]
         @test q[1]["q"][2] == "b"
-    end
 end
 
 # Test missing values are dropped completely
 
 @testset "Missing values" begin
-    for native = (true,false)
-        b = prepare_block("missing_data.cif","miss_data",native=native)
+        b = prepare_block("missing_data.cif","miss_data")
         @test !haskey(b,"_col_missing")
         @test !haskey(b,"_scalar_b")
         @test !haskey(b,"_forget_it")
-    end
 end

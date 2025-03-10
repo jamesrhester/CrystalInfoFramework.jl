@@ -24,7 +24,7 @@ whatever 25.1 "who dares wins and so forth" ababab
 """
 
 loadin() = begin
-    cif_from_string(text_cif)   #native parser
+    cif_from_string(text_cif)
 end
 
 @testset "Simple constructions" begin
@@ -65,5 +65,4 @@ end
 
 @testset "Straight in and out" begin
     @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__DIR__,"nick1.cif")));true end
-    @test begin show(stdout,MIME("text/cif"),Cif(joinpath(@__DIR__,"nick1.cif"),native=true));true end
 end
