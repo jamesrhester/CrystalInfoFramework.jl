@@ -262,7 +262,7 @@ Remove all information from `d` associated with dataname `k`
 delete!(d::DDLm_Dictionary,k::String) = begin
     canonical_name = find_name(d,k)
     for cat in keys(d.block)
-        delete!(parent(d.block[cat]),parent(d.block[cat])[!,:master_id] .== canonical_name)
+        deleteat!(parent(d.block[cat]),parent(d.block[cat])[!,:master_id] .== canonical_name)
         # regroup
         d.block[cat] = groupby(parent(d.block[cat]),:master_id)
     end
@@ -370,9 +370,7 @@ end
     find_name(d::DDLm_Dictionary,name)
 
 Find the canonical name for `name` in `d`. If `name` is not
-present, return `name` unchanged. If accessed in cat/obj format, search also child
-categories. Note that the head category may not have a category associated with it.
-If `name` is the dictionary title it is returned as is.
+present, return `name` unchanged.
 """
 find_name(d::DDLm_Dictionary,name) =  begin
     lname = lowercase(name)
@@ -391,26 +389,48 @@ end
     find_name(d::DDLm_Dictionary,cat,obj)
 
 Find the canonical name referenced by `cat.obj` in `d`, searching also child
-categories according to DDLm semantics. Note that the head category may not 
+and parent categories according to DDLm semantics. Note that the head category may not 
 have a category associated with it.
 """
 find_name(d::DDLm_Dictionary, cat, obj) = begin
-    cat = String(cat)
-    obj = String(obj)
+    cat = lowercase(String(cat))
+    obj = lowercase(String(obj))
     catcol = d[:name][!,:category_id]
-    selector = map(x-> !isnothing(x) && lowercase(x) == lowercase(cat),catcol)
-    pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
+    selector = map(x-> !isnothing(x) && lowercase(x) == cat,catcol)
+    pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== obj),:master_id]
     if length(pname) == 1 return pname[]
     elseif length(pname) > 1
         throw(error("More than one name satisfies $cat.$obj: $pname"))
     end
-    for c in get_child_categories(d,cat)
-        pname = d[:name][(lowercase.(d[:name][!,:category_id]) .== lowercase(c)) .& (lowercase.(d[:name][!,:object_id]) .== lowercase(obj)),:master_id]
-        if length(pname) == 1 return pname[]
-        elseif length(pname) > 1
-            throw(error("More than one name satisfies $c.$obj: $pname"))
+
+    if !is_loop_category(d, cat)
+        throw(KeyError("$cat/$obj"))
+    end
+    
+    # Check children
+
+    for c in get_child_categories(d, cat)
+        try
+            return find_name(d, c, obj)
+        catch KeyError
+            continue
         end
     end
+    
+    # Check parents
+
+    np = get_parent_category(d, cat)
+    while is_loop_category(d, np)
+
+        try
+            return find_name(d, np, obj)
+        catch KeyError
+            newp = get_parent_category(d, np)
+            if newp == np break end
+            np = newp
+        end
+    end
+
     throw(KeyError("$cat/$obj"))
 end
 
@@ -1537,7 +1557,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
                 end
                 import_def[k][!,:master_id] .= definition
                 if haskey(d,k)
-                    delete!(d[k],d[k][!,:master_id] .== definition)
+                    deleteat!(d[k],d[k][!,:master_id] .== definition)
                 else
                     d[k] = DataFrame()
                 end
