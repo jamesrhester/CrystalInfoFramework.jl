@@ -12,16 +12,6 @@ understand dictionaries written in DDLm and DDL2, which can be used to return co
 types and find aliased datanames (note that this includes the PDB
 mmCIF dictionaries).
 
-## Warning: pre-1.0 release
-
-Although some types and methods may change in later versions, in general
-the API has stabilised.
-
-If you see ways to improve the naming or architecture, now is the time
-to raise an issue.
-
-The current release will be the basis of the first stable release.
-
 ## Installation
 
 Once Julia is installed, it is sufficient to `add CrystalInfoFramework`
@@ -29,8 +19,8 @@ at the Pkg prompt (accessed by the `]` character in the REPL).
 
 ## Documentation
 
-Detailed documentation is becoming progressively available 
-[here](https://jamesrhester.github.io/CrystalInfoFramework.jl/dev).
+Detailed documentation is available 
+[here](https://jamesrhester.github.io/CrystalInfoFramework.jl/).
 
 ## Getting started
 
@@ -47,10 +37,7 @@ returned as 1-element Arrays. **This may change in the future**
 ### Reading
 
 ``Cif`` objects are created by calling the ``Cif`` constructor with a
-file name.  The optional argument `native` switches between the 
-[C cif_api parser](https://github.com/COMCIFS/cif_api) (`native=false`,
-not currently available for Windows) and a native Julia parser
-(`native=true`, the default). A ``Cif`` can be created directly from a
+file name.  A ``Cif`` can be created directly from a
 ``String`` in CIF format by calling ``cif_from_string``.
 
 To open a file, and read ``_cell.length_a`` from block ``only_block``, 
@@ -104,12 +91,31 @@ the length of the loop - this is checked.
 ## Dictionaries
 
 CIF dictionaries are created by passing the dictionary file name to
-``DDLm_Dictionary`` or ``DDL2_Dictionary``.
+``DDLm_Dictionary`` or ``DDL2_Dictionary`` constructors.
 
 ### Writing
 
 Use ``show(io::IO,::MIME"text/cif",d)`` to produce
 correctly-formatted dictionaries or data files.
+
+## See Also
+
+(Raise a PR if you'd like your software listed here).
+
+* [``julia_cif_tools``](https://github.com/jamesrhester/julia_cif_tools): Small programs
+making use of this project. Good source of examples.
+
+* [[``ImgCIFHandler.jl``](https://github.com/jamesrhester/ImgCIFHandler.jl): Julia package
+for reading imgCIF data files. Includes scripts to check imgCIF data files for
+consistency.
+
+* [``CrystalInfoContainers.jl``](https://github.com/jamesrhester/CrystalInfoContainers.jl):
+Use CIF dictionary information to organise data from arbitrary sources into relational
+environment.
+
+* [``DrelTools.jl``](https://github.com/jamesrhester/DrelTools.jl): Interpret and execute
+dREL expressions found in CIF dictionaries in the relational environment provided by
+``CrystalInfoContainers.jl``.
 
 ## Architecture
 
