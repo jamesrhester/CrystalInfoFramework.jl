@@ -22,7 +22,7 @@ using Printf,Dates
 export DDLm_Dictionary
 export find_category,get_categories,get_set_categories
 export list_aliases
-export find_object,find_name,filter_def
+export find_object,find_name,filter_def, find_cat_obj
 export get_single_key_cats
 export get_linked_names_in_cat,get_keys_for_cat
 export get_linked_name
@@ -419,6 +419,16 @@ find_name(d::DDLm_Dictionary, cat::Symbol, obj::Symbol) = begin
 end
 
 """
+    find_cat_obj(d::DDLm_Dictionary, dname::AbstractString)
+
+Return the category and object corresponding to the supplied data name, as symbols.
+"""
+find_cat_obj(d::DDLm_Dictionary, dname::AbstractString) = begin
+    n = d[dname][:name]
+    return (Symbol(lowercase(n[!,:category_id][])), Symbol(lowercase(n[!,:object_id][])))
+end
+
+"""
     find_category(d::DDLm_Dictionary,dataname)
 
 Find the category of `dataname` by looking up `d`.
@@ -787,18 +797,20 @@ Index into any default lookup table defined in `dict` for `dataname` using an in
 lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     definition = dict[dataname][:enumeration]
     index_name = :def_index_id in propertynames(definition) ? definition[!,:def_index_id][] : missing
+    @debug "Lookup default" dataname index_name
     if ismissing(index_name) return missing end
     object_name = find_object(dict,index_name)
     # Note non-deriving form of getproperty
-    # println("Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))")
+    @debug "Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))"
     current_val = getproperty(cp,Symbol(object_name))
     @debug "Indexing $dataname using $current_val to get"
     # Now index into the information. ddl.dic states that this is of type 'Code'
     # so we apply the CaselessString constructor
     indexlist = CaselessString.(dict[dataname][:enumeration_default][!,:index])
-    pos = indexin([current_val],indexlist)
-    if pos[1] == nothing return missing end
-    return dict[dataname][:enumeration_default][!,:value][pos[1]]
+    pos = findfirst(x -> x==current_val, indexlist)
+    @debug "Result of indexing" pos typeof(current_val) current_val indexlist
+    if pos == nothing return missing end
+    return dict[dataname][:enumeration_default][!,:value][pos]
 end
 
 # ***Methods for setting and retrieving evaluated functions

@@ -120,6 +120,8 @@ end
     set_func!(t,"myattrfunc","_units.code",:(x -> "radians"),eval(:(x->"radians")))
     @test occursin("radians","$(get_def_meth_txt(t,"myattrfunc","_units.code"))")
     @test get_def_meth(t,"myattrfunc","_units.code")("whatever") == "radians"
+    # Also need find_name to negotiate category hierarchies
+    @test find_name(t, "atom_site_aniso", "ADP_type") == "_atom_site.adp_type"
 end
 
 @testset "Function-related tests for DDL2" begin
