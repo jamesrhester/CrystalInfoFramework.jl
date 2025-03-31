@@ -388,54 +388,67 @@ end
 """
     find_name(d::DDLm_Dictionary,cat,obj)
 
-Find the canonical name referenced by `cat.obj` in `d`, searching also child
+Find the canonical name referenced by `cat`,`obj` in `d`, searching also child
 and parent categories according to DDLm semantics. Note that the head category may not 
-have a category associated with it.
+have a category associated with it. Where `cat`,`obj` could resolve to several
+equally valid names (e.g. `atom_site_aniso` `label` could resolve to
+`_atom_site_aniso.label` or `_atom_site.label`) the one in `cat` is returned,
+otherwise the one at the highest level of the looped category hierarchy is
+returned. 
 """
 find_name(d::DDLm_Dictionary, cat, obj) = begin
+
     cat = lowercase(String(cat))
     obj = lowercase(String(obj))
-    catcol = d[:name][!,:category_id]
-    selector = map(x-> !isnothing(x) && lowercase(x) == cat,catcol)
-    pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== obj),:master_id]
-    if length(pname) == 1 return pname[]
-    elseif length(pname) > 1
-        throw(error("More than one name satisfies $cat.$obj: $pname"))
-    end
 
+    # always check requested category first
+
+    pname = _find_name(d, cat, obj)
+    if !isnothing(pname) return pname end
+    
     if !is_loop_category(d, cat)
         throw(KeyError("$cat/$obj"))
     end
-    
-    # Check children
 
-    for c in get_child_categories(d, cat)
-        try
-            return find_name(d, c, obj)
-        catch KeyError
-            continue
-        end
-    end
-    
-    # Check parents
+    # now search the parent
 
     np = get_parent_category(d, cat)
-    while is_loop_category(d, np)
-
-        try
-            return find_name(d, np, obj)
-        catch KeyError
-            newp = get_parent_category(d, np)
-            if newp == np break end
-            np = newp
-        end
+    if is_loop_category(d, np) && np != cat
+        pname =  _find_name(d, np, obj)
+        if !isnothing(pname) return pname end
     end
+    
+    # Check children. Cannot be recursive as it will try to go up the
+    # category hierarchy again. This is fundamentally flawed as it doesn't go more
+    # than one level deep.
 
+    @debug "Searching children of $cat for $obj"
+    for c in get_child_categories(d, cat)
+        pname = _find_name(d, c, obj)
+        if !isnothing(pname) return pname end
+    end
+    
     throw(KeyError("$cat/$obj"))
 end
 
 find_name(d::DDLm_Dictionary, cat::Symbol, obj::Symbol) = begin
     find_name(d, String(cat), String(obj))
+end
+
+_find_name(d::DDLm_Dictionary, cat::String, obj::String) = begin
+
+    # cat, obj guaranteed to be in lowercase
+    
+    catcol = d[:name][!,:category_id]
+    selector = map(x-> !isnothing(x) && lowercase(x) == cat,catcol)
+    pname = d[:name][selector .& (lowercase.(d[:name][!,:object_id]) .== obj),:master_id]
+
+    if length(pname) == 1 return pname[]
+    elseif length(pname) > 1
+        throw(error("More than one name satisfies $cat.$obj: $pname"))
+    end
+
+    return nothing
 end
 
 """
@@ -1427,6 +1440,7 @@ to ignore.
 """
 resolve_imports!(d::Dict{Symbol,DataFrame},search_dir,cache, ignore) = begin
     if !haskey(d,:import) return d end
+
     if ignore != :Contents
         resolve_templated_imports!(d,search_dir,cache)
         for i in eachrow(d[:import])
@@ -1594,6 +1608,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             importee = DDLm_Dictionary(location,import_dir=original_dir)
             println("Full import of $location/$block/$if_dupl/$if_miss")
             importee_head = importee[block]
+ 
             if importee_head[:definition][!,:class][] != "Head"
                 @warn "full mode imports of non-head categories not supported, ignored"
                 continue

@@ -44,6 +44,8 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
     common_cats = intersect(all_base_cats, all_add_cats)
     common_set_cats = filter(x-> is_set_category(dict, x) && x in top_level_cats, common_cats)
 
+    @debug "Merging cats" common_cats
+    
     # Check that we have key data names defined
 
     for csc in common_cats
@@ -61,6 +63,11 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
 
         @debug "Key data names" csck
 
+        # Get a name to refer to the category
+
+        csc_name = get_loop_names(base, csc, dict)[1]
+        add_name = get_loop_names(addition, csc, dict)[1]
+        
         # Check for keys and add if necessary
 
         for k in csck
@@ -72,8 +79,10 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
                 throw(error("Category $csc has more than 1 row and no $k value"))
             end
 
+            @debug "Adding $k to base block" ids[1]
             base[k] = [ids[1]]
-
+            add_to_loop!(base, csc_name, k)
+                         
             # Add keys to additional block if necessary
 
             if !haskey(addition, k)
@@ -87,8 +96,10 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
                         i = i+1
                         newid = ids[2]*"$i"
                     end
-                    
+
+                    @debug "Adding $k to mergee" newid
                     addition[k] = [newid]
+                    add_to_loop!(addition, add_name, k)
                 end
             end
 
@@ -133,6 +144,7 @@ merge_loop!(base, addition, catname, dict) = begin
 
     kk = get_keys_for_cat(dict, catname)
     if intersect(kk, base_names) != kk || intersect(kk, add_names) != kk
+        @debug "Keys missing" kk base_names add_names
         throw(error("One of keys for $catname missing when merging loop"))
     end
 

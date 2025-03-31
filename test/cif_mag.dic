@@ -30,8 +30,8 @@ _description.text
    This category is the parent of all categories in the dictionary.
    Head categories from other dictionaries are reparented to this category.
 ;
-_import.get  [{"file":"cif_core.dic" "save":"CIF_CORE" "mode":"Full"}
-#              {"file":"cif_ms.dic"   "save":"CIF_MS"   "mode":"Full"}
+_import.get  [{"file":"cif_core.dic" "save":"CIF_CORE_HEAD" "mode":"Full"}
+#              {"file":"cif_ms.dic"   "save":"CIF_MS_HEAD"   "mode":"Full"}
 ]
 save_
 

@@ -138,9 +138,10 @@ add_child_keys!(block, k, dict) = begin
             @debug "Adding value for $an" new_val
             
             if has_category(block, cat, dict)
+                cat_name = any_name_in_cat(block, cat, dict) #to refer to category
                 num_rows = count_rows(block, cat, dict)
                 block[an] = fill(new_val, num_rows)
-                add_to_loop!(block, any_name_in_cat(block, cat, dict), an)
+                add_to_loop!(block, cat_name, an)
             end
         end
     end
@@ -165,6 +166,9 @@ make_set_loops!(block,dict) = begin
         nm = pop!(all_names)
         cat = find_category(dict, nm)
         ct_names = get_loop_names(block, cat, dict)
+
+        @debug "Creating loop" ct_names
+        
         create_loop!(block, ct_names)
         setdiff!(all_names, ct_names)
     end

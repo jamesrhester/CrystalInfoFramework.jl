@@ -11,6 +11,7 @@ data_saly2_all_aniso
 _chemical_formula.sum                 'C7 H6 O3'
 _chemical_formula.weight               132.07
 
+_structure.id                          Structure_1
 _symmetry.cell_setting                 monoclinic
 _symmetry.space_group_name_H-M         P_1_21/a_1
 _symmetry.space_group_name_Hall        -p_2yab
@@ -104,15 +105,16 @@ _atom_site_aniso.U_23
 #  c6  .044(5)  .026(5)  .044(6)  .003(4)  -.002(4)  -.005(4)
 #  c7  .029(4)  .028(4)  .031(5)  .005(4)  .006(3)  -.002(3)
 
-loop_                            
+loop_
+ _refln.id
  _refln.index_h                   
  _refln.index_k                   
  _refln.index_l                   
  _refln.F_meas                    
  _refln.F_calc                    
-    0   0   3  26.557  23.993
-    0   1   1  33.109  32.058
-    1   1   1   9.008   6.604
+1    0   0   3  26.557  23.993
+2    0   1   1  33.109  32.058
+3    1   1   1   9.008   6.604
 
 # These have nothing to do with the above sites, just for
 # testing purposes.
@@ -134,7 +136,8 @@ loop_
     C3A H3A1 . . 0.9700 n
 
 data_next_block
- 
+
+_structure.id                          Structure_2
 _cell.length_a                         11.520(12)
 _cell.length_b                         11.210(11)
 _cell.length_c                         4.920(5)
@@ -202,12 +205,13 @@ _atom_site_aniso.U_23
 #  c6  .044(5)  .026(5)  .044(6)  .003(4)  -.002(4)  -.005(4)
 #  c7  .029(4)  .028(4)  .031(5)  .005(4)  .006(3)  -.002(3)
 
-loop_                            
+loop_
+ _refln.id
  _refln.index_h                   
  _refln.index_k                   
  _refln.index_l                   
  _refln.F_meas                    
  _refln.F_calc                    
-    0   0   3  26.556  23.996
-    0   1   1  33.106  32.056
-    1   1   1   9.006   6.606
+1    0   0   3  26.556  23.996
+2    0   1   1  33.106  32.056
+3    1   1   1   9.006   6.606

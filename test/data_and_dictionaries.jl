@@ -40,15 +40,15 @@ is_looped(b, n) = any(x -> n in x, CrystalInfoFramework.get_loop_names(b))
 end
 
 @testset "Merging blocks" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__,"multi_block_core.dic"))
     n = Cif(joinpath(@__DIR__,"nick1_mergeable.cif"))
     println("About to merge blocks")
     merge_blocks!(n,t)
     f = first(n).second
     @test length(f["_diffrn_radiation.type"]) == 2
     @test length(f["_reflns.apply_dispersion_to_fcalc"]) == 1
-    @test haskey(f,"_atom_site.diffrn_id")
-    @test length(unique(f["_atom_site.diffrn_id"])) == 2
-    dids = f["_diffrn.id"]
-    @test length(setdiff(unique(f["_cell.diffrn_id"]),dids)) == 0
+    @test haskey(f,"_atom_site.structure_id")
+    @test length(unique(f["_atom_site.structure_id"])) == 2
+    dids = f["_structure.id"]
+    @test length(setdiff(unique(f["_cell.structure_id"]),dids)) == 0
 end

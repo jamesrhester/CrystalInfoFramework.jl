@@ -24,7 +24,7 @@ end
     # Test child names
     t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
     @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
-    @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label","_atom_site.diffrn_id","_atom_site.id"])
+    @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label","_atom_site.id"])
     @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
     @test "cell" in get_set_categories(t)
     @test "geom_bond" in get_loop_categories(t)
@@ -36,7 +36,7 @@ end
     @test ismissing(get_default(t,"_space_group_symop.T")) 
     @test get_dimensions(t,"model_site","adp_eigenvectors") == [3,3]
     @test CrystalInfoFramework.get_container_type(t,"_model_site.adp_eigenvalues") == "Array"
-    @test find_head_category(t[:name]) == "cif_core"
+    @test find_head_category(t[:name]) == "cif_core_head"
     struct dummy_packet
         symbol::CaselessString
     end
@@ -111,8 +111,8 @@ end
     ff = get_dict_funcs(t)
     @test ff[1] == "function"
     @test "atomtype" in ff[2]
-    one_meth = """_atom_type.radius_contact =  _atom_type.radius_bond + 1.25"""
-    @test strip(load_func_text(t,"_atom_type.radius_contact","Evaluation")) == strip(one_meth)
+    one_meth = """_enumeration.default = _atom_type.radius_bond + 1.25"""
+    @test strip(load_func_text(t,"_atom_type.radius_contact","Definition")) == strip(one_meth)
     set_func!(t,"myfunc",:(x->x+2),eval(:(x->x+2)))
     @test occursin("x + 2","$(get_func_text(t,"myfunc"))")
     @test get_func(t,"myfunc")(2) == 4
