@@ -159,7 +159,7 @@ end
     @test "revision" in get_objs_in_cat(t,"dictionary_history")
     @test get_dic_name(t) == "mmcif_ddl.dic"
     @test get_dic_namespace(t) == "ddl2"
-    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl2", "cif_img.dic"))
+    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_img.dic"))
     @test list_aliases(t,"_diffrn_detector.details") == ["_diffrn_detector_details"]
     @test length(intersect(list_aliases(t,"_diffrn_detector.details",include_self=true),
                            ["_diffrn_detector_details","_diffrn_detector.details"])) == 2
@@ -183,7 +183,7 @@ end
     # This sometimes gets left out
     @test t["_atom_site_fourier_wave_vector.q1_coeff"][:type].contents[] == "Integer"
     #
-    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl2", "cif_img.dic"))
+    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_img.dic"))
     testout = open("testout.dic","w")
     show(testout,MIME("text/cif"),t)
     close(testout)
