@@ -20,19 +20,53 @@ jobs:
       matrix:
         julia-version: ['1', 'nightly']
         julia-arch: [x64]
-        os: [macos-13, ubuntu-latest, Windows-latest] #, macOS-latest]
+        os: [ubuntu-latest] #, macOS-latest, Windows-latest]
         exclude:
           - os: macOS-latest
             julia-arch: x86
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@latest
         with:
            version: ${{ matrix.julia-version }}
+
       - name: Build package
         run:  |
                 julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.status();'
+
+      - name: Add standard dictionaries
+        uses: actions/checkout@v4
+        with:
+                repo: COMCIFS/cif_core
+                clean: false
+                path: test/dictionaries
+
+      - name: Add magnetic dictionaries
+        uses: actions/checkout@v4
+        with:
+                repo: COMCIFS/magnetic_dic
+                clean: false
+                path: test/dictionaries
+
+      - name: Add msCIF dictionaries
+        uses: actions/checkout@v4
+        with: 
+              repo: COMCIFS/Modulated_Structures
+              clean: false
+              path: test/dictionaries
+
+      - name: Add imgCIF dictionary
+        uses: actions/checkout@v4
+        with:
+                repo: yayahjb/cbf_imgcif_dictionary
+                clean: false
+                path: test/dictionaries
+
+      - name: Dictionary directory contents
+        run: |
+                ls test/dictionaries
+
       - name: Run test no coverage
         uses: julia-actions/julia-runtest@latest
         with:

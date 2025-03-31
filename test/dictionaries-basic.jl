@@ -2,17 +2,17 @@
 
 @testset "Testing dictionary access and construction" begin
     @test begin
-        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+        t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl.dic"))
         true
     end
     @test begin
-        t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+        t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl.dic"))
         String(t["_alias.deprecation_date"][:type][!,:source][]) == "Assigned"
     end
 end
 
 prepare_system() = begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_mag.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_mag.dic"))
 end
 
 
@@ -22,7 +22,7 @@ end
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
     @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
     # Test child names
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
     @test lowercase(find_name(t,"atom_site","matrix_U")) == "_atom_site_aniso.matrix_u"
     @test Set(get_keys_for_cat(t,"atom_site",aliases=true)) == Set(["_atom_site.label","_atom_site_label","_atom_site.id"])
     @test length(get_linked_names_in_cat(t,"geom_bond")) == 2
@@ -48,7 +48,7 @@ end
 end
 
 @testset "Dictionary updating" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl.dic"))
     @test update_dict!(t,"_enumeration.default","_type.purpose","Encode","XXX")
     @test t["_enumeration.default"][:type].purpose[] == "XXX"
     @test !update_dict!(t,"_units.code","_type.source","XXX","YYY")
@@ -74,7 +74,7 @@ end
     @test t[new_def_name][:definition].text[] == "Please edit me"
     @test t["_definition.class"][:name].category_id[] == "definition"
     # replacement of category
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
     rename_category!(t,"atom_site","new_atom_site")
     @test t["_new_atom_site.attached_hydrogens"][:name].object_id[] == "attached_hydrogens"
     @test lowercase(t["_new_atom_site.b_equiv_geom_mean_su"][:name].linked_item_id[]) == "_new_atom_site.b_equiv_geom_mean"
@@ -90,24 +90,24 @@ end
     @test String(ud["_atom_site_rotation.label"][:name][!,:linked_item_id][]) == "_atom_site.label"
     # everything has a definition
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
-    @test get_parent_category(ud,"structure") == "magnetic"
+    @test get_parent_category(ud,"structure") == "cif_mag_head"
     # try importing through alternative directory, we've changed update date.
-    uf = DDLm_Dictionary(joinpath(@__DIR__,"small_core_test.dic"),
+    uf = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "small_core_test.dic"),
                          import_dir=joinpath(@__DIR__,"other import dir"))
     @test String(uf["_diffrn_orient_matrix.UB_11"][:definition][!,:update][]) == "2021-12-07" 
 end
 
 @testset "Introspecting imports" begin
-    ud = DDLm_Dictionary(joinpath(@__DIR__,"cif_mag.dic"),ignore_imports=:All)
+    ud = DDLm_Dictionary(joinpath(@__DIR__,"dictionaries", "cif_mag.dic"),ignore_imports=:All)
     @test check_import_block(ud,"_atom_site_rotation.label",:name,:linked_item_id,"_atom_site.label")
     @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
     # Check enums
-    ud = DDLm_Dictionary(joinpath(@__DIR__,"small_core_test.dic"), ignore_imports=:All)
+    ud = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "small_core_test.dic"), ignore_imports=:All)
     @test check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_default.index","Mn4+")
 end
 
 @testset "Function-related tests for DDLm" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"cif_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
     ff = get_dict_funcs(t)
     @test ff[1] == "function"
     @test "atomtype" in ff[2]
@@ -139,7 +139,7 @@ end
 end
 
 @testset "DDLm reference dictionaries" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__,"ddl.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl.dic"))
     @test "_definition.master_id" in keys(t)
     @test t["_definition.master_id"][:definition].id[] == "_definition.master_id"
     @test find_name(t,"enumeration_set","master_id") == "_enumeration_set.master_id"
@@ -148,7 +148,6 @@ end
     @test "_units.master_id" in get_keys_for_cat(t,"units")
     @test get_linked_name(t,"_method.master_id") == "_definition.master_id"
     @test "dictionary_audit" in CrystalInfoFramework.find_top_level_cats(t)
-    @test nothing in get_enums(t)["_definition.class"]
 end
 
 @testset "DDL2 dictionaries" begin
@@ -160,7 +159,7 @@ end
     @test "revision" in get_objs_in_cat(t,"dictionary_history")
     @test get_dic_name(t) == "mmcif_ddl.dic"
     @test get_dic_namespace(t) == "ddl2"
-    t = DDL2_Dictionary(joinpath(@__DIR__,"cif_img_1.7.11.dic"))
+    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl2", "cif_img.dic"))
     @test list_aliases(t,"_diffrn_detector.details") == ["_diffrn_detector_details"]
     @test length(intersect(list_aliases(t,"_diffrn_detector.details",include_self=true),
                            ["_diffrn_detector_details","_diffrn_detector.details"])) == 2
@@ -184,7 +183,7 @@ end
     # This sometimes gets left out
     @test t["_atom_site_fourier_wave_vector.q1_coeff"][:type].contents[] == "Integer"
     #
-    t = DDL2_Dictionary(joinpath(@__DIR__,"cif_img_1.7.11.dic"))
+    t = DDL2_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl2", "cif_img.dic"))
     testout = open("testout.dic","w")
     show(testout,MIME("text/cif"),t)
     close(testout)

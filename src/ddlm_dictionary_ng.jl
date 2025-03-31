@@ -1309,7 +1309,7 @@ find_top_level_cats(ref_dic::DDLm_Dictionary) = begin
     domain = ref_dic[:dictionary_valid]
     acceptable = []
     for onerow in eachrow(domain)
-        if onerow.application[1] == "Dictionary" && onerow.application[2] != "Prohibited"
+        if onerow.scope == "Dictionary" && onerow.option != "Prohibited"
             append!(acceptable,onerow.attributes)
         end
     end
