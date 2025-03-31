@@ -39,33 +39,41 @@ jobs:
         uses: actions/checkout@v4
         with:
                 repository: COMCIFS/cif_core
-                clean: false
-                path: test/dictionaries
+                path: test/dictionaries/core
 
       - name: Add magnetic dictionaries
         uses: actions/checkout@v4
         with:
                 repository: COMCIFS/magnetic_dic
-                clean: false
-                path: test/dictionaries
+                path: test/dictionaries/magnetic
 
       - name: Add msCIF dictionaries
         uses: actions/checkout@v4
         with: 
               repository: COMCIFS/Modulated_Structures
-              clean: false
-              path: test/dictionaries
+              path: test/dictionaries/ms
 
       - name: Add imgCIF dictionary
         uses: actions/checkout@v4
         with:
                 repository: yayahjb/cbf_imgcif_dictionary
-                clean: false
-                path: test/dictionaries
+                path: test/dictionaries/imgcif
 
+      - name: Copy dictionaries to test directory
+        run: |
+            cd test/dictionaries
+            mv magnetic/cif_mag.dic .
+            mv core/cif_core.dic .
+            mv core/ddl.dic .
+            mv core/templ_enum.cif .
+            mv core/templ_attr.cif .
+            mv ms/cif_ms.dic .
+            mv imgcif/ddl2/cif_img.dic .
+            cd ../..
+            
       - name: Dictionary directory contents
         run: |
-                ls test/dictionaries
+                ls -l test/dictionaries
 
       - name: Run test no coverage
         uses: julia-actions/julia-runtest@latest
