@@ -38,28 +38,28 @@ jobs:
       - name: Add standard dictionaries
         uses: actions/checkout@v4
         with:
-                repo: COMCIFS/cif_core
+                repository: COMCIFS/cif_core
                 clean: false
                 path: test/dictionaries
 
       - name: Add magnetic dictionaries
         uses: actions/checkout@v4
         with:
-                repo: COMCIFS/magnetic_dic
+                repository: COMCIFS/magnetic_dic
                 clean: false
                 path: test/dictionaries
 
       - name: Add msCIF dictionaries
         uses: actions/checkout@v4
         with: 
-              repo: COMCIFS/Modulated_Structures
+              repository: COMCIFS/Modulated_Structures
               clean: false
               path: test/dictionaries
 
       - name: Add imgCIF dictionary
         uses: actions/checkout@v4
         with:
-                repo: yayahjb/cbf_imgcif_dictionary
+                repository: yayahjb/cbf_imgcif_dictionary
                 clean: false
                 path: test/dictionaries
 
