@@ -16,7 +16,7 @@ my_block["_cell.length_a"]
 
 # output
 
-1-element Vector{Union{Missing, Nothing, Dict{String, T}, Vector{T}, String} where T}:
+1-element Vector{String}:
  "11.520(12)"
 ```
 

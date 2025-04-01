@@ -5,8 +5,8 @@
 A `Cif` is a collection of `CifContainer`s indexed by a `String` label.
 
 ```@docs
-Cif(s; verbose=false,native=false,version=0)
-cif_from_string(s::AbstractString; verbose=false,version=0,source="")
+Cif(s; version=0)
+cif_from_string(s::AbstractString; version=0,source="")
 keys(c::Cif)
 first(c::Cif)
 length(c::Cif)
@@ -21,7 +21,7 @@ show(io::IO,::MIME"text/cif",c::Cif)
 
 Concrete
 types of `CifContainer`s are `Block` and `CifBlock`. Only the latter may
-contain nested save frames.  `CifContainer`s act like `Dict{String,Array{CifValue,1}}` 
+contain nested save frames.  `CifContainer`s act like `Dict{String,Array{String,1}}` 
 dictionaries indexed by data name.
 
 ```@docs
@@ -35,15 +35,6 @@ get(b::CifContainer,s::String,a)
 getindex(b::CifContainer,s::Dict)
 setindex!(b::CifContainer,v,s)
 delete!(b::CifContainer,s)
-```
-
-## CIF values
-
-Data names are associated with arrays of values of type `CifValue`.  Single-valued
-data names are associated with arrays with a single element.
-
-```@docs
-CifValue
 ```
 
 ## Loops
@@ -64,7 +55,7 @@ The contents of save frames are invisible to all
 methods except `show`. They can be accessed using `get_frames`, which returns a `Cif` object.
 
 ```@docs
-get_frames(f::CifBlock{V}) where V
+get_frames(f::CifBlock)
 ```
 
 ## CIF dictionaries
@@ -76,7 +67,7 @@ use the DDLm attribute set.
 ```@docs
 DDLm_Dictionary
 DDLm_Dictionary(c::Cif; ignore_imports=false)
-DDLm_Dictionary(a; verbose=false,ignore_imports=false)
+DDLm_Dictionary(a; ignore_imports=false)
 keys(d::DDLm_Dictionary)
 getindex(d::DDLm_Dictionary,k)
 delete!(d::DDLm_Dictionary,k::String)
@@ -101,7 +92,7 @@ Protein Data Bank (wwPDB).
 ```@docs
 DDL2_Dictionary
 DDL2_Dictionary(c::Cif)
-DDL2_Dictionary(a; verbose=false)
+DDL2_Dictionary(a)
 keys(d::DDL2_Dictionary)
 getindex(d::DDL2_Dictionary,k)
 get_categories(d::DDL2_Dictionary)
