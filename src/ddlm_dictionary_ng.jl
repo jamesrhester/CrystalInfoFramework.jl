@@ -95,11 +95,10 @@ DDLm_Dictionary(c::Cif;kwargs...) = begin
 end
 
 """
-    DDLm_Dictionary(a; verbose=false, ignore_imports="None",
+    DDLm_Dictionary(a; ignore_imports="None",
     cache_imports=false)
 
-Create a `DDLm_Dictionary` given filename `a`. `verbose = true` will print
-extra debugging information during reading.`ignore_imports = :None` will ignore
+Create a `DDLm_Dictionary` given filename `a`.`ignore_imports = :None` will ignore
 any `import` attributes. Other options are `:Full` and `:Contents` to ignore
 imports with the respective `mode`, and `:all` to ignore all imports.
 `cache_imports` will store the contents of imported
@@ -121,9 +120,9 @@ unless `import_dir` is specified, in which case the search is relative to
 that directory.
 
 """
-DDLm_Dictionary(a; verbose=false, kwargs...) = begin
-    c = Cif(a, verbose=verbose)
-    DDLm_Dictionary(c;kwargs...)
+DDLm_Dictionary(a; kwargs...) = begin
+    c = Cif(a)
+    DDLm_Dictionary(c; kwargs...)
 end
 
 DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin

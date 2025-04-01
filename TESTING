@@ -1,0 +1,37 @@
+# Testing CrystalInfoFramework.jl
+
+## Setup
+
+Several tests rely on the presence of standard Cif dictionaries in the
+`test/dictionaries` directory. The following sequence of
+commands (in a Unix environment) downloads and prepares this directory:
+
+```
+cd test/dictionaries
+git clone --depth=1 https://github.com/COMCIFS/cif_core core
+git clone --depth=1 https://github.com/COMCIFS/magnetic_dic magnetic
+git clone --depth=1 https://github.com/COMCIFS/Modulated_Structures mod
+git clone --depth=1 https://github.com/yayahjb/cbf_imgcif_dictionary imgcif
+mv magnetic/cif_mag.dic .
+mv core/cif_core.dic core/ddl.dic core/templ_enum.cif core/templ_attr.cif .
+mv mod/cif_ms.dic .
+mv imgcif/ddl2/cif_img.dic .
+```
+
+## Running
+
+To run all tests from the top-level directory of the package:
+
+```
+julia --project=. -e "using Pkg; Pkg.test()"
+```
+
+This will execute all tests found in `.jl` files in the `test`
+directory. To restrict the tests to a particular set of `.jl`
+files:
+
+```
+julia --project=. -e "using Pkg; Pkg.test(test_args=[<regexp>,...])"
+```
+where `<regexp>` is used to match the filenames containing the
+tests. For further details refer to the `TidyTest.jl` package.

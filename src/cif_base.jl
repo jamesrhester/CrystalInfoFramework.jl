@@ -451,36 +451,34 @@ Return all nested CIF containers in `f` as a `Cif` object.
 get_frames(f::CifBlock) = Cif{Block}(f.save_frames,get_source_file(f),"")
 
 """
-    Cif(somepath; verbose=false, version=0)
+    Cif(somepath; version=0)
 
-Read in filename `s` as a CIF file. If `verbose` is true, print
-progress information during parsing.  `version` may be `1`, `2` or
+Read in filename `s` as a CIF file.  `version` may be `1`, `2` or
 `0` (default) for auto-detected CIF version.
 
 """
-Cif(somepath; verbose=false, version=0) = begin
+Cif(somepath; version=0) = begin
     ## get the full filename and make sure we have a string.
     full = convert(String, realpath(somepath))
     pathstring = URI(full).path
-    Cif(open(full), verbose = verbose, version = version, source = full)
+    Cif(open(full), version = version, source = full)
 end
 
-Cif(io::IO; verbose = false, version = 0, source = nothing) = begin
+Cif(io::IO; version = 0, source = nothing) = begin
     full_contents = read(io, String)
     if isnothing(source) source = "$io" end
-    cif_from_string(full_contents, verbose = verbose, version = version, source = source)
+    cif_from_string(full_contents, version = version, source = source)
 end
 
 """
-    cif_from_string(s::AbstractString; verbose=false, version=0, source="")
+    cif_from_string(s::AbstractString; version=0, source="")
 
 Process `s` as the text of a CIF file.
-If `verbose` is true, print progress information during parsing.
 `version` may be `1`, `2` or `0` (default) for auto-detected CIF
 version. If `source` is provided, it is a filesystem location to
 record as the source for `s`.
 """
-cif_from_string(s::AbstractString; verbose=false, version=0, source="") = begin
+cif_from_string(s::AbstractString; version=0, source="") = begin
     if length(s) > 1 && s[1] == '\ufeff'
         s = s[(nextind(s,1)):end]
     end
