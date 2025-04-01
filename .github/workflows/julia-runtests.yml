@@ -76,20 +76,20 @@ jobs:
         with:
                 coverage: 'false'
       - name: Do the coverage run
-        if: matrix.julia-version == '1' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1' && matrix.os == 'ubuntu-latest'
         uses: julia-actions/julia-runtest@latest
       - name: Process the coverage run
-        if: matrix.julia-version == '1' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1' matrix.os == 'ubuntu-latest'
         run: |
                        julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info",process_folder())'
       - name: Upload coverage data
-        if: matrix.julia-version == '1' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1' && matrix.os == 'ubuntu-latest'
         uses: coverallsapp/github-action@master
         with:
               github-token: ${{ secrets.GITHUB_TOKEN }}
               path-to-lcov: './lcov.info'
       - name: Build documentation
-        if: matrix.julia-version == '1' && matrix.julia-arch == 'x64' && matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1' && matrix.os == 'ubuntu-latest'
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # For authentication with SSH deploy key
