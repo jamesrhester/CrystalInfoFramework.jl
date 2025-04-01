@@ -79,7 +79,7 @@ jobs:
         if: matrix.julia-version == '1' && matrix.os == 'ubuntu-latest'
         uses: julia-actions/julia-runtest@latest
       - name: Process the coverage run
-        if: matrix.julia-version == '1' matrix.os == 'ubuntu-latest'
+        if: matrix.julia-version == '1' && matrix.os == 'ubuntu-latest'
         run: |
                        julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info",process_folder())'
       - name: Upload coverage data
