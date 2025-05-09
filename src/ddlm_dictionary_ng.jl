@@ -381,6 +381,8 @@ find_name(d::DDLm_Dictionary,name) =  begin
     if !haskey(d.block,:alias) return lname end
     potentials = d[:alias][lowercase.(d[:alias][!,:definition_id]) .== lname,:master_id]
     if length(potentials) == 1 return potentials[] end
+    # If something is in the keys it is OK.
+    if lname in keys(d) return lname end
     throw(KeyError(name))
 end
 
