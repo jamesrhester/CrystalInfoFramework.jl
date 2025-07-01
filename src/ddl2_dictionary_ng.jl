@@ -266,7 +266,7 @@ with `blockname`
 """
 update_dict!(all_dict_info,new_info,blockname) = begin
     tablename = Symbol(split(first(names(new_info)),'.')[1][2:end])
-    rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
+    DataFrames.rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
     if !haskey(all_dict_info,tablename)
         all_dict_info[tablename] = DataFrame()
     end

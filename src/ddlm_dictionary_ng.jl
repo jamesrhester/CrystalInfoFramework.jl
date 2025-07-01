@@ -1102,7 +1102,7 @@ with column `extra_name` with value `extra_value`
 """
 update_dict!(all_dict_info,new_info,extra_name,extra_value) = begin
     tablename = Symbol(split(String(first(names(new_info))),'.')[1][2:end])
-    rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
+    DataFrames.rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
     if !haskey(all_dict_info,tablename)
         all_dict_info[tablename] = DataFrame()
     end
@@ -1656,7 +1656,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             transform!(d[:name],:category_id => ByRow(x -> if lowercase(x) == old_head new_head else x end) => :xxx)
             # And rename
             select!(d[:name],Not(:category_id))
-            rename!(d[:name],:xxx => :category_id)
+            DataFrames.rename!(d[:name],:xxx => :category_id)
         end
     end
     return d
