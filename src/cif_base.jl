@@ -148,7 +148,43 @@ Remove the value of `s` from `b`
 """
 delete!(b::CifContainer,s) = begin
     delete!(get_data_values(b),lowercase(s))
-    #TODO remove loop information too?
+
+    # Remove loop information
+    old_loop_info = get_loop_names(b, s)
+    if old_loop_info != []
+        # Remove old loop
+        set_loop_names(b, filter( x-> !(lowercase(s) in x), get_loop_names(b)))
+        new_loop_names = filter( x -> x != lowercase(s), old_loop_info)
+        if length(new_loop_names) > 0
+            create_loop!(b, new_loop_names)
+        end
+    end
+    
+end
+
+"""
+    rename!(b::CifContainer, old, new)
+
+Change dataname `old` to `new`, retaining values and loop structure.
+"""
+rename!(b::CifContainer, old, new) = begin
+    old = lowercase(old)
+    new = lowercase(new)
+    if old == new return end
+    old_loop_info = get_loop_names(b, old)
+
+    # Remove old loop
+    set_loop_names(b, filter( x -> x != old_loop_info, get_loop_names(b)))
+    b[new] = b[old]
+    delete!(b, old)
+
+    # Add new loop
+    new_pos = indexin([old], old_loop_info)[]
+    if !isnothing(new_pos)
+        old_loop_info[new_pos] = new
+        create_loop!(b, old_loop_info)
+    end
+    
 end
 
 # ***Nested CIF containers***

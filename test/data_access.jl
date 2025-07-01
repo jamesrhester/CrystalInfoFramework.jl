@@ -115,6 +115,26 @@ end
         @test q[1]["q"][2] == "b"
 end
 
+# Test dropping data names from loops
+@testset "Dropping data names" begin
+    b = prepare_block("simple_loops.cif", "simple_loops")
+    delete!(b, "_col2")
+    @test Set(get_loop_names(b, "_col1")) == Set(["_col1", "_col3"])
+    @test !haskey(b, "_col2")
+end
+
+@testset "Replacing data names" begin
+    b = prepare_block("simple_loops.cif", "simple_loops")
+    old_vals = b["_col1"]
+    CrystalInfoFramework.rename!(b, "_col1", "_column1")
+    @test Set(get_loop_names(b, "_col2")) == Set(["_column1", "_col2", "_col3"])
+    @test b["_column1"] == old_vals
+    @test b["_scalar_a"] == ["a"]
+    old_nl_vals = b["_not_looped"]
+    CrystalInfoFramework.rename!(b, "_not_looped", "_nl")
+    @test b["_nl"] == old_nl_vals
+end
+
 # Test missing values are dropped completely
 
 @testset "Missing values" begin

@@ -21,3 +21,4 @@ loop_
   'a'
   'b'
 
+_not_looped 'Hooray'
