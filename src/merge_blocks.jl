@@ -127,7 +127,21 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
         
         merge_loop!(base, addition, cc, dict)
     end
-    
+
+    # Now add non-common categories from addition
+
+    for loop_group in get_loop_names(addition)
+        
+        if find_category(dict, loop_group[1]) in common_cats
+            continue
+        end
+
+        for lg in loop_group
+            base[lg] = addition[lg]
+        end
+
+        create_loop!(base, loop_group)
+    end
 end
 
 """
@@ -154,7 +168,7 @@ merge_loop!(base, addition, catname, dict) = begin
 
     for mib in missing_in_base
         @debug "Adding missing values for $mib"
-        base[mib] = fill(missing, length(base[base_names[1]]))
+        base[mib] = Vector{Union{Missing, eltype(addition[mib])}}(missing, length(base[base_names[1]]))
         add_to_loop!(base, base_names[1], mib)
     end
 
@@ -162,13 +176,13 @@ merge_loop!(base, addition, catname, dict) = begin
 
     for mia in missing_in_add
         @debug "Adding missing values for $mia"
-        addition[mia] = fill(missing, length(add[add_names[1]]))
+        addition[mia] = Vector{Union{Missing, eltype(base[mib])}}(missing, length(addition[add_names[1]]))
         add_to_loop!(addition, add_names[1], mia)
     end
 
     all_names = union(base_names, add_names)
 
-    # Verify and remove duplicates
+    # Verify and remove duplicates, merge missing
 
     have_new = verify_rows!(base, addition, kk, loop_key = all_names[1])
 

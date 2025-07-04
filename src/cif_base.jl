@@ -78,6 +78,25 @@ get_loop_names(b::CifContainer,n::AbstractString) = begin
     loop_names[]
 end
 
+"""
+    get_all_looped_names(cb::CifContainer)
+
+Get all data names that appear in loops. See also get_all_unlooped_names.
+"""
+get_all_looped_names(cb::CifContainer) = begin
+    collect(Iterators.flatten(get_loop_names(cb)))
+end
+
+"""
+    get_all_unlooped_names(cb::CifContainer)
+
+Get all data names that do not appear in loops. See also get_all_looped_names.
+"""
+get_all_unlooped_names(cb::CifContainer) = begin
+    setdiff(keys(cb), Iterators.flatten(get_loop_names(cb)))
+end
+
+
 length(c::CifContainer) = length(keys(c))
 
 """

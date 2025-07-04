@@ -1,4 +1,5 @@
 # Utility routines for interrogating/updating data blocks based on dictionary information
+# We should be aware that some non-dictionary-defined data names may be present.
 
 """
     has_category(block,catname,dict)
@@ -12,15 +13,31 @@ has_category(block,catname,dict) = begin
     
 end
 
+all_categories_in_block(block, dict) = begin
+
+    fc = map( collect(keys(block))) do k
+        fc = find_category(dict, k)
+        isnothing(fc) ? missing : fc
+    end
+    unique(skipmissing(fc))
+end
+
 """
-    get_loop_names(block, catname, dict)
+    get_loop_names(block, catname, dict; children = false)
 
 Return a list of data names from `catname` in `block`, using
-`dict` for reference.
+`dict` for reference. If `children` is `true`, include data
+names from child categories
 """
-get_loop_names(block, catname, dict) = begin
+get_loop_names(block, catname, dict; children = false) = begin
 
     all_names = get_names_in_cat(dict, catname, aliases = true)
+    if children
+        for c in get_child_categories(dict, catname)
+            append!(all_names, get_names_in_cat(dict, c))
+        end
+    end
+    
     filter!(x -> x in keys(block), all_names)
     
 end
@@ -135,9 +152,10 @@ add_child_keys!(block, k, dict) = begin
 
             # Fill in the values
 
-            @debug "Adding value for $an" new_val
-            
             if has_category(block, cat, dict)
+
+                @debug "Adding value for $an" new_val
+            
                 cat_name = any_name_in_cat(block, cat, dict) #to refer to category
                 num_rows = count_rows(block, cat, dict)
                 block[an] = fill(new_val, num_rows)
@@ -165,6 +183,7 @@ make_set_loops!(block,dict) = begin
     while length(all_names) > 0
         nm = pop!(all_names)
         cat = find_category(dict, nm)
+        if isnothing(cat) continue end
         ct_names = get_loop_names(block, cat, dict)
 
         @debug "Creating loop" ct_names
@@ -184,6 +203,7 @@ are already consistent.
 
 If `keynames` is empty, use `loop_key` to access the loop.
 
+The loops should have the same data names defined.
 TODO: caseless compare
 """
 verify_rows!(base, addition, keynames; loop_key = "") = begin
@@ -210,35 +230,55 @@ verify_rows!(base, addition, keynames; loop_key = "") = begin
         base_index = indexin(common_vals, base_key_vals)
         add_index = indexin(common_vals, add_key_vals)
 
-        @debug "Common values" common_vals
+        @debug "Common values" common_vals base_index add_index
 
     else
         
-        base_index = add_index = 1
+        base_index = add_index = [1]
 
     end
 
-    all_names = get_loop_names(base, length(keynames) > 0 ? keynames[1] : loop_key)
-
-    # Check all entries
+    all_base_names = get_loop_names(base, length(keynames) > 0 ? keynames[1] : loop_key)
+    all_add_names = get_loop_names(addition, length(keynames) > 0 ? keynames[1] : loop_key)
     
+    # Check all entries
+
+    have_missing = false
+    rows_to_ignore = []
     for (bi, ai) in zip(base_index, add_index)
-        for one_name in all_names
-            if base[one_name][bi] != addition[one_name][ai]
-                @error "Contradictory values" one_name bi ai base[one_name][bi] addition[one_name][ai]
-                throw(error("Contradictory values for $one_name at positions $bi / $ai:"))
+        for one_name in all_base_names
+
+            @debug "Checking $bi, $ai for $one_name" addition[one_name][ai] base[one_name][bi]
+            if !ismissing(addition[one_name][ai]) && !ismissing(base[one_name][ai])
+                if base[one_name][bi] != addition[one_name][ai]
+                    @error "Contradictory values" one_name bi ai base[one_name][bi] addition[one_name][ai]
+                    throw(error("Contradictory values for $one_name at positions $bi / $ai:"))
+                end
+            else
+
+                # merge in missing values
+                if ismissing(base[one_name][ai])
+                    @debug "Assigning to missing" typeof(base[one_name])
+                    base[one_name][ai] = addition[one_name][ai]
+                end
             end
+            
         end
 
         # We can completely drop row ai
 
-        @debug "Found duplicate row for $keynames" bi ai
-        
-        drop_row!(addition, first(all_names), ai)
-
+        push!(rows_to_ignore, ai)
     end
 
-    return haskey(addition, first(all_names))
+    sort!(rows_to_ignore, rev = true)
+
+    @debug "Dropping rows" rows_to_ignore
+    
+    for r in rows_to_ignore
+        drop_row!(addition, first(all_add_names), r)
+    end
+    
+    return haskey(addition, first(all_base_names))
 end
 
 """

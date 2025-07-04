@@ -38,6 +38,7 @@ export cif_from_string
 export CifContainer, NestedCifContainer
 export get_frames, get_contents
 export get_loop, eachrow, add_to_loop!, create_loop!, get_loop_names
+export get_all_looped_names, get_all_unlooped_names
 
 # Base methods that we add to
 import Base:keys, getindex, setindex!, length, haskey, iterate, get

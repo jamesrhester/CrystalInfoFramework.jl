@@ -20,7 +20,7 @@
 using Printf,Dates
 
 export DDLm_Dictionary
-export find_category,get_categories,get_set_categories
+export find_category, guess_category, get_categories, get_set_categories
 export list_aliases
 export find_object,find_name,filter_def, find_cat_obj
 export get_single_key_cats
@@ -43,6 +43,7 @@ export get_enums          #get all enumerated lists
 export get_attribute      #get value of particular attribute for a definition 
 export get_dic_namespace
 export get_child_categories # all child categories
+export get_linked_keys # all linked keys
 export is_category
 export find_head_category,add_head_category!
 export rename_category!, rename_name!   #Rename category and names throughout
@@ -58,6 +59,7 @@ export make_cats_uppercase! #Conform to style guide
 
 # With data
 export has_category   # check if a data block has a category
+export all_categories_in_block # list all categories
 export count_rows     # how many rows in a category in a datablock
 export add_child_keys! # add any missing keys
 export make_set_loops! # make sure block loops everything
@@ -467,14 +469,42 @@ end
 
 Find the category of `dataname` by looking up `d`.
 """
-find_category(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:category_id][])
+find_category(d::DDLm_Dictionary, dataname) = begin
+    try
+        return lowercase(d[dataname][:name][!,:category_id][])
+    catch KeyError
+        return nothing
+    end
+end
+
+"""
+   Guess the category looped datanames belong to based on friends in
+   the same loop. Useful when non-dictionary data names are included
+   in a loop.
+"""
+guess_category(d::DDLm_Dictionary, loopnames) = begin
+
+    for l in loopnames
+        if isnothing(find_category(d, l)) continue end
+    end
+
+    return nothing
+
+end
 
 """
     find_object(d::DDLm_Dictionary,dataname)
 
 Find the `object_id` of `dataname` by looking up `d`.
 """
-find_object(d::DDLm_Dictionary,dataname) = lowercase(d[dataname][:name][!,:object_id][])
+find_object(d::DDLm_Dictionary,dataname) = begin
+    try
+        return lowercase(d[dataname][:name][!,:object_id][])
+    catch KeyError
+        return nothing
+    end
+end
+
 
 """
     is_category(d::DDLm_Dictionary,name)
@@ -738,6 +768,22 @@ get_single_key_cats(d::DDLm_Dictionary) = begin
         linkval = d[x[2]][:name][!,:linked_item_id][]
         linkval == nothing || linkval == x[2]
     end
+end
+
+"""
+    get_linked_keys(d::DDLm_Dictionary, k)
+
+Get all data names that are linked to `k` and are keys in their categories.
+"""
+
+get_linked_keys(d::DDLm_Dictionary, k) = begin
+
+    # Just the rows of the master table for which _name.linked_item_id
+    # is the provided value
+    
+    curr_keys = filter( r -> r.linked_item_id == k, parent(d.block[:name])).master_id
+
+    return union(curr_keys, Iterators.flatten([get_linked_keys(d, k) for k in curr_keys]))
 end
 
 """
