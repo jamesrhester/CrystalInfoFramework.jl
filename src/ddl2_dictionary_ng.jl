@@ -149,7 +149,8 @@ end
 get_child_categories(d::DDL2_Dictionary,catname) = []
 
 is_set_category(d::DDL2_Dictionary,catname) = false
-is_loop_category(d::DDL2_Dictionary,catname) = true
+is_loop_category(d::DDL2_Dictionary,catname) = isnothing(catname) ? false : true
+get_parent_category(d::DDL2_Dictionary, catname) = nothing
 
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)
@@ -209,6 +210,7 @@ end
 
 # Not available for DDL2
 lookup_default(d::DDL2_Dictionary,dataname,packet) = missing
+get_dataname_children(d::DDL2_Dictionary, one_name) = []
 
 list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
     if include_self result = [name] else result = [] end
@@ -232,8 +234,8 @@ find_name(d::DDL2_Dictionary,name) = begin
     throw(KeyError(name))
 end
 
-find_name(d::DDL2_Dictionary,cat,obj) = begin
-    return "_"*cat*"."*obj
+find_name(d::DDL2_Dictionary, cat, obj) = begin
+    return "_$cat.$obj"
 end
 
 has_drel_methods(d::DDL2_Dictionary) = true

@@ -50,6 +50,7 @@ export rename_category!, rename_name!   #Rename category and names throughout
 export get_julia_type_name,get_dimensions
 export conform_capitals!  #Capitalise according to style guide
 export add_definition!    #add new definitions
+export replace_category!  #replace an attribute category for a definition
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
 
@@ -234,7 +235,7 @@ getindex(d::DDLm_Dictionary,k) = begin
 end
 
 # If a symbol is passed we access the block directly.
-getindex(d::DDLm_Dictionary,k::Symbol) = parent(getindex(d.block,k)) #not a grouped data frame
+getindex(d::DDLm_Dictionary,k::Symbol) = parent(d.block[k]) #not a grouped data frame
 get(d::DDLm_Dictionary,k::Symbol,default) = parent(get(d.block,k,default))
 
 # Allow access to an arbitrary attribute within a definition
@@ -1069,12 +1070,19 @@ entry for `attr` equals `old_val` and `all` is true, all values are
 changed, otherwise only the first value is changed. If no values were
 changed, `false` is returned, otherwise `true`.
 """
-update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true) = begin
+update_dict!(d::DDLm_Dictionary, dname, attr, old_val, new_val; all=true) = begin
+
+    # Get table and object name
+    
     tablename,objname = split(attr,'.')
     tablename = Symbol(tablename[2:end])
     objname = Symbol(objname)
+
     for_update = d[dname][tablename]
     updated  = false
+
+    # Find the row for updating
+    
     for one_row in eachrow(for_update)
         if getproperty(one_row,objname) == old_val
             setproperty!(one_row,objname,new_val)
@@ -1082,6 +1090,9 @@ update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true) = begin
             if !all break end
         end
     end
+
+    # Special case
+    
     if attr == "_definition.id"   # the whole identity changes!
         new_val = lowercase(new_val)
         ldname = lowercase(dname)
@@ -1102,16 +1113,18 @@ update_dict!(d::DDLm_Dictionary,dname,attr,old_val,new_val;all=true) = begin
 end
 
 """
-If there is only one value, or none, for an attribute there is no need to specify the
-value it is replacing.
+    update_dict!(d::DDLm_Dictionary, dname, attr, new_val)
+
+Update the dictionary entry for `dname`, changing or adding the value of `attr` to
+`new_val`. `attr` is assumed to take a single value.
 """
-update_dict!(d::DDLm_Dictionary,dname,attr,new_val) = begin
-    old_val = get_attribute(d,dname,attr)
+update_dict!(d::DDLm_Dictionary, dname, attr, new_val) = begin
+    old_val = get_attribute(d, dname, attr)
     if ismissing(old_val)
         dcat,dobj = split(attr,".")
         dcat = Symbol(dcat[2:end])
         dobj = Symbol(dobj)
-        underlying = as_jdict(d)
+        underlying = as_jdict(d)   #operate on underlying all-definition structure
         if !haskey(underlying,dcat)
             underlying[dcat] = DataFrame(:master_id=>[lowercase(dname)])
         end
@@ -1144,27 +1157,50 @@ end
 
 Update the appropriate table of `all_dict_info` with
 the contents of `new_info`, filling in implicit values
-with column `extra_name` with value `extra_value`
+of column `extra_name` with value `extra_value`
 """
-update_dict!(all_dict_info,new_info,extra_name,extra_value) = begin
-    tablename = Symbol(split(String(first(names(new_info))),'.')[1][2:end])
-    DataFrames.rename!(x-> Symbol(split(String(x),'.')[end]),new_info)
-    if !haskey(all_dict_info,tablename)
+update_dict!(all_dict_info, new_info, extra_name, extra_value) = begin
+
+    dcat, _ = split(first(names(new_info)),".")
+    tablename = Symbol(dcat[2:end])
+
+    # Rename the columns to just the object part
+    
+    DataFrames.rename!(x-> Symbol(split(String(x),'.')[end]), new_info)
+    
+    if !haskey(all_dict_info, tablename)    #is a new table
         all_dict_info[tablename] = DataFrame()
     end
-    new_info[!,Symbol(extra_name)] = fill(extra_value,nrow(new_info))
-    all_dict_info[tablename] = vcat(all_dict_info[tablename],new_info,cols=:union)
+
+    # Fill in default values
+    
+    new_info[!, Symbol(extra_name)] = fill(extra_value, nrow(new_info))
+
+    # Append new information to the table
+    all_dict_info[tablename] = vcat(all_dict_info[tablename], new_info, cols=:union)
 end
 
-update_row!(all_dict_info,new_vals,extra_name,extra_value) = begin
+"""
+     update_row!(all_dict_info, new_vals, extra_name, extra_value)
+
+`new_vals` are (attribute, value) pairs. `extra_name` is given the
+default value of `extra_value` in the updated row.
+"""
+update_row!(all_dict_info, new_vals, extra_name, extra_value) = begin
+
+    # Find the tablename and add if necessary
+    
     catname = Symbol(split(first(keys(new_vals)),'.')[1][2:end])
-    if !haskey(all_dict_info,catname)
+    if !haskey(all_dict_info, catname)
         all_dict_info[catname] = DataFrame()
     end
+
     final_vals = Dict{Symbol,Any}((Symbol(split(x.first,'.')[end]),[x.second]) for x in new_vals)
     final_vals[Symbol(extra_name)] = extra_value
+
     #push!(all_dict_info[catname],final_vals,cols=:union) dataframes 0.21
-    all_dict_info[catname] = vcat(all_dict_info[catname],DataFrame(final_vals),cols=:union)
+
+    all_dict_info[catname] = vcat(all_dict_info[catname], DataFrame(final_vals),cols=:union)
 end
 
 """
@@ -1281,6 +1317,25 @@ rename_name!(d::DDLm_Dictionary,old,new) = begin
         if !(o in propertynames(parent(d.block[c]))) continue end
         d[c][:,o] = map(x-> !ismissing(x) && !isnothing(x) && lowercase(x) == lowercase(old) ? new : x , d[c][!,o])
     end
+end
+
+"""
+    replace_category!(d::DDLm_Dictionary, dname, catname, new_vals::DataFrame)
+
+Replace the contents of the category for `dname` with the contents of `new_vals`, which
+is a DataFrame whose columns are the object names for `catname`.
+"""
+replace_category!(d::DDLm_Dictionary, dname, catname, new_vals::DataFrame) = begin
+
+    catname = Symbol(catname)
+    
+    # Remove old values
+
+    filter!( r -> r.master_id != dname, d[catname])
+
+    # Add new values and regenerate groups
+
+    d.block[catname] = groupby(vcat(d[catname], new_vals, cols = :union), :master_id)
 end
 
 """

@@ -81,6 +81,15 @@ end
     @test t["_new_atom_site.Cartn_x"][:name].category_id[] == "new_atom_site"
     @test t["new_atom_site"][:definition].scope[] == "Category"
     @test t["atom_site_aniso"][:name].category_id[] == "new_atom_site"
+
+    # Replacing categories
+
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "ddl.dic"))
+    df = DataFrame(:expression => ["test expression"], :purpose => ["Evaluation"], :master_id => "_import.get")
+    replace_category!(t, "_import.get", :method, df)
+    @test size(t["_import.get"][:method], 1) == 1
+    @test t["_import.get"][:method].expression == ["test expression"]
+
 end
 
 # process imports
