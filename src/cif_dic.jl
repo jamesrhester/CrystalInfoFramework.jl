@@ -61,7 +61,7 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     change_func = (x->x)
     #println("Julia type for $cat/$obj is $julia_base_type, converting $value")
     if julia_base_type == Integer
-        change_func = (x -> map(y->parse(Int,y),x))
+        change_func = (x -> map(y-> if ismissing(y) || isnothing(y) y else parse(Int,y) end,x))
     elseif julia_base_type == Float64
         change_func = (x -> map(y->real_from_meas(y),x))
     elseif julia_base_type == Complex
@@ -73,7 +73,7 @@ convert_to_julia(cdic,cat,obj,value::Array) = begin
     end
     if cont_type == "Single"
         return change_func(value)
-    elseif cont_type in ["Array","Matrix"]
+    elseif cont_type in ["Array", "Matrix", "List"]
         return map(change_func,value)
     else error("Unsupported container type $cont_type")   #we can do nothing
     end

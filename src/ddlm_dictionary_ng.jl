@@ -518,14 +518,21 @@ is_category(d::DDLm_Dictionary,name) = begin
 end
 
 """
-    get_categories(d::DDLm_Dictionary, referred=false)
+    get_categories(d::DDLm_Dictionary, referred=false, head=true)
 
 List all categories defined in DDLm Dictionary `d`. If `referred` is `true`, categories
-for which data names are defined, but no category is defined, are also included.
+for which data names are defined, but no category is defined, are also included. If
+`head` is false, the head category is excluded.
 """
-get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}; referred = false) = begin
-    defed_cats = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}; referred = false, head = true) = begin
+
+    if head
+        defed_cats = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+    else
+        defed_cats = lowercase.(d[:definition][d[:definition][!, :scope] .== "Category" .&& d[:definition][!, :class] .!= "Head", :id])
+    end
     if !referred return defed_cats end
+
     more_cats = unique!(lowercase.(d[:name].category_id))
     # remove dictionary name if that is referred to by the Head category
     head_cat = find_head_category(d)

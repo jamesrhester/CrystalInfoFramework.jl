@@ -158,7 +158,7 @@ merge_loop!(base, addition, catname, dict) = begin
 
     kk = get_keys_for_cat(dict, catname)
     if intersect(kk, base_names) != kk || intersect(kk, add_names) != kk
-        @debug "Keys missing" kk base_names add_names
+        @debug "Keys missing" kk intersect(kk, base_names) intersect(kk, add_names)
         throw(error("One of keys for $catname missing when merging loop"))
     end
 
@@ -176,7 +176,7 @@ merge_loop!(base, addition, catname, dict) = begin
 
     for mia in missing_in_add
         @debug "Adding missing values for $mia"
-        addition[mia] = Vector{Union{Missing, eltype(base[mib])}}(missing, length(addition[add_names[1]]))
+        addition[mia] = Vector{Union{Missing, eltype(base[mia])}}(missing, length(addition[add_names[1]]))
         add_to_loop!(addition, add_names[1], mia)
     end
 

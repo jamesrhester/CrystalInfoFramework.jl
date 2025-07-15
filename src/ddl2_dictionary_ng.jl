@@ -1,5 +1,5 @@
 # Enough support for DDL2 dictionaries to allow them to be used
-# for category construction
+# for dREL-based transformation to DDLm.
 #
 # Next generation: reads the dictionary as a database the way
 # the PDB intended, and split on '.' for cat/obj
@@ -146,11 +146,14 @@ find_category(d::DDL2_Dictionary,dataname) = begin
     return String(split(dataname,'.')[1][2:end])
 end
 
+# No such thing as a child or parent category in the DDLm sense
 get_child_categories(d::DDL2_Dictionary,catname) = []
-
-is_set_category(d::DDL2_Dictionary,catname) = false
-is_loop_category(d::DDL2_Dictionary,catname) = isnothing(catname) ? false : true
 get_parent_category(d::DDL2_Dictionary, catname) = nothing
+
+# And no Set categories
+is_set_category(d::DDL2_Dictionary,catname) = false
+is_loop_category(d::DDL2_Dictionary,catname::String) = true
+is_loop_category(d::DDL2_Dictionary,n) = false
 
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)
@@ -222,8 +225,7 @@ list_aliases(d::DDL2_Dictionary,name;include_self=false) = begin
 end
 
 """
-Find the canonical name for `name`. For DDL2 this is not implemented,
-that is, aliases are not recognised.
+Find the canonical name for `name`.
 """
 find_name(d::DDL2_Dictionary,name) = begin
     lname = lowercase(name)
@@ -236,6 +238,11 @@ end
 
 find_name(d::DDL2_Dictionary, cat, obj) = begin
     return "_$cat.$obj"
+end
+
+find_cat_obj(d::DDL2_Dictionary, name) = begin
+    c, o = split(name,".")
+    return Symbol(c[2:end]), Symbol(o)
 end
 
 has_drel_methods(d::DDL2_Dictionary) = true
@@ -255,8 +262,18 @@ generate_parents(defs) = begin
     return Dict(collect(zip(child_list,parent_list)))
 end
 
-get_parent_name(d::DDL2_Dictionary,name) = begin
-    return get(d.parent_lookup,name,nothing)
+get_parent_dataname(d::DDL2_Dictionary,name) = begin
+    return get(d.parent_lookup, name, name)
+end
+
+get_ultimate_link(d::DDL2_Dictionary, name) = begin
+    if haskey(d, name)
+        linkval = get_parent_dataname(d, name)
+        if linkval != name
+            return get_ultimate_link(d, linkval)
+        end
+    end
+    return name
 end
 
 get_cat_class(d::DDL2_Dictionary,name) = "Loop"
