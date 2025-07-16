@@ -31,14 +31,17 @@ _diffrn_radiation.probe                x-ray
 # inserted by JRH; there is no way to figure out a
 # sensible default here
 _reflns.apply_dispersion_to_Fcalc       Yes
+_dodgy.mcdodgy                        "random unknown dataname"
 
 loop_
 _atom_type.symbol
 _atom_type.atomic_mass
 _atom_type.number_in_cell
-  O       15.999   12 
-  C       12.011   28
-  H       1.008    24
+_local.local_not_actual_dataname
+
+  O       15.999   12    this
+  C       12.011   28    is
+  H       1.008    24    dummy
 
 
 loop_

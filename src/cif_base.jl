@@ -323,6 +323,11 @@ be present (e.g. by calling `b[newname]=values`) and have the same length as oth
 values in the loop.
 """
 add_to_loop!(b::CifContainer, tgt, newname) = begin
+
+    if !haskey(b, newname)
+        throw(error("$newname does not exist in data block. Add using b[newname]=val before calling add_to_loop!"))
+    end
+    
     loop_id = filter(l -> tgt in l, get_loop_names(b))
     if length(loop_id) != 1
         throw(error("No single unique loop containing dataname $tgt"))

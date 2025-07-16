@@ -52,3 +52,26 @@ end
     dids = f["_structure.id"]
     @test length(setdiff(unique(f["_cell.structure_id"]),dids)) == 0
 end
+
+@testset "DataDictBlock tests" begin
+    c = Cif(joinpath(@__DIR__,"nick1.cif"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
+    ddb = first(Cif{DataDictBlock}(c, t)).second
+
+    @test guess_category("_space_group_symop.id", ddb) == "space_group_symop"
+    @test guess_category("_local.local_not_actual_dataname", ddb) == "atom_type"
+    @test guess_category("_dodgy.mcdodgy", ddb) === nothing
+
+    ddb["_whatever.whatever"] = ["11", "12", "13"]
+    add_to_loop!(ddb, "_atom_type_scat.symbol", "_whatever.whatever")
+    @test "_whatever.whatever" in ddb.cat_lookup["atom_type_scat"]
+    add_to_loop!(ddb, "_local.local_not_actual_dataname", "_whatever.whatever")
+    @test "_whatever.whatever" in ddb.cat_lookup["atom_type"]
+    @test !("_whatever.whatever" in ddb.cat_lookup["atom_type_scat"])
+    create_loop!(ddb, ["_atom_type.symbol", "_local.local_not_actual_dataname"])
+    @test guess_category("_local.local_not_actual_dataname", ddb) == "atom_type"
+    CrystalInfoFramework.rename!(ddb, "_cell.length_a", "_cell.length_alpha")
+    @test guess_category("_cell.length_alpha", ddb) == nothing
+    @test !("_cell.length_a" in ddb.cat_lookup["cell"])
+
+end

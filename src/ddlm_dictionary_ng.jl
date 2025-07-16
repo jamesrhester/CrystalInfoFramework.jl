@@ -26,6 +26,7 @@ export find_object,find_name,filter_def, find_cat_obj
 export get_single_key_cats
 export get_linked_names_in_cat,get_keys_for_cat
 export get_linked_name
+export get_parent_dataname              #Next one up
 export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
@@ -59,7 +60,9 @@ export update_dict! #Update dictionary contents
 export make_cats_uppercase! #Conform to style guide
 
 # With data
+export DataDictBlock  # category-based data access
 export has_category   # check if a data block has a category
+export get_category_names, get_category, filter_category
 export all_categories_in_block # list all categories
 export count_rows     # how many rows in a category in a datablock
 export add_child_keys! # add any missing keys
@@ -479,21 +482,6 @@ find_category(d::DDLm_Dictionary, dataname) = begin
 end
 
 """
-   Guess the category looped datanames belong to based on friends in
-   the same loop. Useful when non-dictionary data names are included
-   in a loop.
-"""
-guess_category(d::DDLm_Dictionary, loopnames) = begin
-
-    for l in loopnames
-        if isnothing(find_category(d, l)) continue end
-    end
-
-    return nothing
-
-end
-
-"""
     find_object(d::DDLm_Dictionary,dataname)
 
 Find the `object_id` of `dataname` by looking up `d`.
@@ -554,7 +542,7 @@ get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:
 Return true if `catname` is declared as a Set category. If `d` is a `Reference` dictionary defining
 DDLm attributes themselves, only the `dictionary` category is a Set category.
 """
-is_set_category(d::DDLm_Dictionary,catname) = begin
+is_set_category(d::DDLm_Dictionary, catname::AbstractString) = begin
     cat_decl = get_cat_class(d,catname)
     dic_type = d[:dictionary].class[]
     if dic_type != "Reference" && cat_decl == "Set" return true end
@@ -562,6 +550,7 @@ is_set_category(d::DDLm_Dictionary,catname) = begin
     return false
 end
 
+is_set_category(d::AbstractCifDictionary, n::Nothing) = false
 """
     is_loop_category(d::DDLm_Dictionary,catname)
 
@@ -569,13 +558,15 @@ Return true if `catname` is declared as a Loop category. For
 `Reference` dictionaries describing the DDLm attributes themselves,
 all categories except `dictionary` are treated as Loop categories.
 """
-is_loop_category(d::DDLm_Dictionary,catname) = begin
+is_loop_category(d::DDLm_Dictionary, catname::AbstractString) = begin
     cat_decl = get_cat_class(d,catname)
     dic_type = d[:dictionary].class[]
     if dic_type == "Reference" && catname == "dictionary" return false end
     if dic_type == "Reference" && cat_decl == "Set" return true end
     return cat_decl == "Loop"
 end
+
+is_loop_category(d::AbstractCifDictionary, n::Nothing) = false
 
 """
     get_objs_in_cat(d::DDLm_Dictionary,catname)

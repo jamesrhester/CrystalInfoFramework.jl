@@ -174,7 +174,7 @@ end
                            ["_diffrn_detector_details","_diffrn_detector.details"])) == 2
     @test find_name(t,"_diffrn_detector_details") == "_diffrn_detector.details"
     @test find_name(t,"_diffrn_measurement.device") == "_diffrn_measurement.device"
-    @test get_parent_name(t,"_diffrn_measurement_axis.measurement_device") == "_diffrn_measurement.device"
+    @test get_parent_dataname(t,"_diffrn_measurement_axis.measurement_device") == "_diffrn_measurement.device"
     @test "detector bins" in as_data(t)["_item_enumeration.detail"]
     @test get_julia_type_name(t,"axis","type") == (:CaselessString,"Single")
     @test get_julia_type_name(t,"array_element_size","size") == (Float64,"Single")
