@@ -15,11 +15,23 @@ struct CifSetProjection <: CifContainer
 end
 
 CifSetProjection(sig::Dict, d::AbstractCifDictionary) = begin
+
     equivs = map( x -> (x, get_dataname_children(d, x)), collect(keys(sig)))
-    equivs = map(equivs) do e
-        k, children = e
-        k => map( c -> (find_category(d, c), c) , children)
+    for (k, v) in equivs
+        filter!(v) do one_link
+            cat = find_category(d, one_link)
+            catkeys = get_keys_for_cat(d, cat)
+            if !(one_link in catkeys)
+                false
+            else
+                finalkeys = get_ultimate_link.(Ref(d), catkeys)
+                finalcats = find_category.(Ref(d), finalkeys)
+                count( x->is_set_category(d, x), finalcats) == length(sig) || length(catkeys) == 1 && catkeys[] in keys(sig)
+            end
+        end
     end
+    
+    equivs = [k => map( c -> (find_category(d, c), c) , children) for (k, children) in equivs]
 
     @debug "Calculated equivalent data names" equivs
     
@@ -225,6 +237,27 @@ add_to_cat!(cp::CifSetProjection, catname, datanames, datavalues) = begin
     end
 end
 
+add_to_cat!(cp::CifSetProjection, ::Nothing, datanames, datavalues) = begin
+
+    if length(cp.setkeys) != 0
+        throw(error("$(cp.setkeys) is not compatible with unknown category for $datanames"))
+    end
+    
+    # All data values must be length 1
+
+    if any( x->length(x) != 1, datavalues)
+        throw(error("Nothing category holds only length-1 data values"))
+    end
+
+    new_names = setdiff(datanames, get_category_names(cp, nothing))
+    append!(cp.cat_lookup, new_names)
+    for (i,dn) in enumerate(datanames)
+        cp.values[dn] = datavalues[i]
+    end
+    
+end
+
+
 """
     Add category `catname` to `cp`. `datavalues` contains the values in the
     same order as `datanames`. This should not be called directly. If `catname`
@@ -251,9 +284,11 @@ end
     A CifDataset provides a relational view of a collection of Cif blocks
 """
 struct CifDataset <: CifContainer
-    blocks::Array{CifSetProjection, 1}
-    reference_dict::DDLm_Dictionary    
+    blocks::Dict{Dict{String, String}, CifSetProjection}
+    reference_dict::DDLm_Dictionary
 end
+
+CifDataset(d::DDLm_Dictionary) = CifDataset(Dict{Dict{String, String}, CifSetProjection}(), d)
 
 CifDataset(cf::CifContainer, d::DDLm_Dictionary) = begin
 
@@ -265,9 +300,9 @@ CifDataset(cf::CifContainer, d::DDLm_Dictionary) = begin
     key_data_names = Iterators.flatten(get_keys_for_cat.(Ref(d), all_keyed_sets))
     all_vals = collect_values.(Ref(cf), Ref(d), key_data_names)
 
-    # For each combination of keys and values, create a CifSetProject block
+    # For each combination of keys and values, create a CifSetProjection block
 
-    proto_dataset = CifDataset(CifSetProjection[], d)
+    proto_dataset = CifDataset(d)
 
     for one_cat in all_categories
         ak = get_keys_for_cat(d, one_cat)
@@ -298,20 +333,7 @@ end
 iterate(c::CifDataset) = iterate(c.blocks)
 iterate(c::CifDataset, s) = iterate(c.blocks, s)
 
-has_signature(c::CifDataset, sig::Dict) = begin
-    for v in c
-        if get_signature(v) == sig return true
-        end
-    end
-    return false
-end
+haskey(c::CifDataset, sig::Dict) = haskey(c.blocks, sig)
 
-get_by_signature!(c::CifDataset, sig::Dict) = begin
-    for v in c
-        if get_signature(v) == sig return v end
-    end
-    csp = CifSetProjection(sig, c.reference_dict)
-    push!(c.blocks, csp)
-    return csp
-end
-
+getindex(c::CifDataset, sig::Dict) = c.blocks[sig]
+setindex!(c::CifDataset, val::CifSetProjection, sig) = c.blocks[sig] = val

@@ -70,3 +70,8 @@ end
     @test ismissing(csp["_space_group_symop.operation_xyz"][5])
     
 end
+
+@testset "CifDataset from block" begin
+
+    
+end
