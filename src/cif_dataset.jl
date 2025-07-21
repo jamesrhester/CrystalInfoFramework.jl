@@ -1,7 +1,7 @@
 # A CifDataset offers a view of a CIF file as a single collection of relational
 # tables.
 export CifDataset, CifSetProjection
-export get_by_signature, has_signature
+export get_by_signature, has_signature, add_to_cat!, is_allowed_cat
 
 """
    A CifSetProjection looks like a particular type of CifBlock, where all Set-valued
@@ -68,8 +68,12 @@ end
 
 length(c::CifSetProjection, catname) = begin
 
+    topcats = (v[1][1] for (k, v) in c.equivalents)
+
+    if catname in topcats return 1 end
+    
     if has_category(c, catname)
-        n = get_category_names(c, catname)
+        n = get_category_names(c, catname, non_set = true)
         return length(c[first(n)])
     else
         return 0
@@ -78,12 +82,31 @@ length(c::CifSetProjection, catname) = begin
 end
 
 """
-    get_category_names(c::CifDataset, catname)
+   is_allowed(cp::CifSetProjection, catname)
 
-Return all data names thought to belong to `catname` in `c`. 
+Return true if `catname` is allowed for `cp`.
 """
-get_category_names(c::CifSetProjection, catname) = begin
-    c.cat_lookup[catname]
+is_allowed_cat(cp::CifSetProjection, catname) = begin
+
+    all_info = Iterators.flatten(values(cp.equivalents))
+    catname in (cat for (cat,k) in all_info)
+end
+
+"""
+    get_category_names(c::CifDataset, catname; non_set = false)
+
+Return all data names thought to belong to `catname` in `c`. If `non_set` is true,
+only return those data names that are not implicitly valued.
+"""
+get_category_names(c::CifSetProjection, catname; non_set = false) = begin
+
+    all_names = get(c.cat_lookup, catname, [])
+
+    if non_set
+        all_names = filter( x-> x in keys(c.values), all_names)
+    end
+
+    return all_names
 end
 
 has_category(c::CifSetProjection, catname) = catname in keys(c.cat_lookup)
@@ -113,40 +136,113 @@ get_signature(cp::CifSetProjection) = cp.setkeys
 """
     add_to_cat!(cp::CifSetProjection, catname, catcontents)
 
-Extend `catname` with the `catcontents`, which is a [names, contents] list
-where `contents` are vectors of values. Any names not present in either list
-are assigned `missing` values.
+Extend `catname` with the `datavalues` for each of the `datanames`. If some datanames
+are already present, all values are assumed to be additional to the current list and
+appended, with missing values in the gaps. If all names are new and the lengths are
+identical, they are simply added. If all names are new and lengths are different, an
+error is raised as the correct action is unclear.
 """
-add_to_cat!(cp::CifSetProjection, catname, catcontents) = begin
-    (names, values) = catcontents
-    new_names = setdiff(names, get_category_names(cp, catname))
-    missed_names = setdiff(get_category_names(cp, catname), names)
-    old_len = length(cp, catname)
-    new_len = length(first(values))
+add_to_cat!(cp::CifSetProjection, catname, datanames, datavalues) = begin
 
-    # Align pre-existing lengths
+    # Lengths must be the same
 
-    for nn in new_names
-        a = Vector{Any, old_len}[]
-        fill!(a, missing)
-        cp.values[nn] = a
+    if length(unique!(length.(datavalues))) != 1
+        throw(error("Supplied data values for $catname have different lengths"))
+    end
+    
+    if !has_category(cp, catname)
+        add_new_cat!(cp, catname, datanames, datavalues)
+        return
     end
 
+    # Values of set and equivalent keys may not change
+    
+    all_info = Iterators.flatten(values(cp.equivalents))
+    equiv_keys = (k for (_,k) in all_info)
+    bad = intersect(datanames, equiv_keys)
+    if length(bad) > 0
+        throw(error("Changing set key data values not allowed: $bad"))
+    end
+    
+    # Work out overlap of names and lengths
+    
+    new_names = setdiff(datanames, get_category_names(cp, catname, non_set = true))
+    missed_names = setdiff(get_category_names(cp, catname, non_set = true), datanames)
+    old_len = length(cp, catname)
+    new_len = length(first(datavalues))
+
+    # Make sure we have a recognisable situation
+
+    if length(new_names) == length(datanames) && old_len != new_len
+        throw(error("Ambiguous task: names all new but lengths don't match pre-existing names"))
+    end
+    
+    # If adding to top cats, enforce single value
+
+    topcats = (k[1][1] for (k, v) in cp.equivalents)
+
+    if catname in topcats && new_len != 1
+
+        @debug "Non length 1 addition to $catname" datanames datavalues
+        throw(error("Additions to Set category $catname may only be length 1"))
+    end
+    
+    # Align pre-existing lengths if some names common
+
+    if length(new_names) != length(datanames) 
+        for nn in new_names
+            a = Vector{Any}(missing, old_len)
+            cp.values[nn] = a
+        end
+    end
+    
     # Add new names to lookup
     
     append!(cp.cat_lookup[catname], new_names)
 
-
-    # Add to existing values
-
-    for on in get_category_names(cp, catname)
-        ii = indexin([on], names)[]
-        if !isnothing(ii)
-            append!(cp.values[on], values[ii])
-        else
-            # Not supplied with anything
-            append!(cp.values[on], fill(missing, new_len))
+    if length(new_names) == length(datanames)
+        for (i,nn) in enumerate(new_names)
+            cp.values[nn] = datavalues[i]
         end
+
+    else
+        
+        # Add to existing values
+
+        for on in get_category_names(cp, catname, non_set = true)
+
+            @debug "Adding to $on"
+            
+            ii = indexin([on], datanames)[]
+            if !isnothing(ii)
+                append!(cp.values[on], datavalues[ii])
+            else
+                # Not supplied with anything
+                @debug "Filling out $on with missing values"
+                append!(cp.values[on], fill(missing, new_len))
+            end
+        end
+    end
+end
+
+"""
+    Add category `catname` to `cp`. `datavalues` contains the values in the
+    same order as `datanames`. This should not be called directly. If `catname`
+    already exists, an error is thrown.
+"""
+add_new_cat!(cp::CifSetProjection, catname, datanames, datavalues) = begin
+
+    if has_category(cp, catname)
+        throw(error("$catname already exists"))
+    end
+
+    if !(is_allowed_cat(cp, catname))
+        throw(error("$catname is not appropriate for $(cp.setkeys)"))
+    end
+    
+    cp.cat_lookup[catname] = datanames
+    for (n, v) in zip(datanames, datavalues)
+        cp.values[n] = v
     end
     
 end

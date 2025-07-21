@@ -12,11 +12,61 @@ end
 @testset "CifSetProjection basics" begin
 
     t, r = prepare_system()
-    sig = Dict("_pd_phase.id" => "crcuo2")
+
+    # First an empty CSP
+    
+    sig = Dict("_pd_phase.id" => "cr2cuo4")
     csp = CifSetProjection(sig, t)
     @test haskey(csp, "_pd_phase.id")
     @test !(haskey(csp, "_pd_phase_mass.phase_id"))
-    @test csp["_pd_phase.id"][] == "crcuo2"
+    @test csp["_pd_phase.id"][] == "cr2cuo4"
     @test "_pd_phase.id" in keys(csp)
     @test length(csp, "pd_phase") == 1
+    @test get_category_names(csp, "pd_phase") == ["_pd_phase.id"]
+    @test get_category_names(csp, "pd_phase", non_set = true) == []
+    @test has_category(csp, "pd_phase")
+    @test get_loop_names(csp) == []
+
+    # Now add an extra data name
+
+    add_to_cat!(csp, "pd_phase", ["_pd_phase.name"],[["Cr2CuO4"]])
+    @test length(csp, "pd_phase") == 1
+    @test "_pd_phase.name" in keys(csp)
+    @test haskey(csp, "_pd_phase.name")
+    @test "_pd_phase.id" in get_category_names(csp, "pd_phase")
+
+end
+
+@testset "CifSetProjection loops" begin
+
+    t, r = prepare_system()
+
+    # Prepare a looped category
+
+    sig = Dict("_space_group.id" => "fddd")
+    csp = CifSetProjection(sig, t)
+    add_to_cat!(csp, "space_group_symop",
+                ["_space_group_symop.id", "_space_group_symop.operation_xyz"],
+                 [["1", "2", "3"], ["x,y,z", "-x,1/4+y,1/4+z", "abc"]])
+    @test length(csp, "space_group_symop") == 3
+    @test haskey(csp, "_space_group_symop.id")
+    @test haskey(csp, "_space_group_symop.space_group_id")
+    @test csp["_space_group_symop.space_group_id"] == fill("fddd", 3)
+    @test is_allowed_cat(csp, "space_group_wyckoff")
+    @test !is_allowed_cat(csp, "pd_phase")
+
+    # Add some more values
+
+    add_to_cat!(csp, "space_group_symop",
+                ["_space_group_symop.id","_dodgy.dodge"],
+                [["4","5"], ["3.14","59"]])
+
+    @test length(csp, "space_group_symop") == 5
+
+    p = (length(getindex(csp, n)) for n in get_category_names(csp, "space_group_symop", non_set = true))
+    @test all( x-> x == 5, p)
+    @test ismissing(csp["_dodgy.dodge"][2])
+    @test "_dodgy.dodge" in get_category_names(csp, "space_group_symop")
+    @test ismissing(csp["_space_group_symop.operation_xyz"][5])
+    
 end
