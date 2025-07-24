@@ -4,7 +4,7 @@ prepare_system() = begin
 
     #TODO: Make this a smaller version with only a few single-key, double-key
     # categories
-    t = DDLm_Dictionary(joinpath(@__DIR__, "mini_cif_pow.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "mini_cif_pow.dic"))
     r = Cif(joinpath(@__DIR__, "reorg_test1.cif"))
     return t,r
 end
