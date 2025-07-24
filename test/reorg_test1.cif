@@ -1,0 +1,572 @@
+#\#CIF_2.0
+#
+# Example of a dataset containing measurements at
+# multiple temperatures of a two-phase sample
+#
+#=============================================================================
+
+# List all distinct radiations used. In this case this belongs in the
+# overall data block.
+
+data_classic
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_diffrn_radiation.id                common
+_diffrn_radiation_wavelength.value  0.41326
+_diffrn_radiation.probe             x-ray
+_diffrn_radiation.polarisn_ratio    0.9900
+
+# Other general information here
+
+#=============================================================================
+
+# List all distinct structures, one per data block, including space group
+
+data_cr2cuo4_7k
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cr2cuo4_7K
+_structure.diffrn_id         7K
+_structure.space_group_id    fddd
+_structure.phase_id          cr2cuo4
+
+_pd_phase.id       cr2cuo4
+_pd_phase.name     Cr2CuO4
+
+_space_group.id            fddd
+_space_group.name_H-M_alt  "F d d d"
+_space_group.name_Hall  "-F 2uv 2vw"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,1/4+y,1/4+z
+     3  1/4+x,-y,1/4+z
+     4  3/4-x,1/4-y,1/2+z
+     5  -x,-y,-z
+# ...
+
+_cell.length_a  7.71270(3)
+_cell.length_b  8.54329(4)
+_cell.length_c  8.53643(4)
+_cell.angle_alpha  90
+_cell.angle_beta   90
+_cell.angle_gamma  90
+_cell.volume  562.481(6)
+
+_chemical_formula.sum  "Cr2 Cu O4"
+_chemical_formula.weight  231.53
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu     Cu   0.12500     0.12500     0.12500     1.0000     Uiso 0.00003(22) 8
+Cr     Cr   0.50000     0.50000     0.50000     1.0000     Uiso 0.00011(22) 16
+O      O    0.24582(21) 0.2682(4)   0.2674(4)   1.0000     Uiso 0.0042(5) 32
+
+data_cr2cuo4_17k
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cr2cuo4_17K
+_structure.diffrn_id         17K
+_structure.space_group_id    fddd
+_structure.phase_id          cr2cuo4
+
+_pd_phase.id       cr2cuo4
+_pd_phase.name     Cr2CuO4
+
+_space_group.id            fddd
+_space_group.name_H-M_alt  "F d d d"
+_space_group.name_Hall  "-F 2uv 2vw"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,1/4+y,1/4+z
+     3  1/4+x,-y,1/4+z
+     4  3/4-x,1/4-y,1/2+z
+     5  -x,-y,-z
+# ...
+
+_cell.length_a  7.71286(3)
+_cell.length_b  8.54321(4)
+_cell.length_c  8.53651(4)
+_cell.angle_alpha  90
+_cell.angle_beta   90
+_cell.angle_gamma  90
+_cell.volume  562.493(6)
+
+_chemical_formula_sum  "Cr2 Cu O4"
+_chemical_formula_weight  231.53
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu     Cu   0.12500     0.12500     0.12500     1.0000     Uiso 0.00062(21) 8
+Cr     Cr   0.50000     0.50000     0.50000     1.0000     Uiso 0.00036(21) 16
+O      O    0.24520(20) 0.2681(4)   0.2676(4)   1.0000     Uiso 0.0042(4) 32
+
+data_cr2cuo4_47k
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cr2cuo4_47K
+_structure.diffrn_id         47K
+_structure.space_group_id    fddd
+_structure.phase_id          cr2cuo4
+
+_pd_phase.id       cr2cuo4
+_pd_phase.name     Cr2CuO4
+
+_space_group.id            fddd
+_space_group.name_H-M_alt  "F d d d"
+_space_group.name_Hall  "-F 2uv 2vw"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,1/4+y,1/4+z
+     3  1/4+x,-y,1/4+z
+     4  3/4-x,1/4-y,1/2+z
+     5  -x,-y,-z
+# ...
+
+_cell.length_a  7.713768(29)
+_cell.length_b  8.54289(3)
+_cell.length_c  8.53669(4)
+_cell.angle_alpha  90
+_cell.angle_beta   90
+_cell.angle_gamma  90
+_cell.volume  562.550(5)
+
+_chemical_formula.sum  "Cr2 Cu O4" # <- need to add ptr to _structure.id
+_chemical_formula.weight  231.53   # <- need to add ptr to _structure.id
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu     Cu   0.12500     0.12500     0.12500     1.0000     Uiso 0.00086(21) 8
+Cr     Cr   0.50000     0.50000     0.50000     1.0000     Uiso 0.00020(20) 16
+O      O    0.24566(20) 0.2674(4)   0.2676(4)   1.0000     Uiso 0.0032(4) 32
+
+data_cuo_7K
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cuo_7K
+_structure.diffrn_id         7K
+_structure.space_group_id    c2c
+_structure.phase_id          cuo
+
+_pd_phase.id       cuo
+_pd_phase.name     CuO
+
+_space_group.id            c2c
+_space_group.name_H-M_alt  "C 2/c"
+_space_group.name_Hall     "-C 2yc"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,y,1/2-z
+     3  -x,-y,-z
+     4  x,-y,1/2+z
+     5  1/2+x,1/2+y,z
+     6  1/2-x,1/2+y,1/2-z
+     7  1/2-x,1/2-y,-z
+     8  1/2+x,1/2-y,1/2+z
+
+_cell.length_a  4.677(4)
+_cell.length_b  3.4188(11)
+_cell.length_c  5.131(6)
+_cell.angle_alpha  90
+_cell.angle_beta   99.751(21)
+_cell.angle_gamma  90
+_cell.volume  80.860(18)
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu1    Cu2+ 0.25000     0.25000     0.00000     1.0000     Uiso 0.0010     4
+O1     O2-  0.00000     0.41840     0.25000     1.0000     Uiso 0.0010     4
+
+data_cuo_17K
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cuo_17K
+_structure.diffrn_id         17K
+_structure.space_group_id    c2c
+_structure.phase_id          cuo
+
+_pd_phase.id       cuo
+_pd_phase.name     CuO
+
+_space_group.id            c2c
+_space_group.name_H-M_alt  "C 2/c"
+_space_group.name_Hall     "-C 2yc"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,y,1/2-z
+     3  -x,-y,-z
+     4  x,-y,1/2+z
+     5  1/2+x,1/2+y,z
+     6  1/2-x,1/2+y,1/2-z
+     7  1/2-x,1/2-y,-z
+     8  1/2+x,1/2-y,1/2+z
+
+_cell.length_a  4.6779(31)
+_cell.length_b  3.4196(10)
+_cell.length_c  5.130(5)
+_cell.angle_alpha  90
+_cell.angle_beta   99.754(18)
+_cell.angle_gamma  90
+_cell.volume  80.871(16)
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu1    Cu2+ 0.25000     0.25000     0.00000     1.0000     Uiso 0.0010     4
+O1     O2-  0.00000     0.41840     0.25000     1.0000     Uiso 0.0010     4
+
+data_cuo_47K
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_structure.id                cuo_47K
+_structure.diffrn_id         47K
+_structure.space_group_id    c2c
+_structure.phase_id          cuo
+
+_pd_phase.id       cuo
+_pd_phase.name     CuO
+
+_space_group.id            c2c
+_space_group.name_H-M_alt  "C 2/c"
+_space_group.name_Hall     "-C 2yc"
+
+loop_
+    _space_group_symop.id
+    _space_group_symop.operation_xyz
+     1  x,y,z
+     2  -x,y,1/2-z
+     3  -x,-y,-z
+     4  x,-y,1/2+z
+     5  1/2+x,1/2+y,z
+     6  1/2-x,1/2+y,1/2-z
+     7  1/2-x,1/2-y,-z
+     8  1/2+x,1/2-y,1/2+z
+
+_cell.length_a  4.677(3)
+_cell.length_b  3.4199(10)
+_cell.length_c  5.131(5)
+_cell.angle_alpha  90
+_cell.angle_beta   99.771(20)
+_cell.angle_gamma  90
+_cell.volume  80.886(17)
+
+loop_
+   _atom_site.label
+   _atom_site.type_symbol
+   _atom_site.fract_x
+   _atom_site.fract_y
+   _atom_site.fract_z
+   _atom_site.occupancy
+   _atom_site.adp_type
+   _atom_site.U_iso_or_equiv
+   _atom_site.site_symmetry_multiplicity
+Cu1    Cu2+ 0.25000     0.25000     0.00000     1.0000     Uiso 0.0010     4
+O1     O2-  0.00000     0.41840     0.25000     1.0000     Uiso 0.0010     4
+
+#=============================================================================
+
+# List per-diffractogram information, one per block
+
+data_0H_00
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_diffrn.id                   7K
+_diffrn.ambient_temperature  6.778
+_diffrn.ambient_pressure     100
+_diffrn.diffrn_radiation_id  common
+
+_pd_diffractogram.id       0H_00
+_pd_diffractogram.diffrn_id  7K
+_pd_meas.2theta_range_min  0.50000
+_pd_meas.2theta_range_max  26.09600
+_pd_meas.2theta_range_inc  0.00200
+_pd_meas.number_of_points  12799
+
+loop_
+   _pd_data.point_id
+   _pd_meas.intensity_total
+   _pd_calc.intensity_total
+   _pd_proc.intensity_bkg_calc
+   _pd_proc.ls_weight
+
+  1 43.783814    41.795171    41.771237   0.0229313
+  2 45.626478    41.851699    41.827565   0.0219996
+  3 47.171463    41.908055    41.883717   0.021299
+  4 36.951371    41.964215    41.939672   0.0272123
+  5 33.266743    42.020211    41.99546    0.0301765
+  6 40.981582    42.075989    42.051027   0.0246658
+  7 41.683548    42.131611    42.106435   0.0245573
+# ... measurements omitted
+
+data_0H_04
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_diffrn.id                   17K
+_diffrn.ambient_temperature  16.702
+_diffrn.ambient_pressure     100
+_diffrn.diffrn_radiation_id  common
+
+_pd_diffractogram.id       0H_04
+_pd_diffractogram.diffrn_id   17K
+_pd_meas.2theta_range_min  0.50000
+_pd_meas.2theta_range_max  26.09600
+_pd_meas.2theta_range_inc  0.00200
+_pd_meas.number_of_points  12799
+
+loop_
+   _pd_data.point_id
+   _pd_meas.intensity_total
+   _pd_calc.intensity_total
+   _pd_proc.intensity_bkg_calc
+   _pd_proc.ls_weight
+  1 29.898017    41.711299    41.687919   0.0335978
+  2 39.768154    41.769158    41.745582   0.0253885
+  3 39.527914    41.826837    41.803062   0.0253699
+  4 46.349986    41.884328    41.860353   0.0218265
+  5 42.403998    41.941639    41.91746    0.0240971
+  6 47.876864    41.99877     41.974385   0.0210206
+  7 40.335609    42.055705    42.031112   0.0249116
+# ...omitted measurements
+
+data_OH_09
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_diffrn.id                   47K
+_diffrn.ambient_temperature  46.97
+_diffrn.ambient_pressure     100
+_diffrn.diffrn_radiation_id  common
+
+_pd_diffractogram.id          0H_09
+_pd_diffractogram.diffrn_id   47K
+_pd_meas.2theta_range_min  0.50000
+_pd_meas.2theta_range_max  26.09600
+_pd_meas.2theta_range_inc  0.00200
+_pd_meas.number_of_points  12799
+
+loop_
+   _pd_data.point_id
+   _pd_meas.intensity_total
+   _pd_calc.intensity_total
+   _pd_proc.intensity_bkg_calc
+   _pd_proc.ls_weight
+  1 42.173306    41.069518    41.047364   0.0238043
+  2 48.964589    41.127992    41.105653   0.0205706
+  3 45.8184      41.186308    41.163781   0.021942
+  4 43.853758    41.244428    41.221709   0.0231165
+  5 61.582546    41.302373    41.279462   0.0163382
+  6 35.581044    41.360115    41.337009   0.0282443
+  7 48.461362    41.417706    41.394402   0.0207815
+# ...measurements omitted
+
+#===============================================================
+
+# Information that is per-phase, per histogram
+
+data_0H_cr2cuo4
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_00
+_pd_phase.id               cr2cuo4
+_pd_phase_mass.percent     98.88(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  a    1    1    1     2923.7101  1848.8118   0.0   4.75465
+  b    0    2    2    50887.9824 44176.2312 180.0   3.01930
+  c    2    2    0    41129.5142 38146.8191 180.0   2.86244
+  d    2    0    2    40719.7976 38182.2594 180.0   2.86141
+# ...
+
+# preferred orientation information also goes here
+
+data_0H_cuo
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_00
+_pd_phase.id               cuo
+_pd_phase_mass.percent     1.12(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  a    1    1     0     4339.5540   527.9252  180.0   2.74595
+  b    0    0     2     5381.1374  4772.3738    0.0   2.52848
+  c    1    1    -1     7778.9105  6672.9552  180.0   2.52221
+  d    1    1     1    10519.8297 10580.5215  180.0   2.31709
+  e    2    0     0     6179.8194  4667.8699  180.0   2.30477
+  f    1    1    -2     1570.8862   298.7972    0.0   1.96126
+# ...
+
+data_04_cr2cuo4
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_04
+_pd_phase.id               cr2cuo4
+_pd_phase_mass.percent     98.85(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  i    1    1    1     2857.5850  1815.5648   0.0   4.75469
+  ii   0    2    2    50066.2033 44075.8291 180.0   3.01930
+  iii  2    2    0    40970.9520 37913.9619 180.0   2.86246
+  iv   2    0    2    40623.1705 37934.3275 180.0   2.86146
+  v    1    3    1    65233.6297 67538.1258 180.0   2.54953
+# ...
+
+data_04_cuo
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_04
+_pd_phase.id               cuo
+_pd_phase_mass.percent     1.15(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  q    1    1     0    3027.3298   528.0777  180.0   2.74652
+  w    0    0     2    5645.9302  4772.1111    0.0   2.52777
+  e    1    1    -1    7984.2080  6673.2990  180.0   2.52253
+  r    1    1     1   10367.4860 10581.1099  180.0   2.31726
+  t    2    0     0    6208.4277  4668.0844  180.0   2.30514
+# ...
+
+data_09_cr2cuo4
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_09
+_pd_phase.id               cr2cuo4
+_pd_phase_mass.percent     98.65(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  1    1    1    1     2866.3493  1806.1692   0.0   4.75488
+  2    0    2    2    48243.5918 43869.8403 180.0   3.01927
+  3    2    2    0    40547.2038 38008.3146 180.0   2.86260
+  4    2    0    2    40068.9116 37989.4186 180.0   2.86167
+  5    1    3    1    66629.5169 68307.3304 180.0   2.54949
+# ...
+
+data_09_cuo
+
+_audit_dataset.id c5c4b947-0708-411e-b44b-e157f645fd23
+
+_pd_diffractogram.id       0H_09
+_pd_phase.id               cuo
+_pd_phase_mass.percent     1.35(4)
+
+loop_
+   _refln.id
+   _refln.index_h
+   _refln.index_k
+   _refln.index_l
+   _refln.F_squared_meas
+   _refln.F_squared_calc
+   _refln.phase_calc
+   _refln.d_spacing
+  u    1    1     0     4614.5984   528.0627  180.0   2.74646
+  v    0    0     2     5629.4996  4772.3673    0.0   2.52846
+  w    1    1    -1     7957.5050  6673.6405  180.0   2.52285
+  g    1    1     1    10650.5252 10580.9378  180.0   2.31721
+  h    2    0     0     5809.4324  4667.7910  180.0   2.30463
+# ...

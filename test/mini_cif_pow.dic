@@ -1,0 +1,4518 @@
+#\#CIF_2.0
+##############################################################################
+#                                                                            #
+#                        Powder CIF Dictionary                               #
+#                                                                            #
+#  CIF data definitions specifically for powder diffraction applications.    #
+#                                                                            #
+#               Converted from DDL1 to DDLm 26 June 2014                     #
+#                                                                            #
+##############################################################################
+
+data_CIF_POW
+
+    _dictionary.title             CIF_POW
+    _dictionary.class             Instance
+    _dictionary.version           2.5.0
+    _dictionary.date              2025-06-23
+    _dictionary.uri
+https://raw.githubusercontent.com/COMCIFS/Powder_Dictionary/master/cif_pow.dic
+    _dictionary.ddl_conformance   4.2.0
+    _dictionary.namespace         CifPow
+    _description.text
+;
+    The CIF_POW dictionary records the definitions of data items needed in
+    powder diffraction studies. Note that unlike most IUCr CIF
+    dictionaries, the data name is not always constructed as
+    <category>.<object>.
+;
+
+save_PD_GROUP
+
+    _definition.id                PD_GROUP
+    _definition.scope             Category
+    _definition.class             Head
+    _definition.update            2024-12-13
+    _description.text
+;
+    Groups all of the categories of definitions in the powder
+    diffraction study of materials.
+;
+    _name.category_id             CIF_POW
+    _name.object_id               PD_GROUP
+
+    _import.get
+        [
+          {
+           'dupl':Ignore  'file':multi_block_core.dic  'mode':Full
+           'save':MULTIBLOCK_CORE
+          }
+        ]
+
+save_
+
+save_PD_PHASE
+
+    _definition.id                PD_PHASE
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2025-04-18
+    _description.text
+;
+    This category allows for the description of the phases contributing to the
+    powder diffraction data set. Note that if multiple-phase Rietveld or other
+    structural analysis is performed, the structural results will be placed in
+    different data blocks, using CIF entries from the core CIF dictionary.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PHASE
+    _category_key.name            '_pd_phase.id'
+
+save_
+
+save_pd_phase.id
+
+    _definition.id                '_pd_phase.id'
+    _definition.update            2025-04-18
+    _description.text
+;
+    Unique label identifying a phase.
+;
+    _name.category_id             pd_phase
+    _name.object_id               id
+    _type.purpose                 Key
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+
+    loop_
+      _description_example.case
+         '1991-15-09T16:54:00Z|Si-std|B.Toby|D500#1234-987'
+         '9d0e3eef-614a-4127-aef5-8b859168fd13'
+         'PHASE A'
+         'Calcium sulphate hemihydrate. ACME Chemicals, batch #12090.'
+
+save_
+
+save_pd_phase.name
+
+    _definition.id                '_pd_phase.name'
+    _alias.definition_id          '_pd_phase_name'
+    _definition.update            2023-01-18
+    _description.text
+;
+    The name of the phase. It may be designated as unknown, or by a mineral
+    name, structure type, chemical formula, or other identifier.
+;
+    _name.category_id             pd_phase
+    _name.object_id               name
+    _type.purpose                 Describe
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+
+    loop_
+      _description_example.case
+         'NIST 640e Silicon standard'
+         'Al2O3'
+         'malachite'
+         'Calcium sulphate hemihydrate. ACME Chemicals, batch #12090.'
+         'Olivine#Mg2SiO4'
+
+save_
+
+save_PD_CALC_OVERALL
+
+    _definition.id                PD_CALC_OVERALL
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2025-06-19
+    _description.text
+;
+    Items in this category record overall features of the computed
+    diffractogram.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_CALC_OVERALL
+    _category_key.name            '_pd_calc_overall.diffractogram_id'
+    _description_example.case
+;
+         _pd_diffractogram.id   DIFFRACTOGRAM_NUMBER_7
+         _pd_calc.method        Rietveld
+
+         _pd_calc_overall.component_presentation_order
+             [ PHASE_A_ID PHASE_B_ID PHASE_C_ID ]
+
+         loop_
+         _pd_data.point_id
+         _pd_meas.2theta_scan
+         _pd_meas.intensity_total
+         _pd_calc.intensity_total
+         _pd_calc.component_intensities_net
+         0   3.99875   1061.8   1076.653 [ 20.20 203.215 512.256 ]
+         1   4.03625   1053.9   1074.628 [ 21.34 204.535 513.156 ]
+         2   4.07375   1060.2   1072.667 [ 21.45 205.755 516.456 ]
+         3   4.11125   1017.3   1070.768 [ 21.55 206.975 513.256 ]
+         #...
+;
+    _description_example.detail
+;
+         Tabulation of diffraction data consisting of measured and
+         calculated data, where the calculated data also include intensities
+         ascribed to the different phases which make up the model. The phases to
+         which the intensities belong are given by the value of
+         _pd_calc_overall.component_presentation_order. These values correspond
+         to the _pd_phase.id values of the phases contributing to the current
+         diffractogram. As _pd_calc.component_intensities_net is used, the
+         intensities given do not include any background contribution.
+
+         The category key value associated with _pd_data.point_id is given
+         with every data point. The category key value associated with
+         _pd_calc_overall.diffractogram_id and _pd_data.diffractogram_id would
+         be taken as 'DIFFRACTOGRAM_NUMBER_7', the value of
+         _pd_diffractogram.id given in the data block.
+;
+
+save_
+
+save_pd_calc.method
+
+    _definition.id                '_pd_calc.method'
+    _alias.definition_id          '_pd_calc_method'
+    _definition.update            2023-01-18
+    _description.text
+;
+    A description of the method used for the calculation of the
+    intensities in _pd_calc.intensity_*. If the pattern was
+    calculated from crystal structure data for a single phase, the
+    atom coordinates and other crystallographic information should
+    be included in the datablock using the core CIF ATOM_SITE and
+    CELL data items. If multiple phases were used, these should
+    be listed in the pd_phase category.
+;
+    _name.category_id             pd_calc_overall
+    _name.object_id               method
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+    loop_
+      _description_example.case
+         'Rietveld'
+         'Pawley'
+         'Le Bail'
+         'Independent peak fitting'
+
+save_
+
+save_pd_calc_overall.component_presentation_order
+
+    _definition.id
+        '_pd_calc_overall.component_presentation_order'
+    _definition.update            2023-06-13
+    _description.text
+;
+    List of _pd_phase.ids specifying the order in which
+    the individual phases' calculated components are given
+    within _pd_calc.component_intensities_*.
+;
+    _name.category_id             pd_calc_overall
+    _name.object_id               component_presentation_order
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               List
+    _type.dimension               '[]'
+    _type.contents                Code
+
+save_
+
+save_pd_calc_overall.diffractogram_id
+
+    _definition.id                '_pd_calc_overall.diffractogram_id'
+    _definition.update            2023-01-12
+    _description.text
+;
+    The diffractogram (see _pd_diffractogram.id) to which the associated
+    features relate.
+;
+    _name.category_id             pd_calc_overall
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_PD_DATA
+
+    _definition.id                PD_DATA
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2022-10-11
+    _description.text
+;
+    The PD_DATA category is a "container" category that is defined
+    in order to allow raw, processed, and calculated data points
+    in a diffraction data set to be optionally tabulated together.
+    As PD_CALC, PD_MEAS, and PD_PROC are all subcategories of this
+    category, the various items belonging to those categories may
+    be looped together or separately, as desired.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_DATA
+
+    loop_
+      _category_key.name
+         '_pd_data.point_id'
+         '_pd_data.diffractogram_id'
+
+    loop_
+      _description_example.case
+      _description_example.detail
+;
+         loop_
+         _pd_data.point_id
+         _pd_meas.2theta_scan
+         _pd_meas.intensity_total
+         _pd_calc.intensity_total
+         _pd_calc.intensity_bkg
+         1   5.001   43.364   25.994961   25.994961
+         2   5.004   38.007   26.200290   26.200290
+         3   5.007   38.318   26.404083   26.404083
+         4   5.010   41.877   26.606346   26.606346
+         #further data points follow
+;
+;
+         Tabulation of diffraction data consisting of measured and calculated
+         data. The measured diffraction angle and measured intensity are given.
+         The calculated diffraction pattern intensity, including background, is
+         given, and finally, the calculated background is listed.
+
+         The category key value associated with _pd_data.point_id is given
+         with every data point. In the usual case that only one diffractogram
+         is present in the data block, the category key value associated with
+         _pd_data.diffractogram_id would be taken from the value associated
+         with the data name _pd_diffractogram.id given in that data block.
+;
+;
+         loop_
+         _pd_data.point_id
+         _pd_meas.time_of_flight
+         _pd_proc.d_spacing
+         _pd_proc.intensity_total
+         _pd_proc.ls_weight
+         _pd_calc.intensity_total
+         _pd_calc.intensity_bkg
+         0   1110.30100   1.489225   0.60008   6528.86960   0.553025   0.504217
+         1   1114.74220   1.495170   0.63531   6316.37917   0.571286   0.504020
+         2   1119.20117   1.501138   0.64690   6107.85715   0.593895   0.503826
+         3   1123.67798   1.507131   0.65580   6162.14696   0.620014   0.503635
+         4   1128.17269   1.513147   0.69097   5674.48379   0.647871   0.503449
+         #further data points follow
+;
+;
+         Tabulation of diffraction data consisting of measured, processed, and
+         calculated data. The measured time-of-flight is given along with the
+         corresponding d-values; The parameters for this conversion may be
+         given elsewhere using PD_CALIB_D_TO_TOF data items. The measured
+         intensity is not given, only the processed intensity is listed. The
+         weighting associated with each data point in the diffraction pattern
+         modelling process is given, along with the calculated intensity and
+         background.
+
+         The category key value associated with _pd_data.point_id is given
+         with every data point. In the usual case that only one diffractogram
+         is present in the data block, the category key value associated with
+         _pd_data.diffractogram_id would be taken from the value associated
+         with the data name _pd_diffractogram.id given in that data block.
+;
+;
+         loop_
+         _pd_data.point_id
+         _pd_meas.2theta_scan
+         _pd_proc.2theta_corrected
+         _pd_meas.intensity_total
+         _pd_calc.intensity_total
+         0   3.99875   3.907132   1061.8   1076.653
+         1   4.03625   3.944633   1053.9   1074.628
+         2   4.07375   3.982134   1060.2   1072.667
+         3   4.11125   4.019635   1017.3   1070.768
+         #further data points follow
+;
+;
+         Tabulation of diffraction data consisting of measured, processed, and
+         calculated data. The measured diffraction angle is given, along with
+         diffraction angles corrected for any instrument alignment or
+         specimen displacement. Finally, the measured intensity and intensity
+         calculated from a model are given. The two intensities include
+         background and are on the same scale.
+
+         The category key value associated with _pd_data.point_id is given
+         with every data point. In the usual case that only one diffractogram
+         is present in the data block, the category key value associated with
+         _pd_data.diffractogram_id would be taken from the value associated
+         with the data name _pd_diffractogram.id given in that data block.
+;
+;
+         loop_
+         _pd_data.point_id
+         _pd_meas.2theta_scan
+         _pd_meas.counts_total
+         1   4.03   154
+         2   4.09   140
+         3   4.15   134
+         4   4.21   171
+         #further data points follow
+;
+;
+         Tabulation of diffraction data consisting only of measured data. The
+         intensity is measured in counts, including background. The
+         X-coordinate is 2θ degrees as given by the diffractometer.
+
+         The category key value associated with _pd_data.point_id is given
+         with every data point. In the usual case that only one diffractogram
+         is present in the data block, the category key value associated with
+         _pd_data.diffractogram_id would be taken from the value associated
+         with the data name _pd_diffractogram.id given in that data block.
+;
+
+save_
+
+save_pd_data.diffractogram_id
+
+    _definition.id                '_pd_data.diffractogram_id'
+    _definition.update            2022-12-16
+    _description.text
+;
+    Label identifying the diffraction measurement that the
+    data tabulated in the PD_DATA category belong to. This
+    may be omitted in the usual case that only one diffraction
+    measurement is present in a data block.
+;
+    _name.category_id             pd_data
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_data.point_id
+
+    _definition.id                '_pd_data.point_id'
+    _alias.definition_id          '_pd_data_point_id'
+    _definition.update            2025-06-19
+    _description.text
+;
+    Arbitrary label identifying a specific entry in a loop of
+    values forming a diffractogram.
+
+    This should be used in preference to _pd_calc.point_id,
+    _pd_calc_component.point_id, _pd_meas.point_id, or
+    _pd_proc.point_id whenever data items from more than one of
+    those categories are looped together.
+;
+    _name.category_id             pd_data
+    _name.object_id               point_id
+    _type.purpose                 Key
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_PD_CALC
+
+    _definition.id                PD_CALC
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2022-10-11
+    _description.text
+;
+    This section is used for storing a computed diffractogram trace.
+    This may be a simulated powder pattern for a material from a
+    program such as LAZY/PULVERIX or the computed intensities from a
+    Rietveld refinement.
+;
+    _name.category_id             PD_DATA
+    _name.object_id               PD_CALC
+
+    loop_
+      _category_key.name
+         '_pd_calc.point_id'
+         '_pd_calc.diffractogram_id'
+
+save_
+
+save_pd_calc.component_intensities_net
+
+    _definition.id                '_pd_calc.component_intensities_net'
+    _definition.update            2023-06-17
+    _description.text
+;
+    List of intensity values for the contributions of an
+    arbitrary number of individual phases to a computed
+    diffractogram for each data point. Values are listed
+    in the order given by _pd_calc_overall.component_presentation_order.
+    Values should be computed at the same locations as the
+    processed diffractogram, and thus the numbers of points
+    will be defined by _pd_proc.number_of_points. Point
+    positions may be defined using _pd_proc.2theta_range_*,
+    _pd_proc.2theta_corrected, _pd_proc.d_spacing, or other
+    appropriate x-coordinates.
+
+    Use _pd_calc.component_intensities_net if the computed
+    component contribution diffraction patterns do not
+    include background or normalization corrections and thus
+    are specified on the same scale as the
+    _pd_proc.intensity_net values.
+
+    _pd_calc.component_intensities_* should be looped with
+    either _pd_proc.intensity_net, _pd_meas.counts_*, and/or
+    _pd_meas.intensity_*.
+;
+    _name.category_id             pd_calc
+    _name.object_id               component_intensities_net
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               List
+    _type.dimension               '[]'
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_calc.component_intensities_total
+
+    _definition.id                '_pd_calc.component_intensities_total'
+    _definition.update            2023-06-17
+    _description.text
+;
+    List of intensity values for the contributions of an
+    arbitrary number of individual phases to a computed
+    diffractogram at each data point. Values are listed
+    in the order given by _pd_calc_overall.component_presentation_order.
+    Values should be computed at the same locations as the
+    processed diffractogram, and thus the numbers of points
+    will be defined by _pd_proc.number_of_points. Point
+    positions may be defined using _pd_proc.2theta_range_*,
+    _pd_proc.2theta_corrected, _pd_proc.d_spacing, or other
+    appropriate x-coordinates.
+
+    Use _pd_calc.component_intensities_total if the computed
+    component contribution diffraction patterns include background
+    or normalization corrections (or both), and thus are specified
+    on the same scale as the observed intensities (_pd_meas.counts_*
+    or _pd_meas.intensity_*).
+
+    _pd_calc.component_intensities_* should be looped with
+    either _pd_proc.intensity_net, _pd_meas.counts_*, and/or
+    _pd_meas.intensity_*.
+;
+    _name.category_id             pd_calc
+    _name.object_id               component_intensities_total
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               List
+    _type.dimension               '[]'
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_calc.diffractogram_id
+
+    _definition.id                '_pd_calc.diffractogram_id'
+    _definition.update            2023-06-23
+    _description.text
+;
+    Label identifying the calculated diffractogram that the
+    calculated data belong to. This may be omitted in the usual
+    case that only one calculation is present in a data block.
+;
+    _name.category_id             pd_calc
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_data.diffractogram_id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_calc.intensity_bkg
+
+    _definition.id                '_pd_calc.intensity_bkg'
+    _definition.update            2025-06-21
+    _description.text
+;
+    Intensity values for the computed background of a
+    diffractogram at each data point. Values should be computed
+    at the same locations as the processed diffractogram, and
+    thus the numbers of points will be defined by
+    _pd_proc.number_of_points and point positions may
+    be defined using _pd_proc.2theta_range_* or
+    _pd_proc.2theta_corrected.
+
+    If the background is calculated in such a way that
+    s.u. values are available, prefer _pd_proc.intensity_bkg_calc.
+
+    See also PD_BACKGROUND.
+;
+    _name.category_id             pd_calc
+    _name.object_id               intensity_bkg
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_calc.intensity_net
+
+    _definition.id                '_pd_calc.intensity_net'
+    _alias.definition_id          '_pd_calc_intensity_net'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Intensity values for a computed diffractogram at
+    each data point. Values should be computed at the
+    same locations as the processed diffractogram, and thus
+    the numbers of points will be defined by
+    _pd_proc.number_of_points and point positions may
+    be defined using _pd_proc.2theta_range_* or
+    _pd_proc.2theta_corrected.
+
+    Use _pd_calc.intensity_net if the computed diffractogram
+    does not contain background or normalization corrections
+    and thus is specified on the same scale as the
+    _pd_proc.intensity_net values.
+
+    If an observed pattern is included, _pd_calc.intensity_*
+    should be looped with either _pd_proc.intensity_net,
+    _pd_meas.counts_* or _pd_meas.intensity_*.
+;
+    _name.category_id             pd_calc
+    _name.object_id               intensity_net
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+    _method.purpose               Evaluation
+    _method.expression
+;
+    t = 0
+    loop pcc as pd_calc_component {
+        t += pcc.intensity_net
+    }
+    pd_calc.intensity_net = t
+;
+
+save_
+
+save_pd_calc.intensity_total
+
+    _definition.id                '_pd_calc.intensity_total'
+    _alias.definition_id          '_pd_calc_intensity_total'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Intensity values for a computed diffractogram at
+    each data point. Values should be computed at the
+    same locations as the processed diffractogram, and thus
+    the numbers of points will be defined by
+    _pd_proc.number_of_points and point positions may
+    be defined using _pd_proc.2theta_range_* or
+    _pd_proc.2theta_corrected.
+
+    Use _pd_calc.intensity_total if the computed diffraction
+    pattern includes background or normalization corrections
+    (or both) and thus is specified on the same scale as the
+    observed intensities (_pd_meas.counts_* or _pd_meas.intensity_*).
+    If an observed pattern is included, _pd_calc.intensity_*
+    should be looped with either _pd_proc.intensity_net,
+    _pd_meas.counts_* or _pd_meas.intensity_*.
+;
+    _name.category_id             pd_calc
+    _name.object_id               intensity_total
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+    _method.purpose               Evaluation
+    _method.expression
+;
+    t = pd_calc.intensity_bkg
+    loop pcc as pd_calc_component {
+        t += pcc.intensity_total - pd_calc.intensity_bkg
+    }
+    pd_calc.intensity_total = t
+;
+
+save_
+
+save_pd_calc.point_id
+
+    _definition.id                '_pd_calc.point_id'
+    _alias.definition_id          '_pd_calc_point_id'
+    _definition.update            2025-06-19
+    _description.text
+;
+    Arbitrary label identifying a calculated data point.
+    Used to identify a specific entry in a loop of values forming the
+    calculated diffractogram.
+
+    Note that identical values of _pd_calc.point_id, _pd_meas.point_id, and
+    _pd_proc.point_id refer to the same point, and thus provide a way of
+    indicating that points in disparate loops are equivalent. The role of this
+    identifier should be adopted by _pd_data.point_id if measured, processed,
+    and/or calculated intensity values are combined in a single loop.
+;
+    _name.category_id             pd_calc
+    _name.object_id               point_id
+    _name.linked_item_id          '_pd_data.point_id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_PD_MEAS
+
+    _definition.id                PD_MEAS
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2025-04-18
+    _description.text
+;
+    This section contains the measured diffractogram prior to
+    processing and application of correction terms. While additional
+    information may be added to the CIF as data are processed and
+    transported between laboratories, the information in this section of
+    the CIF will rarely be changed once data collection is complete.
+
+    Where possible, measurements in this section should have no
+    post-collection processing applied (normalizations, corrections,
+    smoothing, zero-offset corrections etc.). Such corrected
+    measurements should be recorded in the PD_PROC section.
+
+    Data sets that are measured as counts, where a standard
+    uncertainty can be considered equivalent to the standard
+    deviation and where the standard deviation can be estimated
+    as the square root of the number of counts recorded, should
+    use the _pd_meas.counts_* fields. All other intensity values
+    should be recorded using _pd_meas.intensity_*.
+;
+    _name.category_id             PD_DATA
+    _name.object_id               PD_MEAS
+
+    loop_
+      _category_key.name
+         '_pd_meas.point_id'
+         '_pd_meas.diffractogram_id'
+
+save_
+
+save_pd_instr.dist_spec_vdetc
+
+    _definition.id                '_pd_instr.dist_spec_vdetc'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Distance from the specimen to the virtual detector (in millimetres).
+    The virtual detector is point in space at which the detector is
+    sampling the diffracted radiation from the point of view of the
+    specimen, e.g. the specimen-receiving slit distance in a point-detector,
+    Bragg-Brentano diffractometer. This distance is also referred to as
+    the 'secondary radius', or the 'diffracted beam radius'.
+
+    Where the specimen-detector distance is difficult to define, for example,
+    for a large, flat, area detector, the distance refers to the closest
+    approach of the detector to the specimen.
+
+    See the discussion on 'detector circle' or 'goniometer circle' in
+    International Tables Vol H, S2.1.4.1 for further information.
+;
+    _name.category_id             pd_meas
+    _name.object_id               dist_spec_vdetc
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   millimetres
+
+save_
+
+save_pd_instr.dist_vsrc_spec
+
+    _definition.id                '_pd_instr.dist_vsrc_spec'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Distance from the virtual source to the specimen (in millimetres).
+    The virtual source is point in space from which the incident radiation
+    can be said to be coming from the point of view of the specimen.
+    This distance is also referred to as the 'primary radius', or the
+    'incident beam radius'.
+
+    See the discussion on 'detector circle' or 'goniometer circle' in
+    International Tables Vol H, S2.1.4.1 for further information.
+;
+    _name.category_id             pd_meas
+    _name.object_id               dist_vsrc_spec
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   millimetres
+
+save_
+
+save_pd_instr.var_illum_len
+
+    _definition.id                '_pd_instr.var_illum_len'
+    _alias.definition_id          '_pd_instr_var_illum_len'
+    _definition.update            2016-10-20
+    _description.text
+;
+    Length of the specimen that is illuminated by the radiation
+    source (in millimetres) for instruments where
+    the illumination length varies with 2θ (fixed
+    divergence slits). The _pd_instr.var_illum_len
+    values should be included in the same loop as the
+    intensity measurements (_pd_meas.* items).
+
+    See _pd_instr.cons_illum_len for instruments where
+    the divergence slit is θ-compensated to yield a
+    constant illumination length.
+;
+    _name.category_id             pd_meas
+    _name.object_id               var_illum_len
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   millimetres
+
+save_
+
+save_pd_meas.2theta_scan
+
+    _definition.id                '_pd_meas.2theta_scan'
+
+    loop_
+      _alias.definition_id
+         '_pd_meas_2theta_scan'
+         '_pd_meas_angle_2theta'
+
+    _definition.update            2025-06-20
+    _description.text
+;
+    2θ diffraction angle (in degrees) for intensity
+    points measured in a scanning method. The scan method used
+    (e.g. continuous or step scan) should be specified in
+    the item _pd_meas.scan_method. For fixed 2θ (white-beam)
+    experiments, use _pd_meas.2theta_fixed. In the case of
+    continuous-scan data sets, the 2θ value should be the
+    value at the midpoint of the counting period. Associated
+    with each _pd_meas.2theta_scan value will be
+    _pd_meas.counts_* items. The 2θ values should
+    not be corrected for nonlinearity,
+    zero offset etc. Corrected values may be specified
+    using _pd_proc.2theta_corrected.
+
+    Note that for data sets collected with constant step size,
+    _pd_meas.2theta_range_* (min, max and inc) may be used
+    instead of _pd_meas.2theta_scan. _pd_meas_angle_2theta was
+    originally a distinct but cognate definition and should not be
+    used in new files.
+;
+    _name.category_id             pd_meas
+    _name.object_id               2theta_scan
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.2theta_scan_su
+
+    _definition.id                '_pd_meas.2theta_scan_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.2theta_scan.
+;
+    _name.category_id             pd_meas
+    _name.object_id               2theta_scan_su
+    _name.linked_item_id          '_pd_meas.2theta_scan'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.counts_background
+
+    _definition.id                '_pd_meas.counts_background'
+    _alias.definition_id          '_pd_meas_counts_background'
+    _definition.update            2022-12-30
+    _description.text
+;
+    Counts recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These counts are measured without
+    a specimen, specimen mounting etc., often referred to
+    as the instrument background.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead, make the
+    corrections and record the result using
+    _pd_proc.intensity_net, _norm, or _total, as appropriate,
+    for corrected diffractograms.
+
+    Note that counts-per-second values should be converted to
+    total counts. If the counting time varies for different
+    points, it may be included in the loop using
+    _pd_meas.step_count_time. A constant count time can be
+    recorded using _pd_meas_overall.step_count_time.
+
+    Standard uncertainties should not be quoted for these values.
+    If the standard uncertainties differ from the square root of
+    the number of counts, _pd_meas.intensity_* should be used.
+;
+    _name.category_id             pd_meas
+    _name.object_id               counts_background
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            0:
+    _units.code                   counts
+
+save_
+
+save_pd_meas.counts_container
+
+    _definition.id                '_pd_meas.counts_container'
+    _alias.definition_id          '_pd_meas_counts_container'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Counts recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These counts are measured from a
+    specimen container or mounting without a specimen, includes
+    background.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead use
+    _pd_proc.intensity_* for corrected diffractograms.
+
+    Note that counts-per-second values should be converted to
+    total counts. If the counting time varies for different
+    points, it may be included in the loop using
+    _pd_meas.step_count_time. A constant count time can be
+    recorded using _pd_meas_overall.step_count_time.
+
+    Standard uncertainties should not be quoted for these values.
+    If the standard uncertainties differ from the square root of
+    the number of counts, _pd_meas.intensity_* should be used.
+;
+    _name.category_id             pd_meas
+    _name.object_id               counts_container
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            0:
+    _units.code                   counts
+
+save_
+
+save_pd_meas.counts_monitor
+
+    _definition.id                '_pd_meas.counts_monitor'
+    _alias.definition_id          '_pd_meas_counts_monitor'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Counts recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These counts are measured by an
+    incident-beam monitor to calibrate the flux on the specimen.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead use
+    _pd_proc.intensity_* for corrected diffractograms.
+
+    Note that counts-per-second values should be converted to
+    total counts. If the counting time varies for different
+    points, it may be included in the loop using
+    _pd_meas.step_count_time. A constant count time can be
+    recorded using _pd_meas_overall.step_count_time.
+
+    Standard uncertainties should not be quoted for these values.
+    If the standard uncertainties differ from the square root of
+    the number of counts, _pd_meas.intensity_* should be used.
+;
+    _name.category_id             pd_meas
+    _name.object_id               counts_monitor
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            0:
+    _units.code                   counts
+
+save_
+
+save_pd_meas.counts_total
+
+    _definition.id                '_pd_meas.counts_total'
+    _alias.definition_id          '_pd_meas_counts_total'
+    _definition.update            2022-12-04
+    _description.text
+;
+    Counts recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These counts are measured from the
+    specimen with background, specimen mounting, and/or container
+    scattering included.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead use
+    _pd_proc.intensity_* for corrected diffractograms.
+
+    Note that counts-per-second values should be converted to
+    total counts. If the counting time varies for different
+    points, it may be included in the loop using
+    _pd_meas.step_count_time. A constant count time can be
+    recorded using _pd_meas_overall.step_count_time.
+
+    Standard uncertainties should not be quoted for these values.
+    If the standard uncertainties differ from the square root of
+    the number of counts, _pd_meas.intensity_* should be used.
+;
+    _name.category_id             pd_meas
+    _name.object_id               counts_total
+    _type.purpose                 Number
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            0:
+    _units.code                   counts
+
+save_
+
+save_pd_meas.detector_id
+
+    _definition.id                '_pd_meas.detector_id'
+    _alias.definition_id          '_pd_meas_detector_id'
+    _definition.update            2023-06-09
+    _description.text
+;
+    A code which identifies the detector or channel number in a
+    position-sensitive, energy-dispersive or other multiple-detector
+    instrument for which the individual instrument geometry is being
+    defined. This code should match the code name used for
+    _pd_instr_detector.id.
+
+    Calibration information, such as angle offsets or a calibration
+    function to convert channel numbers to Q, energy, wavelength,
+    angle etc. should be described using PD_CALIB_XCOORD and/or
+    PD_CALIBRATION data items. If _pd_calibration.conversion_eqn is
+    used, the detector IDs should be the number to be used in the
+    equation.
+;
+    _name.category_id             pd_meas
+    _name.object_id               detector_id
+    _name.linked_item_id          '_pd_instr_detector.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_pd_meas.diffractogram_id
+
+    _definition.id                '_pd_meas.diffractogram_id'
+    _definition.update            2023-06-23
+    _description.text
+;
+    Label identifying the diffraction measurement that the
+    data tabulated in the PD_MEAS category belong to. This
+    may be omitted in the usual case that only one diffraction
+    measurement is present in a data block.
+;
+    _name.category_id             pd_meas
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_data.diffractogram_id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_meas.intensity_background
+
+    _definition.id                '_pd_meas.intensity_background'
+    _alias.definition_id          '_pd_meas_intensity_background'
+    _definition.update            2022-12-30
+    _description.text
+;
+    Intensity recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These intensities are measured
+    without a specimen, specimen mounting etc., often
+    referred to as the instrument background.
+
+    Use these entries for measurements where intensity
+    values are not counts (use _pd_meas.counts_* for event-counting
+    measurements where the standard uncertainty is
+    estimated as the square root of the number of counts).
+
+    If the counting time varies for different points, it may
+    be included in the loop using _pd_meas.step_count_time.
+    A constant count time can be recorded using
+    _pd_meas_overall.step_count_time.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead, make the
+    corrections and record the result using
+    _pd_proc.intensity_net, _norm, or _total, as appropriate,
+    for corrected diffractograms.
+
+    _pd_meas.units_of_intensity should be used to specify
+    the units of the intensity measurements.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_background
+    _type.purpose                 Measurand
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_meas.intensity_background_su
+
+    _definition.id                '_pd_meas.intensity_background_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_meas.intensity_background.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_background_su
+    _name.linked_item_id          '_pd_meas.intensity_background'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.intensity_container
+
+    _definition.id                '_pd_meas.intensity_container'
+    _alias.definition_id          '_pd_meas_intensity_container'
+    _definition.update            2022-12-30
+    _description.text
+;
+    Intensity recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These intensities are measured from
+    the specimen container or mounting without a specimen, includes
+    background.
+
+    Use these entries for measurements where intensity
+    values are not counts (use _pd_meas.counts_* for event-counting
+    measurements where the standard uncertainty is
+    estimated as the square root of the number of counts).
+
+    If the counting time varies for different points, it may
+    be included in the loop using _pd_meas.step_count_time.
+    A constant count time can be recorded using
+    _pd_meas_overall.step_count_time.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead, make the
+    corrections and record the result using
+    _pd_proc.intensity_net, _norm, or _total, as appropriate,
+    for corrected diffractograms.
+
+    _pd_meas.units_of_intensity should be used to specify
+    the units of the intensity measurements.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_container
+    _type.purpose                 Measurand
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_meas.intensity_container_su
+
+    _definition.id                '_pd_meas.intensity_container_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_meas.intensity_container.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_container_su
+    _name.linked_item_id          '_pd_meas.intensity_container'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.intensity_monitor
+
+    _definition.id                '_pd_meas.intensity_monitor'
+    _alias.definition_id          '_pd_meas_intensity_monitor'
+    _definition.update            2023-01-18
+    _description.text
+;
+    Intensity recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These intensities are measured by an
+    incident-beam monitor to calibrate the flux on the specimen.
+    For a single value used to scale an entire diffractogram, see
+    _pd_calib_incident_intensity.incident_intensity.
+
+    Use these entries for measurements where intensity
+    values are not counts (use _pd_meas.counts_* for event-counting
+    measurements where the standard uncertainty is
+    estimated as the square root of the number of counts).
+
+    If the counting time varies for different points, it may
+    be included in the loop using _pd_meas.step_count_time.
+    A constant count time can be recorded using
+    _pd_meas_overall.step_count_time.
+
+    Corrections for background, detector dead time etc.
+    should not have been made to these values. Instead, make the
+    corrections and record the result using
+    _pd_proc.intensity_net, _norm, or _total, as appropriate,
+    for corrected diffractograms.
+
+    _pd_meas.units_of_intensity should be used to specify
+    the units of the intensity measurements.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_monitor
+    _type.purpose                 Measurand
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_meas.intensity_monitor_su
+
+    _definition.id                '_pd_meas.intensity_monitor_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_meas.intensity_monitor.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_monitor_su
+    _name.linked_item_id          '_pd_meas.intensity_monitor'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.intensity_total
+
+    _definition.id                '_pd_meas.intensity_total'
+    _alias.definition_id          '_pd_meas_intensity_total'
+    _definition.update            2022-12-30
+    _description.text
+;
+    Intensity recorded at each measurement point as a function of
+    angle, time, channel, or some other variable (see
+    _pd_meas.2theta_* etc.). These intensities are measured from
+    the specimen, with background, specimen mounting, and/or container
+    scattering included.
+
+    Use these entries for measurements where intensity
+    values are not counts (use _pd_meas.counts_* for event-counting
+    measurements where the standard uncertainty is
+    estimated as the square root of the number of counts).
+
+    If the counting time varies for different points, it may
+    be included in the loop using _pd_meas.step_count_time.
+    A constant count time can be recorded using
+    _pd_meas_overall.step_count_time.
+
+    Corrections for background, detector dead time etc.,
+    should not have been made to these values. Instead use
+    _pd_proc.intensity_* for corrected diffractograms.
+
+    _pd_meas.units_of_intensity should be used to specify
+    the units of the intensity measurements.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_total
+    _type.purpose                 Measurand
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_meas.intensity_total_su
+
+    _definition.id                '_pd_meas.intensity_total_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_meas.intensity_total.
+;
+    _name.category_id             pd_meas
+    _name.object_id               intensity_total_su
+    _name.linked_item_id          '_pd_meas.intensity_total'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.point_id
+
+    _definition.id                '_pd_meas.point_id'
+    _alias.definition_id          '_pd_meas_point_id'
+    _definition.update            2025-06-19
+    _description.text
+;
+    Arbitrary label identifying a measured data point.
+    Used to identify a specific entry in a loop of values forming the
+    measured diffractogram.
+
+    Note that identical values of _pd_calc.point_id, _pd_meas.point_id, and
+    _pd_proc.point_id refer to the same point, and thus provide a way of
+    indicating that points in disparate loops are equivalent. The role of this
+    identifier should be adopted by _pd_data.point_id if measured, processed,
+    and/or calculated intensity values are combined in a single loop.
+;
+    _name.category_id             pd_meas
+    _name.object_id               point_id
+    _name.linked_item_id          '_pd_data.point_id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_pd_meas.position
+
+    _definition.id                '_pd_meas.position'
+    _alias.definition_id          '_pd_meas_position'
+    _definition.update            2022-10-11
+    _description.text
+;
+    A linear distance in millimetres corresponding to the
+    location where an intensity measurement is made.
+    Used for detectors where a distance measurement is made
+    as a direct observable, such as from a microdensitometer
+    trace from film or a strip chart recorder. This is an
+    alternative to _pd_meas.2theta_scan, which should only be
+    used for instruments that record intensities directly
+    against 2θ. For instruments where the position scale
+    is nonlinear, the data item _pd_meas.detector_id should
+    be used to record positions.
+
+    Calibration information, such as angle offsets or a
+    function to convert this distance to a 2θ angle
+    or d-space, should be supplied with items from PD_CALIB.
+
+    Do not confuse this with the instrument geometry
+    descriptions given by _pd_instr.dist_*.
+;
+    _name.category_id             pd_meas
+    _name.object_id               position
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   millimetres
+
+save_
+
+save_pd_meas.position_su
+
+    _definition.id                '_pd_meas.position_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.position.
+;
+    _name.category_id             pd_meas
+    _name.object_id               position_su
+    _name.linked_item_id          '_pd_meas.position'
+    _units.code                   millimetres
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.step_count_time
+
+    _definition.id                '_pd_meas.step_count_time'
+    _alias.definition_id          '_pd_meas_step_count_time'
+    _definition.update            2025-06-22
+    _description.text
+;
+    The count time in seconds for each intensity measurement.
+
+    Use this item for measurements where the count time
+    varies for different points; where the step count time is
+    constant, prefer _pd_meas_overall.step_count_time.
+;
+    _name.category_id             pd_meas
+    _name.object_id               step_count_time
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   seconds
+
+save_
+
+save_pd_meas.step_count_time_su
+
+    _definition.id                '_pd_meas.step_count_time_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.step_count_time.
+;
+    _name.category_id             pd_meas
+    _name.object_id               step_count_time_su
+    _name.linked_item_id          '_pd_meas.step_count_time'
+    _units.code                   seconds
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.time_of_flight
+
+    _definition.id                '_pd_meas.time_of_flight'
+    _alias.definition_id          '_pd_meas_time_of_flight'
+    _definition.update            2023-01-06
+    _description.text
+;
+    Measured time in microseconds for time-of-flight neutron
+    measurements. Note that the flight distance may be
+    specified using _pd_instr.dist_* values.
+;
+    _name.category_id             pd_meas
+    _name.object_id               time_of_flight
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   microseconds
+
+save_
+
+save_pd_meas.time_of_flight_su
+
+    _definition.id                '_pd_meas.time_of_flight_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.time_of_flight.
+;
+    _name.category_id             pd_meas
+    _name.object_id               time_of_flight_su
+    _name.linked_item_id          '_pd_meas.time_of_flight'
+    _units.code                   microseconds
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_PD_PROC
+
+    _definition.id                PD_PROC
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2025-04-18
+    _description.text
+;
+    This section contains the diffraction data set after processing
+    and application of correction terms. If the data set is
+    reprocessed, this section may be replaced.
+;
+    _name.category_id             PD_DATA
+    _name.object_id               PD_PROC
+
+    loop_
+      _category_key.name
+         '_pd_proc.point_id'
+         '_pd_proc.diffractogram_id'
+
+save_
+
+save_pd_proc.2theta_corrected
+
+    _definition.id                '_pd_proc.2theta_corrected'
+    _alias.definition_id          '_pd_proc_2theta_corrected'
+    _definition.update            2022-10-11
+    _description.text
+;
+    The 2θ diffraction angle in degrees of an intensity
+    measurement where 2θ is not constant. Used if
+    corrections such as for nonlinearity, zero offset etc.
+    have been applied to the _pd_meas.2theta_* values or if
+    2θ values are computed. If the 2θ values
+    are evenly spaced, _pd_proc.2theta_range_min,
+    _pd_proc.2theta_range_max and _pd_proc.2theta_range_inc
+    may be used to specify the 2θ values.
+;
+    _name.category_id             pd_proc
+    _name.object_id               2theta_corrected
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:180.0
+    _units.code                   degrees
+
+save_
+
+save_pd_proc.2theta_corrected_su
+
+    _definition.id                '_pd_proc.2theta_corrected_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.2theta_corrected.
+;
+    _name.category_id             pd_proc
+    _name.object_id               2theta_corrected_su
+    _name.linked_item_id          '_pd_proc.2theta_corrected'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.d_spacing
+
+    _definition.id                '_pd_proc.d_spacing'
+    _alias.definition_id          '_pd_proc_d_spacing'
+    _definition.update            2022-10-11
+    _description.text
+;
+    d-spacing corresponding to an intensity point
+    from Bragg's law, d = λ/(2 sinθ), in units of angstroms.
+;
+    _name.category_id             pd_proc
+    _name.object_id               d_spacing
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   angstroms
+
+save_
+
+save_pd_proc.d_spacing_su
+
+    _definition.id                '_pd_proc.d_spacing_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.d_spacing.
+;
+    _name.category_id             pd_proc
+    _name.object_id               d_spacing_su
+    _name.linked_item_id          '_pd_proc.d_spacing'
+    _units.code                   angstroms
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.diffractogram_id
+
+    _definition.id                '_pd_proc.diffractogram_id'
+    _definition.update            2023-06-23
+    _description.text
+;
+    Label identifying the diffraction measurement that the
+    data tabulated in the PD_PROC category belong to. This
+    may be omitted in the usual case that only one diffraction
+    measurement is present in a data block.
+;
+    _name.category_id             pd_proc
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_data.diffractogram_id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_proc.energy_detection
+
+    _definition.id                '_pd_proc.energy_detection'
+    _alias.definition_id          '_pd_proc_energy_detection'
+    _definition.update            2022-10-11
+    _description.text
+;
+    Detection energy in electronvolts selected by the analyser,
+    if not the same as the incident energy (triple-axis or
+    energy-dispersive data). This may be a single value or may
+    vary for each data point (triple-axis and time-of-flight data).
+;
+    _name.category_id             pd_proc
+    _name.object_id               energy_detection
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   electron_volts
+
+save_
+
+save_pd_proc.energy_detection_su
+
+    _definition.id                '_pd_proc.energy_detection_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.energy_detection.
+;
+    _name.category_id             pd_proc
+    _name.object_id               energy_detection_su
+    _name.linked_item_id          '_pd_proc.energy_detection'
+    _units.code                   electron_volts
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.energy_incident
+
+    _definition.id                '_pd_proc.energy_incident'
+    _alias.definition_id          '_pd_proc_energy_incident'
+    _definition.update            2022-10-11
+    _description.text
+;
+    Incident energy in electronvolts of the source computed
+    from secondary calibration information (time-of-flight
+    and synchrotron data).
+;
+    _name.category_id             pd_proc
+    _name.object_id               energy_incident
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   electron_volts
+
+save_
+
+save_pd_proc.energy_incident_su
+
+    _definition.id                '_pd_proc.energy_incident_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.energy_incident.
+;
+    _name.category_id             pd_proc
+    _name.object_id               energy_incident_su
+    _name.linked_item_id          '_pd_proc.energy_incident'
+    _units.code                   electron_volts
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_bkg_calc
+
+    _definition.id                '_pd_proc.intensity_bkg_calc'
+    _alias.definition_id          '_pd_proc_intensity_bkg_calc'
+    _definition.update            2025-06-21
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    _pd_proc.intensity_bkg_calc is intended to contain the
+    background intensity for every data point where the
+    background function has been fitted or estimated (for example, in
+    all Rietveld and profile fits) where the background
+    values have an asssociated s.u..
+
+    If there is no s.u. value, prefer _pd_calc.intensity_bkg.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_bkg_calc
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_bkg_calc_su
+
+    _definition.id                '_pd_proc.intensity_bkg_calc_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_bkg_calc.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_bkg_calc_su
+    _name.linked_item_id          '_pd_proc.intensity_bkg_calc'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_bkg_fix
+
+    _definition.id                '_pd_proc.intensity_bkg_fix'
+    _alias.definition_id          '_pd_proc_intensity_bkg_fix'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    If the background is estimated for a limited number of points
+    and the calculated background is then extrapolated from
+    these fixed points, indicate the background values for
+    these points with _pd_proc.intensity_bkg_fix. Use a value
+    of '.' for data points where a fixed background has not
+    been defined. The extrapolated background at every point
+    may be specified using _pd_proc.intensity_bkg_calc.
+    See also _pd_calc.intensity_bkg.
+
+    Background values should be on the same scale as the
+    _pd_proc.intensity_net values. Thus normalization and
+    correction factors should be applied before
+    background subtraction (or should be applied to the
+    background values equally).
+
+    The other normalization factors applied to the data set (for
+    example, Lp corrections, compensation for variation in
+    counting time) may be specified in _pd_proc.intensity_norm.
+    The function should be specified as the one used to divide the
+    measured intensities.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_bkg_fix
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_bkg_fix_su
+
+    _definition.id                '_pd_proc.intensity_bkg_fix_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_bkg_fix.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_bkg_fix_su
+    _name.linked_item_id          '_pd_proc.intensity_bkg_fix'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_incident
+
+    _definition.id                '_pd_proc.intensity_incident'
+    _alias.definition_id          '_pd_proc_intensity_incident'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    If the intensities have been corrected for a variation of the
+    incident intensity as a function of a data-collection
+    variable (examples: source fluctuations in synchrotrons,
+    θ-compensated slits in conventional diffractometers,
+    spectral corrections for white-beam experiments), the
+    correction function should be specified as
+    _pd_proc.intensity_incident. The normalization should be
+    specified in _pd_proc.intensity_incident as a value to be
+    used to divide the measured intensities to obtain the
+    normalised diffractogram. Thus, the
+    _pd_proc.intensity_incident values should increase as the
+    incident flux is increased.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_incident
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_incident_su
+
+    _definition.id                '_pd_proc.intensity_incident_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_incident.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_incident_su
+    _name.linked_item_id          '_pd_proc.intensity_incident'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_net
+
+    _definition.id                '_pd_proc.intensity_net'
+    _alias.definition_id          '_pd_proc_intensity_net'
+    _definition.update            2022-12-30
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    Intensity values for the processed diffractogram for
+    each data point (see _pd_proc.2theta_*, _pd_proc.wavelength
+    etc.) after background subtraction, normalization, and other
+    correction factors have been applied (in contrast to
+    _pd_meas.counts_* or _pd_meas.intensity_* values, which are
+    uncorrected).
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_net
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_net_su
+
+    _definition.id                '_pd_proc.intensity_net_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_net.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_net_su
+    _name.linked_item_id          '_pd_proc.intensity_net'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_norm
+
+    _definition.id                '_pd_proc.intensity_norm'
+    _alias.definition_id          '_pd_proc_intensity_norm'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    Values in this data item are normalisation-corrected and contain
+    a background component.
+
+    Background values (for example, given by _pd_proc.intensity_bkg_calc,
+    or _pd_calc.intensity_bkg) should be on the same scale as the
+    _pd_proc.intensity_net values. Thus normalization and correction
+    factors should be applied before background subtraction (or should be
+    applied to the background values equally).
+
+    Normalization factors applied to the data set (for
+    example, Lp corrections, compensation for variation in
+    counting time) may be specified in _pd_proc.intensity_norm.
+    The function should be specified as the one used to divide the
+    measured intensities.
+
+    Note that if the intensities have been corrected for a variation
+    of the incident intensity as a function of a data-collection
+    variable, the correction function should be specified separately
+    as _pd_proc.intensity_incident.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_norm
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_norm_su
+
+    _definition.id                '_pd_proc.intensity_norm_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_norm.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_norm_su
+    _name.linked_item_id          '_pd_proc.intensity_norm'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.intensity_total
+
+    _definition.id                '_pd_proc.intensity_total'
+    _alias.definition_id          '_pd_proc_intensity_total'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Inclusion of s.u.'s for these values is strongly recommended.
+
+    Intensity values for the processed diffractogram at each data
+    point as a function of angle, time, channel, or some other
+    variable (see _pd_meas.2theta_* etc.), where background, normalization,
+    or other corrections have not been applied.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_total
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.intensity_total_su
+
+    _definition.id                '_pd_proc.intensity_total_su'
+    _definition.update            2022-09-28
+    _description.text
+;
+    Standard uncertainty of _pd_proc.intensity_total.
+;
+    _name.category_id             pd_proc
+    _name.object_id               intensity_total_su
+    _name.linked_item_id          '_pd_proc.intensity_total'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.ls_weight
+
+    _definition.id                '_pd_proc.ls_weight'
+    _alias.definition_id          '_pd_proc_ls_weight'
+    _definition.update            2023-07-05
+    _description.text
+;
+    Weight applied to each profile point. These values
+    may be omitted if the weights are 1/u^2^, where
+    u is the s.u. for the _pd_proc.intensity_net values.
+
+    A weight value of zero is used to indicate a data
+    point not used for refinement (see
+    _pd_proc.info_excluded_regions).
+;
+    _name.category_id             pd_proc
+    _name.object_id               ls_weight
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_proc.point_id
+
+    _definition.id                '_pd_proc.point_id'
+    _alias.definition_id          '_pd_proc_point_id'
+    _definition.update            2025-06-19
+    _description.text
+;
+    Arbitrary label identifying a processed data point.
+    Used to identify a specific entry in a loop of values forming the
+    processed diffractogram.
+
+    Note that identical values of _pd_calc.point_id, _pd_meas.point_id, and
+    _pd_proc.point_id refer to the same point, and thus provide a way of
+    indicating that points in disparate loops are equivalent. The role of this
+    identifier should be adopted by _pd_data.point_id if measured, processed,
+    and/or calculated intensity values are combined in a single loop.
+;
+    _name.category_id             pd_proc
+    _name.object_id               point_id
+    _name.linked_item_id          '_pd_data.point_id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_pd_proc.recip_len_q
+
+    _definition.id                '_pd_proc.recip_len_Q'
+    _alias.definition_id          '_pd_proc_recip_len_Q'
+    _definition.update            2022-10-11
+    _description.text
+;
+    Length in reciprocal space (|Q|= 2π/d) corresponding to
+    an intensity point. Units are inverse angstroms.
+;
+    _name.category_id             pd_proc
+    _name.object_id               recip_len_Q
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   reciprocal_angstroms
+
+save_
+
+save_pd_proc.recip_len_q_su
+
+    _definition.id                '_pd_proc.recip_len_Q_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.recip_len_Q.
+;
+    _name.category_id             pd_proc
+    _name.object_id               recip_len_Q_su
+    _name.linked_item_id          '_pd_proc.recip_len_Q'
+    _units.code                   reciprocal_angstroms
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_proc.wavelength
+
+    _definition.id                '_pd_proc.wavelength'
+    _alias.definition_id          '_pd_proc_wavelength'
+    _definition.update            2023-01-22
+    _description.text
+;
+    Wavelength in angstroms for the incident radiation as
+    computed from secondary calibration information. This will
+    be most appropriate for measurements where the wavelength varies
+    for each data point and must be looped with the intensity values,
+    such as time-of-flight, or energy-dispersive measurements.
+
+    For measurements where the incident radiation can be considered to
+    be monochromatic and has been estimated or refined, for instance,
+    from instrumental parameters or a reference material, please record
+    the wavelength with _diffrn_radiation_wavelength.value and
+    _diffrn_radiation_wavelength.determination.
+;
+    _name.category_id             pd_proc
+    _name.object_id               wavelength
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   angstroms
+
+save_
+
+save_pd_proc.wavelength_su
+
+    _definition.id                '_pd_proc.wavelength_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_proc.wavelength.
+;
+    _name.category_id             pd_proc
+    _name.object_id               wavelength_su
+    _name.linked_item_id          '_pd_proc.wavelength'
+    _units.code                   angstroms
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_PD_DIFFRACTOGRAM
+
+    _definition.id                PD_DIFFRACTOGRAM
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2025-06-23
+    _description.text
+;
+    This category includes data names relating to a diffractogram
+    as a whole.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_DIFFRACTOGRAM
+    _category_key.name            '_pd_diffractogram.id'
+    _description_example.case
+;
+         _diffrn.id                    'high temperature iron ore'
+         _diffrn.ambient_temperature   1273
+         _diffrn.ambient_pressure      101.3
+
+         _pd_instr.id                       "Lab machine 1"
+         _pd_instr.geometry                 Bragg-Brentano
+         _pd_instr.detector_circle_radius   117.5
+
+         _pd_spec.id            ABC123_03
+         _pd_spec.prep_id       ABC123_main
+         _pd_spec.description   'Iron ore from FeOre Inc. ID number ABC123'
+         _pd_spec.mount_mode    reflection
+
+         _pd_diffractogram.id          5d30dab0-3840-48e6-9dbd-3ea09c67217f
+         _pd_diffractogram.diffrn_id   "high temperature iron ore"
+         _pd_diffractogram.instr_id    "Lab machine 1"
+         _pd_diffractogram.spec_id     ABC123_03
+
+         loop_
+            _pd_meas.2theta_scan
+            _pd_proc.intensity_total
+            _pd_proc.ls_weight
+            _pd_calc.intensity_total
+            _pd_proc.intensity_bkg_calc
+            5.01   43.364   0.0402   25.994961    25.994961
+            5.04   38.007   0.0505   26.200290    26.200290
+            5.07   38.318   0.0465   26.404083    26.404083
+            5.10   41.877   0.0452   26.606346    26.606346
+            #...
+;
+    _description_example.detail
+;
+         A set of diffraction conditions, instrument settings, and specimen
+         information, are detailed with their respective id values.
+         A diffractogram is defined with a UUID, and then linked to those
+         diffraction conditions, instrument settings, and specimen information
+         through the relevant _pd_diffractogram.* data names. This says that
+         the diffractogram was collected under those conditions, with that
+         instrument, and that specimen.
+;
+
+save_
+
+save_pd_diffractogram.diffrn_id
+
+    _definition.id                '_pd_diffractogram.diffrn_id'
+    _definition.update            2023-10-16
+    _description.text
+;
+    A code which identifies the diffraction conditions under which this
+    diffractogram was collected.
+;
+    _name.category_id             pd_diffractogram
+    _name.object_id               diffrn_id
+    _name.linked_item_id          '_diffrn.id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Word
+
+save_
+
+save_pd_diffractogram.id
+
+    _definition.id                '_pd_diffractogram.id'
+    _definition.update            2025-04-18
+    _description.text
+;
+    Arbitrary label identifying a powder diffraction measurement.
+;
+    _name.category_id             pd_diffractogram
+    _name.object_id               id
+    _type.purpose                 Key
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+
+    loop_
+      _description_example.case
+         '1991-15-09T16:54:00Z|SEPD7234|B.Toby|SEPD.IPNS.ANL.GOV'
+         '76d675f5-9f0b-4bd9-8be3-1266edf74908'
+         'DIFFRACTOGRAM Z2'
+         'Insitu_pattern_0123'
+         'Synthesis number 1'
+         'white_030e391f'
+
+save_
+
+save_pd_diffractogram.instr_id
+
+    _definition.id                '_pd_diffractogram.instr_id'
+    _definition.update            2025-06-20
+    _description.text
+;
+    The instrument (see _pd_instr.id) with which the diffractogram was
+    collected.
+;
+    _name.category_id             pd_diffractogram
+    _name.object_id               instr_id
+    _name.linked_item_id          '_pd_instr.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_diffractogram.spec_id
+
+    _definition.id                '_pd_diffractogram.spec_id'
+    _definition.update            2023-03-25
+    _description.text
+;
+    The specimen (see _pd_spec.id) from which the diffractogram was collected.
+;
+    _name.category_id             pd_diffractogram
+    _name.object_id               spec_id
+    _name.linked_item_id          '_pd_spec.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_PD_MEAS_OVERALL
+
+    _definition.id                PD_MEAS_OVERALL
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2025-04-18
+    _description.text
+;
+    This section contains information about the conditions used for
+    the measurement of the diffraction data set, prior to processing
+    and application of correction terms. While additional
+    information may be added to the CIF as data are processed and
+    transported between laboratories, the information in this section of
+    the CIF will rarely be changed once data collection is complete.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_MEAS_OVERALL
+    _category_key.name            '_pd_meas_overall.diffractogram_id'
+
+save_
+
+save_pd_meas.2theta_fixed
+
+    _definition.id                '_pd_meas.2theta_fixed'
+    _alias.definition_id          '_pd_meas_2theta_fixed'
+    _definition.update            2022-10-11
+    _description.text
+;
+    The 2θ diffraction angle in degrees for measurements
+    in a white-beam fixed-angle experiment. For measurements
+    where 2θ is scanned, see _pd_meas.2theta_scan or
+    _pd_meas.2theta_range_*.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               2theta_fixed
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.2theta_fixed_su
+
+    _definition.id                '_pd_meas.2theta_fixed_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.2theta_fixed.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               2theta_fixed_su
+    _name.linked_item_id          '_pd_meas.2theta_fixed'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.2theta_range_inc
+
+    _definition.id                '_pd_meas.2theta_range_inc'
+    _alias.definition_id          '_pd_meas_2theta_range_inc'
+    _definition.update            2022-09-28
+    _description.text
+;
+    2θ diffraction angle increment in degrees used for the
+    measurement of intensities. These may be used in place of the
+    _pd_meas.2theta_scan values for data sets measured with a
+    constant step size.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               2theta_range_inc
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.2theta_range_max
+
+    _definition.id                '_pd_meas.2theta_range_max'
+    _alias.definition_id          '_pd_meas_2theta_range_max'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Maximum 2θ diffraction angle in degrees used for the
+    measurement of intensities. These may be used in place of the
+    _pd_meas.2theta_scan values for data sets measured with a
+    constant step size.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               2theta_range_max
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.2theta_range_min
+
+    _definition.id                '_pd_meas.2theta_range_min'
+    _alias.definition_id          '_pd_meas_2theta_range_min'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Minimum 2θ diffraction angle in degrees used for the
+    measurement of intensities. These may be used in place of the
+    _pd_meas.2theta_scan values for data sets measured with a
+    constant step size.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               2theta_range_min
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.angle_chi
+
+    _definition.id                '_pd_meas.angle_chi'
+    _alias.definition_id          '_pd_meas_angle_chi'
+    _definition.update            2022-10-11
+    _description.text
+;
+    The diffractometer angle in degrees for an instrument with an
+    Euler circle. The definitions for these angles follow the
+    convention of International Tables for X-ray Crystallography
+    (1974), Vol. IV, p. 276.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_chi
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.angle_chi_su
+
+    _definition.id                '_pd_meas.angle_chi_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.angle_chi.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_chi_su
+    _name.linked_item_id          '_pd_meas.angle_chi'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.angle_omega
+
+    _definition.id                '_pd_meas.angle_omega'
+    _alias.definition_id          '_pd_meas_angle_omega'
+    _definition.update            2022-10-11
+    _description.text
+;
+    The diffractometer angle in degrees for an instrument with an
+    Euler circle. The definitions for these angles follow the
+    convention of International Tables for X-ray Crystallography
+    (1974), Vol. IV, p. 276.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_omega
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.angle_omega_su
+
+    _definition.id                '_pd_meas.angle_omega_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.angle_omega.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_omega_su
+    _name.linked_item_id          '_pd_meas.angle_omega'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.angle_phi
+
+    _definition.id                '_pd_meas.angle_phi'
+    _alias.definition_id          '_pd_meas_angle_phi'
+    _definition.update            2022-10-11
+    _description.text
+;
+    The diffractometer angle in degrees for an instrument with an
+    Euler circle. The definitions for these angles follow the
+    convention of International Tables for X-ray Crystallography
+    (1974), Vol. IV, p. 276.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_phi
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.angle_phi_su
+
+    _definition.id                '_pd_meas.angle_phi_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.angle_phi.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               angle_phi_su
+    _name.linked_item_id          '_pd_meas.angle_phi'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.datetime_initiated
+
+    _definition.id                '_pd_meas.datetime_initiated'
+    _alias.definition_id          '_pd_meas_datetime_initiated'
+    _definition.update            2022-09-30
+    _description.text
+;
+    The date and time of the data-set measurement.
+    Entries should follow the standard RFC 3339 ABNF format
+    'yyyy-mm-ddThh:mm:ss{Z|[+-]zz:zz}'. Where possible, give
+    the time when the measurement was started, rather than
+    when it was completed.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               datetime_initiated
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                DateTime
+
+    loop_
+      _description_example.case
+         1990-07-13T14:40:00Z
+         2042-12-13T02:37:23Z
+         2005-03-03T12:02:09.17+09:30
+         2015-10-30T22:45:00-02:00
+         1912-02-03T11:47:00Z
+         1979-09-01T12:00:00Z
+
+save_
+
+save_pd_meas.number_of_points
+
+    _definition.id                '_pd_meas.number_of_points'
+    _alias.definition_id          '_pd_meas_number_of_points'
+    _definition.update            2019-09-25
+    _description.text
+;
+    Total number of points in the measured diffractogram.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               number_of_points
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            1:
+    _units.code                   none
+
+save_
+
+save_pd_meas.rocking_angle
+
+    _definition.id                '_pd_meas.rocking_angle'
+    _alias.definition_id          '_pd_meas_rocking_angle'
+    _definition.update            2023-07-05
+    _description.text
+;
+    The total angular range, in degrees, through which a specimen is rotated or
+    oscillated during a measurement step (see _pd_meas.rocking_axis).
+
+    Where the rocking axis aligns with a measurement axis, and the rotation
+    range relates to the point being measured, the total angular range is
+    assumed to be centred on the measurement point.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               rocking_angle
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:360.0
+    _units.code                   degrees
+
+save_
+
+save_pd_meas.rocking_angle_su
+
+    _definition.id                '_pd_meas.rocking_angle_su'
+    _definition.update            2022-10-27
+    _description.text
+;
+    Standard uncertainty of _pd_meas.rocking_angle.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               rocking_angle_su
+    _name.linked_item_id          '_pd_meas.rocking_angle'
+    _units.code                   degrees
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_meas.rocking_axis
+
+    _definition.id                '_pd_meas.rocking_axis'
+    _alias.definition_id          '_pd_meas_rocking_axis'
+    _definition.update            2014-06-20
+    _description.text
+;
+    The axis (or axes) used to rotate or rock the
+    specimen for better randomization of crystallites
+    (see _pd_meas.rocking_angle).
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               rocking_axis
+    _type.purpose                 State
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+    loop_
+      _enumeration_set.state
+         chi
+         omega
+         phi
+
+save_
+
+save_pd_meas.scan_method
+
+    _definition.id                '_pd_meas.scan_method'
+    _alias.definition_id          '_pd_meas_scan_method'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Code identifying the method for scanning reciprocal space.
+    The designation `fixed' should be used for measurements where
+    film, a stationary position-sensitive or area detector
+    or other non-moving detection mechanism is used to
+    measure diffraction intensities.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               scan_method
+    _type.purpose                 State
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+    loop_
+      _enumeration_set.state
+      _enumeration_set.detail
+         step                     'Step scan.'
+         cont                     'Continuous scan.'
+         tof                      'Time of flight.'
+         disp                     'Energy dispersive.'
+         fixed                    'Stationary detector.'
+
+save_
+
+save_pd_meas.special_details
+
+    _definition.id                '_pd_meas.special_details'
+    _alias.definition_id          '_pd_meas_special_details'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Special details of the diffraction measurement process.
+    Include information about source instability, degradation etc.
+    However, this item should not be used to record information
+    that can be specified in other PD_MEAS entries.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               special_details
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_meas.units_of_intensity
+
+    _definition.id                '_pd_meas.units_of_intensity'
+    _alias.definition_id          '_pd_meas_units_of_intensity'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Units for intensity measurements when _pd_meas.intensity_*
+    is used. Note that use of 'counts' or 'counts per second'
+    here is strongly discouraged: convert the intensity
+    measurements to counts and use _pd_meas.counts_* and
+    _pd_meas.step_count_time instead of _pd_meas.intensity_*.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               units_of_intensity
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+    loop_
+      _description_example.case
+         'estimated from strip chart'
+         'arbitrary, from film density'
+         'counts, with automatic dead-time correction applied'
+
+save_
+
+save_pd_meas_overall.diffractogram_id
+
+    _definition.id                '_pd_meas_overall.diffractogram_id'
+    _definition.update            2023-01-12
+    _description.text
+;
+    The diffractogram (see _pd_diffractogram.id) to which the measurement
+    conditions relate.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_meas_overall.step_count_time
+
+    _definition.id                '_pd_meas_overall.step_count_time'
+    _definition.update            2025-06-22
+    _description.text
+;
+    The count time in seconds for each intensity measurement where
+    the count time is constant for each step in the diffractogram.
+
+    Where the step count time is not constant for each point, use
+    _pd_meas.step_count_time.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               step_count_time
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   seconds
+
+save_
+
+save_pd_meas_overall.step_count_time_su
+
+    _definition.id                '_pd_meas_overall.step_count_time_su'
+    _definition.update            2025-06-22
+    _description.text
+;
+    Standard uncertainty of _pd_meas_overall.step_count_time.
+;
+    _name.category_id             pd_meas_overall
+    _name.object_id               step_count_time_su
+    _name.linked_item_id          '_pd_meas_overall.step_count_time'
+    _units.code                   seconds
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_PD_PHASE_MASS
+
+    _definition.id                PD_PHASE_MASS
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2022-12-03
+    _description.text
+;
+    This category describes the percent composition by mass of
+    phases in a specimen. Values are derived from modelling a
+    particular diffraction measurement on a specimen and should
+    not be used where the mass composition has been determined
+    by other means.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PHASE_MASS
+
+    loop_
+      _category_key.name
+         '_pd_phase_mass.diffractogram_id'
+         '_pd_phase_mass.phase_id'
+
+    loop_
+      _description_example.case
+      _description_example.detail
+;
+         _audit.schema         Custom
+         _pd_diffractogram.id  A_DIFFRACTOGRAM
+
+         loop_
+         _pd_phase_mass.phase_id
+         _pd_phase_mass.percent
+         _pd_phase_mass.percent_su
+         PHASE_1   45.45   0.42
+         PHASE_2   37.42   0.63
+         PHASE_3   17.13   0.53
+;
+;
+         Tabulation of quantitative phase analysis data. The relative phase
+         masses, expressed as percentages of the entire specimen, are given
+         along with their associated standard uncertainties. The values are
+         associated with one diffractogram and three phases.
+
+         Blocks containing information about more than one phase or
+         diffractogram must set a non-default value for _audit.schema.
+;
+
+;
+         _audit.schema         Custom
+
+         _pd_diffractogram.id  ANOTHER_DIFFRACTOGRAM
+
+         _pd_qpa_internal_std.mass_percent    25.000
+         _pd_qpa_internal_std.phase_id        PHASE_2
+
+         loop_
+         _pd_phase_mass.phase_id
+         _pd_phase_mass.percent
+         _pd_phase_mass.absolute
+         _pd_phase_mass.original
+         PHASE_1   45.45   30.36   40.49
+         PHASE_2   37.42   25.00    0
+         PHASE_3   17.13   11.44   15.26
+;
+;
+         Tabulation of quantitative phase analysis data.
+
+         The relative phase masses are given by _pd_phase_mass.percent, and as
+         we know that PHASE_2 is an internal standard, we can also
+         calculate the absolute mass percentages in the specimen, given by
+         _pd_phase_mass.absolute. We can then calculate the original mass
+         percentages, those present in the sample before adding the internal
+         standard, given by _pd_phase_mass.original.
+
+         Blocks containing information about more than one phase or
+         diffractogram must set a non-default value for _audit.schema.
+;
+
+save_
+
+save_pd_phase_mass.absolute
+
+    _definition.id                '_pd_phase_mass.absolute'
+    _definition.update            2025-06-17
+    _description.text
+;
+    Total mass of a phase expressed as a percentage of the total
+    mass of the specimen.
+
+    That is, _pd_phase_mass.absolute represents a mass percentage of the
+    analysed phase after some internal standard, external standard, or
+    other calibration has been applied to the data to account for the
+    presence of amorphous or other unanalysed phases.
+
+    If absolute quantification was obtained using other than an internal
+    standard, the value of _pd_phase_mass.absolute is the same as
+    _pd_phase_mass.original.
+
+    The value of _pd_phase_mass.absolute given to any internal standard phase
+    represents the total crystalline contribution of that standard.
+    That is, if 1 g of a 90% crystalline internal standard was added
+    to 3 g of sample, the value of _pd_phase_mass.absolute for the
+    standard phase is 22.5 wt%.
+
+    See also _pd_phase_mass.original.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               absolute
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:100.0
+    _units.code                   none
+
+save_
+
+save_pd_phase_mass.absolute_su
+
+    _definition.id                '_pd_phase_mass.absolute_su'
+    _definition.update            2025-06-17
+    _description.text
+;
+    Standard uncertainty of _pd_phase_mass.absolute.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               absolute_su
+    _name.linked_item_id          '_pd_phase_mass.absolute'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_phase_mass.diffractogram_id
+
+    _definition.id                '_pd_phase_mass.diffractogram_id'
+    _definition.update            2022-12-03
+    _description.text
+;
+    A diffractogram id to which the phase mass percent value
+    relates.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_phase_mass.original
+
+    _definition.id                '_pd_phase_mass.original'
+    _definition.update            2025-06-17
+    _description.text
+;
+    Total mass of the phase expressed as a percentage of the total
+    mass of the specimen, ignoring the presence of an internal
+    standard.
+
+    That is, _pd_phase_mass.original represents an absolute mass percentage
+    of the analysed phase after an internal standard has been
+    applied to the data to account for the presence of amorphous or other
+    unanalysed phases, but then scaled to remove the internal standard, which
+    wasn't present in the original specimen.
+
+    The value of _pd_phase_mass.original given to any internal standard phase
+    is necessarily 0 wt%.
+
+    If absolute quantification was obtained using other than an internal
+    standard, the value of _pd_phase_mass.original is the same as
+    _pd_phase_mass.absolute.
+
+    See also _pd_phase_mass.absolute.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               original
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:100.0
+    _units.code                   none
+
+save_
+
+save_pd_phase_mass.original_su
+
+    _definition.id                '_pd_phase_mass.original_su'
+    _definition.update            2025-06-17
+    _description.text
+;
+    Standard uncertainty of _pd_phase_mass.original.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               original_su
+    _name.linked_item_id          '_pd_phase_mass.original'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_phase_mass.percent
+
+    _definition.id                '_pd_phase_mass.percent'
+    _alias.definition_id          '_pd_phase_mass_%'
+    _definition.update            2025-06-17
+    _description.text
+;
+    Total mass of the phase expressed as a percentage of the total
+    crystalline mass of the specimen. That is, _pd_phase_mass.percent
+    represents a relative mass percentage of the analysed phase.
+
+    These values ignore the presence of amorphous or other unanalysed
+    phases in the specimen.
+
+    For absolute mass percentages, see _pd_phase_mass.absolute
+    and _pd_phase_mass.original.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               percent
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:100.0
+    _units.code                   none
+
+save_
+
+save_pd_phase_mass.percent_su
+
+    _definition.id                '_pd_phase_mass.percent_su'
+    _definition.update            2022-12-03
+    _description.text
+;
+    Standard uncertainty of _pd_phase_mass.percent.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               percent_su
+    _name.linked_item_id          '_pd_phase_mass.percent'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_phase_mass.phase_id
+
+    _definition.id                '_pd_phase_mass.phase_id'
+    _definition.update            2022-12-03
+    _description.text
+;
+    The phase (see _pd_phase.id) to which the percent mass relates.
+;
+    _name.category_id             pd_phase_mass
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_PD_PREF_ORIENT
+
+    _definition.id                PD_PREF_ORIENT
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2023-01-12
+    _description.text
+;
+    This section contains a description of preferred-orientation
+    corrections applied to a phase when modelling its contribution
+    to a histogram.
+
+    March-Dollase and spherical harmonics corrections can be given explicitly.
+    For other methods, use the _pd_pref_orient.special_details.
+
+    See Dollase, W. A. (1986). J. Appl. Cryst. 19, 267-272 and
+    Jarvinen, M. (1993). J. Appl. Cryst. 26, 525-531 for
+    further information.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PREF_ORIENT
+
+    loop_
+      _category_key.name
+         '_pd_pref_orient.diffractogram_id'
+         '_pd_pref_orient.phase_id'
+
+save_
+
+save_pd_pref_orient.diffractogram_id
+
+    _definition.id                '_pd_pref_orient.diffractogram_id'
+    _definition.update            2023-01-12
+    _description.text
+;
+    The diffractogram (see _pd_diffractogram.id) to which the preferred-
+    orientation correction relates.
+;
+    _name.category_id             pd_pref_orient
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient.phase_id
+
+    _definition.id                '_pd_pref_orient.phase_id'
+    _definition.update            2023-01-12
+    _description.text
+;
+    The phase (see _pd_phase.id) to which the preferred-orientation
+    correction relates.
+;
+    _name.category_id             pd_pref_orient
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient.special_details
+
+    _definition.id                '_pd_pref_orient.special_details'
+    _definition.update            2023-01-06
+    _description.text
+;
+    Description of the preferred-orientation correction if
+    such a correction is used, and it cannot be described
+    as a March-Dollase or spherical harmonics correction.
+
+    or
+
+    Additional information relevant to non-routine steps
+    used in the application of a preferred-orientation model
+    that cannot be specified elsewhere.
+
+    If the correction can be described as a March-Dollase
+    or spherical harmonics correction, use
+    _pd_pref_orient_March_Dollase.* or
+    _pd_pref_orient_spherical_harmonics.*, as
+    appropriate.
+
+    Omitting _pd_pref_orient* implies that no preferred-
+    orientation correction has been used. If a non-standard
+    function form is used, it is recommended that the actual
+    equation in TeX, or a programming language, is used to
+    specify the function as well as a giving a description.
+    Include the value(s) used for the correction with s.u.'s.
+;
+    _name.category_id             pd_pref_orient
+    _name.object_id               special_details
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_PD_PREF_ORIENT_MARCH_DOLLASE
+
+    _definition.id                PD_PREF_ORIENT_MARCH_DOLLASE
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2023-01-06
+    _description.text
+;
+    This section contains a description of March-Dollase
+    preferred-orientation corrections applied to a phase
+    when modelling its contribution to a histogram.
+
+    For spherical harmonics corrections, see
+    PD_PREF_ORIENT_SPHERICAL_HARMONICS. For other methods,
+    use _pd_pref_orient.special_details.
+
+    See Dollase, W. A. (1986). J. Appl. Cryst. 19, 267-272 for
+    further information.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PREF_ORIENT_MARCH_DOLLASE
+
+    loop_
+      _category_key.name
+         '_pd_pref_orient_March_Dollase.diffractogram_id'
+         '_pd_pref_orient_March_Dollase.id'
+         '_pd_pref_orient_March_Dollase.phase_id'
+
+    loop_
+      _description_example.case
+      _description_example.detail
+;
+         _audit.schema                Custom
+
+         loop_
+         _pd_pref_orient_March_Dollase.id
+         _pd_pref_orient_March_Dollase.diffractogram_id
+         _pd_pref_orient_March_Dollase.phase_id
+         _pd_pref_orient_March_Dollase.hkl
+         _pd_pref_orient_March_Dollase.fract
+         _pd_pref_orient_March_Dollase.fract_su
+         1   DIFFPAT_1   PHASE_1   [1 0 4]   0.79   0.12
+         2   DIFFPAT_1   PHASE_2   [0 0 1]   0.66   0.15
+;
+;
+         Showing a fully qualified reporting of the preferred-orientation
+         corrections for a phase with a _pd_phase.id of 'PHASE_1' a phase
+         with a _pd_phase.id of 'PHASE_2', both belonging to a diffractogram
+         with a _pd_diffractogram.id of 'DIFFPAT_1.
+
+         The first phase has the preferred-orientation direction of 104, with a
+         March r parameter value of 0.79 with a standard uncertainty of 0.12.
+
+         The second phase has the preferred-orientation direction of 001, with a
+         March r parameter value of 0.66 with a standard uncertainty of 0.15.
+
+         As information about more than one phase is present in the data block
+         _audit.schema takes a non-default value.
+;
+;
+         _pd_diffractogram.id   DIFFPAT_A
+         _pd_phase.id           PHASE_A
+
+         loop_
+         _pd_pref_orient_March_Dollase.id
+         _pd_pref_orient_March_Dollase.index_h
+         _pd_pref_orient_March_Dollase.index_k
+         _pd_pref_orient_March_Dollase.index_l
+         _pd_pref_orient_March_Dollase.fract
+         _pd_pref_orient_March_Dollase.r
+         a   1 0 0   0.63   0.79
+         b   0 1 0   0.37   0.66
+;
+;
+         Reporting of the preferred-orientation corrections for a phase with the
+         _pd_phase.id of 'PHASE_A' for diffractogram DIFFPAT_A.
+
+         There are two preferred-orientation corrections being applied to the
+         same phase. The first is in the 100 direction, with a March r parameter
+         value of 0.79. This individual correction contributes 63% to the total
+         correction. The second is in the 010 direction, with a March r
+         parameter value of 0.66. This individual correction contributes 37% to
+         the total correction.
+;
+
+save_
+
+save_pd_pref_orient_march_dollase.diffractogram_id
+
+    _definition.id
+        '_pd_pref_orient_March_Dollase.diffractogram_id'
+    _definition.update            2023-01-06
+    _description.text
+;
+    A diffractogram id to which the preferred-orientation correction
+    relates.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient_march_dollase.fract
+
+    _definition.id                '_pd_pref_orient_March_Dollase.fract'
+    _definition.update            2023-01-06
+    _description.text
+;
+    In the case of multiple March-Dollase preferred-orientation
+    directions for a single phase, this denotes the fractional
+    amount of preferred orientation in each direction.
+
+    The sum of all values for a given phase and diffractogram
+    should be 1.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               fract
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_march_dollase.fract_su
+
+    _definition.id                '_pd_pref_orient_March_Dollase.fract_su'
+    _definition.update            2022-11-17
+    _description.text
+;
+    Standard uncertainty of _pd_pref_orient_March_Dollase.fract.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               fract_su
+    _name.linked_item_id          '_pd_pref_orient_March_Dollase.fract'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_pref_orient_march_dollase.geom
+
+    _definition.id                '_pd_pref_orient_March_Dollase.geom'
+    _definition.update            2023-01-06
+    _description.text
+;
+    Code identifying the geometry of the preferred-orientation
+    correction, as distinct from the geometry of data collection.
+
+    The functional form of the March-Dollase correction depends
+    on whether the data were collected in symmetric or asymmetric
+    reflection or transmission, or capillary geometries. See
+    Section 3, Rowles & Buckley (2017) J. Appl. Cryst. (2017).
+    50, 240-251, for further discussion.
+
+    In most Rietveld software, 'symmetric reflection' is the
+    default implementation.
+
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               geom
+    _type.purpose                 State
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+    loop_
+      _enumeration_set.state
+      _enumeration_set.detail
+         srefln                   'Symmetric reflection.'
+         arefln                   'Asymmetric reflection.'
+         strans                   'Symmetric transmission.'
+         atrans                   'Asymmetric transmission.'
+         cap                      'Capillary (Debye-Scherrer).'
+    _enumeration.default          srefln
+
+save_
+
+save_pd_pref_orient_march_dollase.hkl
+
+    _definition.id                '_pd_pref_orient_March_Dollase.hkl'
+    _definition.update            2023-01-06
+    _description.text
+;
+    Miller indices of the March-Dollase preferred-orientation
+    direction.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               hkl
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Matrix
+    _type.dimension               '[3]'
+    _type.contents                Integer
+    _units.code                   none
+    _method.purpose               Evaluation
+    _method.expression
+;
+    With po as pd_pref_orient_March_Dollase
+
+           po.hkl =  [po.index_h,
+                      po.index_k,
+                      po.index_l]
+;
+
+save_
+
+save_pd_pref_orient_march_dollase.id
+
+    _definition.id                '_pd_pref_orient_March_Dollase.id'
+    _definition.update            2023-01-06
+    _description.text
+;
+    A code to uniquely identify each March-Dollase
+    preferred-orientation correction.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               id
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+    _enumeration.default          .
+
+save_
+
+save_pd_pref_orient_march_dollase.index_h
+
+    _definition.id                '_pd_pref_orient_March_Dollase.index_h'
+    _definition.update            2023-01-06
+    _description.text
+;
+    The h Miller index of the March-Dollase preferred-orientation
+    direction.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               index_h
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Integer
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_march_dollase.index_k
+
+    _definition.id                '_pd_pref_orient_March_Dollase.index_k'
+    _definition.update            2023-01-06
+    _description.text
+;
+    The k Miller index of the March-Dollase preferred-orientation
+    direction.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               index_k
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Integer
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_march_dollase.index_l
+
+    _definition.id                '_pd_pref_orient_March_Dollase.index_l'
+    _definition.update            2023-01-06
+    _description.text
+;
+    The l Miller index of the March-Dollase preferred-orientation
+    direction.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               index_l
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Integer
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_march_dollase.phase_id
+
+    _definition.id                '_pd_pref_orient_March_Dollase.phase_id'
+    _definition.update            2023-01-06
+    _description.text
+;
+    A phase id to which the preferred-orientation correction
+    relates.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient_march_dollase.r
+
+    _definition.id                '_pd_pref_orient_March_Dollase.r'
+    _definition.update            2022-11-17
+    _description.text
+;
+    March distribution parameter describing the degree of
+    preferred-orientation in a given phase and diffractogram.
+    In general, a value of 1 describes an unoriented phase.
+    r in the range (0,1) describes orientation of disk-like
+    particles, and r in the range (1, ∞) describes orientation
+    of needle-like particles.
+
+    The direction of the correction must also be given using
+    _pd_pref_orient_March_Dollase.index_h, _k, and _l. If
+    more than one orientation direction is used, the fractional
+    contribution of each direction must be specified with
+    _pd_pref_orient_March_Dollase.fract.
+
+    Omitting _pd_pref_orient* implies that no preferred-
+    orientation correction has been used.
+
+    See Dollase, W. A. (1986). J. Appl. Cryst. 19, 267-272 for
+    further information.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               r
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            0.0:
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_march_dollase.r_su
+
+    _definition.id                '_pd_pref_orient_March_Dollase.r_su'
+    _definition.update            2022-11-17
+    _description.text
+;
+    Standard uncertainty of _pd_pref_orient_March_Dollase.r.
+;
+    _name.category_id             pd_pref_orient_March_Dollase
+    _name.object_id               r_su
+    _name.linked_item_id          '_pd_pref_orient_March_Dollase.r'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_PD_PREF_ORIENT_SPHERICAL_HARMONICS
+
+    _definition.id                PD_PREF_ORIENT_SPHERICAL_HARMONICS
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2023-01-06
+    _description.text
+;
+    This section contains a description of spherical
+    harmonics preferred-orientation corrections applied
+    to a phase when modelling its contribution to a
+    histogram.
+
+    For March-Dollase corrections, see
+    PD_PREF_ORIENT_MARCH_DOLLASE. For other methods,
+    use _pd_pref_orient.special_details.
+
+    See Jarvinen, M. (1993). J. Appl. Cryst. 26, 525-531 for
+    further information.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PREF_ORIENT_SPHERICAL_HARMONICS
+
+    loop_
+      _category_key.name
+         '_pd_pref_orient_spherical_harmonics.diffractogram_id'
+         '_pd_pref_orient_spherical_harmonics.id'
+         '_pd_pref_orient_spherical_harmonics.phase_id'
+
+    loop_
+      _description_example.case
+      _description_example.detail
+;
+         _audit.schema          Custom
+
+         loop_
+         _pd_pref_orient_spherical_harmonics.id
+         _pd_pref_orient_spherical_harmonics.phase_id
+         _pd_pref_orient_spherical_harmonics.diffractogram_id
+         _pd_pref_orient_spherical_harmonics.y_ij
+         _pd_pref_orient_spherical_harmonics.c_ij
+         _pd_pref_orient_spherical_harmonics.c_ij_su
+         a   PHASE_A DIFFPAT_A   [0 0]   1.0     .
+         b   PHASE_A DIFFPAT_A   [2 0]   1.538   0.013
+         c   PHASE_B DIFFPAT_A   [0 0]   1.0     .
+         d   PHASE_B DIFFPAT_A   [4 1]  -0.066   0.010
+         e   PHASE_A DIFFPAT_B   [0 0]   1.0     .
+         f   PHASE_A DIFFPAT_B   [2 0]   1.630   0.014
+;
+;
+         Showing a fully qualified reporting of the preferred-orientation
+         corrections for phases with the _pd_phase.id of 'PHASE_A' and 'PHASE_B'
+         present in the diffractograms with the _pd_diffractogram.id of
+         'DIFFPAT_A' and 'DIFFPAT_B'.
+
+         In diffractogram 'DIFFPAT_A', both 'PHASE_A' and 'PHASE_B' have
+         corrections applied, with the non-(0,0) order/term pairs taking the
+         values (2,0) and (4,1), with coefficients of 1.538(13) and -0.066(10),
+         respectively.
+
+         In diffractogram 'DIFFPAT_B', only 'PHASE_A' has corrections applied,
+         with the non-(0,0) order/term pair taking the value (2,0), with a
+         coefficient of 1.630(14).
+
+         As information for more than one phase is contained in the data block,
+         _audit.schema has non-default value 'Custom'.
+;
+;
+         _pd_phase.id   PHASE_A
+
+         loop_
+         _pd_pref_orient_spherical_harmonics.id
+         _pd_pref_orient_spherical_harmonics.diffractogram_id
+         _pd_pref_orient_spherical_harmonics.y_i
+         _pd_pref_orient_spherical_harmonics.y_j
+         _pd_pref_orient_spherical_harmonics.c_ij
+         _pd_pref_orient_spherical_harmonics.c_ij_su
+         a   DIFFPAT_A   0   0   1.0     .
+         b   DIFFPAT_A   2   0   1.538   0.013
+         c   DIFFPAT_A   4   0   0.913   0.016
+         d   DIFFPAT_A   4  -3  -0.166   0.010
+         1   DIFFPAT_B   0   0   1.0     .
+         2   DIFFPAT_B   2   0   1.630   0.014
+;
+;
+         Reporting of the preferred-orientation corrections for a phase with the
+         _pd_phase.id of 'PHASE_A'.
+
+         This table is reporting preferred-orientation values pertinent to this
+         phase, as seen in two diffractograms: 'DIFFPAT_A' and 'DIFFPAT_B'.
+         There are four corrections applied in 'DIFFPAT_A' corresponding to
+         order/term pairs of (0,0), (2,0), (4,0), and (4, -3), and their
+         magnitudes and standard uncertainties are 1.0, 1.538(13), 0.913(16),
+         and -0.166(10), respectively. There are two corrections applied in
+         'DIFFPAT_B' corresponding to order/term pairs of (0,0) and (2,0), and
+         their magnitudes and standard uncertainties are 1.0 and 1.630(14),
+         respectively.
+;
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.c_ij
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.c_ij'
+    _definition.update            2022-11-17
+    _description.text
+;
+    The value of the coefficient scaling the spherical
+    harmonic, ij, as given by _pd_pref_orient_spherical_harmonics.y_ij.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               c_ij
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.c_ij_su
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.c_ij_su'
+    _definition.update            2022-11-17
+    _description.text
+;
+    Standard uncertainty of _pd_pref_orient_spherical_harmonics.c_ij.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               c_ij_su
+    _name.linked_item_id          '_pd_pref_orient_spherical_harmonics.c_ij'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.diffractogram_id
+
+    _definition.id
+        '_pd_pref_orient_spherical_harmonics.diffractogram_id'
+    _definition.update            2023-01-06
+    _description.text
+;
+    A diffractogram id to which the preferred-orientation correction
+    relates.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.geom
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.geom'
+    _definition.update            2023-01-06
+    _description.text
+;
+    Code identifying the geometry of the preferred-orientation
+    correction, as distinct from the geometry of data collection.
+
+    The functional form of the spherical harmonics correction depends
+    on whether the data were collected in symmetric or asymmetric
+    reflection or transmission, or capillary geometries. See
+    Section 3, Rowles & Buckley (2017) J. Appl. Cryst. (2017).
+    50, 240-251, for further discussion.
+
+    In most Rietveld software, 'symmetric reflection' is the
+    default implementation.
+
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               geom
+    _type.purpose                 State
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+    loop_
+      _enumeration_set.state
+      _enumeration_set.detail
+         srefln                   'Symmetric reflection.'
+         arefln                   'Asymmetric reflection.'
+         strans                   'Symmetric transmission.'
+         atrans                   'Asymmetric transmission.'
+         cap                      'Capillary (Debye-Scherrer).'
+    _enumeration.default          srefln
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.id
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.id'
+    _definition.update            2022-11-17
+    _description.text
+;
+    A code to uniquely identify each spherical harmonic
+    preferred-orientation correction.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               id
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+    _enumeration.default          .
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.phase_id
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.phase_id'
+    _definition.update            2023-01-06
+    _description.text
+;
+    A phase id to which the preferred-orientation correction
+    relates.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.texture_index
+
+    _definition.id
+        '_pd_pref_orient_spherical_harmonics.texture_index'
+    _definition.update            2023-01-06
+    _description.text
+;
+    The texture index, as described by equation 4.212
+    in Bunge, as T = sum_{i,j} [c_{i,j}^2 / (2i+1)].
+
+    It gives the value [1, ∞), where 1 is a random powder
+    and ∞ is an ideal single crystal.
+
+    Bunge, H.J., (2015) "Texture Analysis in Materials Science:
+    Mathematical Methods", Helga and Hans-Peter Bunge,
+    Wolfratshausen.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               texture_index
+    _type.purpose                 Measurand
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            1.0:
+    _units.code                   none
+    _method.purpose               Evaluation
+    _method.expression
+;
+    t = 0.0
+
+    Loop po as pd_pref_orient_spherical_harmonics  {
+        t += po.c_ij ** 2 / (2 * po.y_i + 1)
+    }
+    _pd_pref_orient_spherical_harmonics.texture_index = t
+
+;
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.texture_index_su
+
+    _definition.id
+        '_pd_pref_orient_spherical_harmonics.texture_index_su'
+    _definition.update            2022-11-17
+    _description.text
+;
+    Standard uncertainty of _pd_pref_orient_spherical_harmonics.texture_index.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               texture_index_su
+    _name.linked_item_id
+        '_pd_pref_orient_spherical_harmonics.texture_index'
+    _units.code                   none
+
+    _import.get                   [{'file':templ_attr.cif  'save':general_su}]
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.y_i
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.y_i'
+    _definition.update            2022-11-17
+    _description.text
+;
+    The order of the spherical harmonics preferred-orientation
+    correction. Valid values are positive, even integers.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               y_i
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            0:
+    _units.code                   none
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.y_ij
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.y_ij'
+    _definition.update            2023-06-13
+    _description.text
+;
+    The order (i) and term (j) of the spherical harmonic
+    preferred-orientation correction. Spherical
+    harmonics are functions that obey the point-symmetry
+    operations of the phase, and can be used to model
+    deviations in peak intensity due to preferred-orientation
+    or texture.
+
+    In the application of spherical harmonics corrections,
+    valid orders are positive, even integers, and possible
+    terms are in the range -i:i. Valid terms are restricted
+    by space-group symmetry. The parity of the term is given
+    by its sign; odd parity is negative, even is positive.
+
+    Omitting _pd_pref_orient* implies that no preferred-
+    orientation correction has been used.
+
+    See Jarvinen, M. (1993). J. Appl. Cryst. 26, 525-531 for
+    further information.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               y_ij
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               List
+    _type.dimension               '[2]'
+    _type.contents                Integer
+    _units.code                   none
+    _method.purpose               Evaluation
+    _method.expression
+;
+    With po as pd_pref_orient_spherical_harmonics
+
+      po.y_ij = [po.y_i, po.y_j]
+;
+
+save_
+
+save_pd_pref_orient_spherical_harmonics.y_j
+
+    _definition.id                '_pd_pref_orient_spherical_harmonics.y_j'
+    _definition.update            2023-01-06
+    _description.text
+;
+    The term (j) of the given order (i) of the spherical harmonics
+    preferred-orientation correction. The parity of the term
+    is given by its sign; odd parity is negative, even is positive.
+
+    In general, possible values are in the range -i:i. Valid values
+    are dependent on the space-group of the phase.
+;
+    _name.category_id             pd_pref_orient_spherical_harmonics
+    _name.object_id               y_j
+    _type.purpose                 Number
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Integer
+    _units.code                   none
+    _method.purpose               Definition
+    _method.expression
+;
+     With po as pd_pref_orient_spherical_harmonics
+
+    _enumeration.range = -po.y_i:po.y_i
+;
+
+save_
+
+save_PD_PROC_OVERALL
+
+    _definition.id                PD_PROC_OVERALL
+    _definition.scope             Category
+    _definition.class             Set
+    _definition.update            2025-04-18
+    _description.text
+;
+    This section contains overall information about the diffraction
+    data set after processing and application of correction
+    terms. If the data set is reprocessed, this section may be
+    replaced.
+;
+    _name.category_id             PD_GROUP
+    _name.object_id               PD_PROC_OVERALL
+    _category_key.name            '_pd_proc_overall.diffractogram_id'
+
+save_
+
+save_pd_proc.2theta_range_inc
+
+    _definition.id                '_pd_proc.2theta_range_inc'
+    _alias.definition_id          '_pd_proc_2theta_range_inc'
+    _definition.update            2021-11-12
+    _description.text
+;
+    The increment in 2θ diffraction angles in degrees for the
+    measurement of intensities. These may be used in place of the
+    _pd_proc.2theta_corrected values, or in the case of white-beam
+    experiments it will define the fixed 2θ value.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               2theta_range_inc
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:180.0
+    _units.code                   degrees
+
+save_
+
+save_pd_proc.2theta_range_max
+
+    _definition.id                '_pd_proc.2theta_range_max'
+    _alias.definition_id          '_pd_proc_2theta_range_max'
+    _definition.update            2014-06-20
+    _description.text
+;
+    The maximum 2θ diffraction angle in degrees for the
+    measurement of intensities. This may be used in place of the
+    _pd_proc.2theta_corrected values, or in the case of white-beam
+    experiments it will define the fixed 2θ value together with
+    _pd_proc.2theta_range_min.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               2theta_range_max
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:180.0
+    _units.code                   degrees
+
+save_
+
+save_pd_proc.2theta_range_min
+
+    _definition.id                '_pd_proc.2theta_range_min'
+    _alias.definition_id          '_pd_proc_2theta_range_min'
+    _definition.update            2014-06-20
+    _description.text
+;
+    The minimum 2θ diffraction angle in degrees for the
+    measurement of intensities. This may be used in place of the
+    _pd_proc.2theta_corrected values, or in the case of white-beam
+    experiments they will define the fixed 2θ value together with
+    _pd_proc.2theta_range_max.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               2theta_range_min
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _enumeration.range            -180.0:180.0
+    _units.code                   degrees
+
+save_
+
+save_pd_proc.info_data_reduction
+
+    _definition.id                '_pd_proc.info_data_reduction'
+    _alias.definition_id          '_pd_proc_info_data_reduction'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Description of the processing steps applied in the data-reduction
+    process (background subtraction, α-2 stripping, smoothing
+    etc.). Include details of the program(s) used etc.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               info_data_reduction
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_proc.info_datetime
+
+    _definition.id                '_pd_proc.info_datetime'
+    _alias.definition_id          '_pd_proc_info_datetime'
+    _definition.update            2023-01-16
+    _description.text
+;
+    Date and time when the data set was most recently processed.
+
+    Entries should follow the standard RFC 3339 ABNF format
+    'yyyy-mm-ddThh:mm:ss{Z|[+-]zz:zz}'.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               info_datetime
+    _type.purpose                 Encode
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                DateTime
+
+    loop_
+      _description_example.case
+         1990-07-13T14:40:00Z
+         2042-12-13T02:37:23Z
+         2005-03-03T12:02:09.17+09:30
+         2015-10-30T22:45:00-02:00
+         1912-02-03T11:47:00Z
+         1979-09-01
+
+save_
+
+save_pd_proc.info_excluded_regions
+
+    _definition.id                '_pd_proc.info_excluded_regions'
+    _alias.definition_id          '_pd_proc_info_excluded_regions'
+    _definition.update            2025-06-21
+    _description.text
+;
+    Description of regions in the diffractogram excluded
+    from processing along with a justification of why the
+    data points were not used.
+
+    To indicate excluded regions in a machine-readble manner,
+    set the requisite values in _pd_proc.ls_weight to 0.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               info_excluded_regions
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+    _description_example.case     '20 to 21 degrees unreliable due to beam dump'
+
+save_
+
+save_pd_proc.info_special_details
+
+    _definition.id                '_pd_proc.info_special_details'
+    _alias.definition_id          '_pd_proc_info_special_details'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Detailed description of any non-routine processing steps
+    applied due to any irregularities in this particular data set.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               info_special_details
+    _type.purpose                 Describe
+    _type.source                  Recorded
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_pd_proc.number_of_points
+
+    _definition.id                '_pd_proc.number_of_points'
+    _alias.definition_id          '_pd_proc_number_of_points'
+    _definition.update            2019-09-25
+    _description.text
+;
+    The total number of data points in the processed diffractogram.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               number_of_points
+    _type.purpose                 Number
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Integer
+    _enumeration.range            1:
+    _units.code                   none
+
+save_
+
+save_pd_proc_overall.diffractogram_id
+
+    _definition.id                '_pd_proc_overall.diffractogram_id'
+    _definition.update            2023-01-12
+    _description.text
+;
+    The diffractogram (see _pd_diffractogram.id) to which the overall
+    processing attributes relate.
+;
+    _name.category_id             pd_proc_overall
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+save_REFLN
+
+    _definition.id                REFLN
+    _definition.scope             Category
+    _definition.class             Loop
+    _definition.update            2016-11-09
+    _description.text
+;
+    The CATEGORY of data items used to describe the reflection data
+    used in the refinement of one or more crystallographic phases.
+;
+    _name.category_id             DIFFRACTION
+    _name.object_id               REFLN
+
+    loop_
+      _category_key.name
+         '_refln.id'
+         '_pd_refln.phase_id'
+         '_refln.diffractogram_id'
+
+save_
+
+save_pd_refln.peak_id
+
+    _definition.id                '_pd_refln.peak_id'
+    _alias.definition_id          '_pd_refln_peak_id'
+    _definition.update            2014-06-20
+    _description.text
+;
+    Code which identifies the powder diffraction peak that
+    contains the current reflection. This code must match a
+    _pd_peak.id code.
+;
+    _name.category_id             refln
+    _name.object_id               peak_id
+    _name.linked_item_id          '_pd_peak.id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_pd_refln.peak_overall_id
+
+    _definition.id                '_pd_refln.peak_overall_id'
+    _definition.update            2023-04-13
+    _description.text
+;
+    A code linking to general information about peak description and
+    determination for the reflection peaks.
+;
+    _name.category_id             refln
+    _name.object_id               peak_overall_id
+    _name.linked_item_id          '_pd_peak_overall.id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Code
+
+save_
+
+save_pd_refln.phase_id
+
+    _definition.id                '_pd_refln.phase_id'
+    _alias.definition_id          '_pd_refln_phase_id'
+    _definition.update            2016-11-09
+    _description.text
+;
+    A code which identifies the particular phase to which
+    this reflection belongs.
+;
+    _name.category_id             refln
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_refln.diffractogram_id
+
+    _definition.id                '_refln.diffractogram_id'
+    _definition.update            2025-05-23
+    _description.text
+;
+    The diffractogram to which the reflection list relates.
+;
+    _name.category_id             refln
+    _name.object_id               diffractogram_id
+    _name.linked_item_id          '_pd_diffractogram.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
+save_refln.f_complex
+
+    _definition.id                '_refln.F_complex'
+    _alias.definition_id          '_refln_F_complex'
+    _definition.update            2025-05-22
+    _description.text
+;
+    The structure factor vector for the reflection calculated from
+    the atom site data for the phase given by phase_id.
+;
+    _name.category_id             refln
+    _name.object_id               F_complex
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Complex
+    _method.purpose               Definition
+    _method.expression
+;
+         If (_diffrn_radiation.probe == "neutron")  _units.code =  "femtometres"
+    Else If (_diffrn_radiation.probe == "electron") _units.code =  "volts"
+    Else                                            _units.code =  "electrons"
+;
+
+save_
+
+save_refln.f_squared_meas
+
+    _definition.id                '_refln.F_squared_meas'
+    _alias.definition_id          '_refln_F_squared_meas'
+    _definition.update            2025-05-22
+    _description.text
+;
+    The structure factor amplitude for the reflection derived by partitioning
+    the background-subtracted observed intensity _pd_proc.intensity_net between
+    reflections in the same proportion as those reflections contribute to
+    the corresponding background-free calculated point in _pd_calc.intensity_net
+;
+    _name.category_id             refln
+    _name.object_id               F_squared_meas
+    _type.purpose                 Measurand
+    _type.source                  Derived
+    _type.container               Single
+    _type.contents                Real
+    _method.purpose               Definition
+    _method.expression
+;
+    If      (_diffrn_radiation.probe == "neutron")
+                                         _units.code = "femtometre_squared"
+    Else If (_diffrn_radiation.probe == "electron")
+                                         _units.code =  "volt_squared"
+    Else                                 _units.code =  "electron_squared"
+;
+
+save_
+
+save_refln.wavelength_id
+
+    _definition.id                '_refln.wavelength_id'
+
+    loop_
+      _alias.definition_id
+      _alias.deprecation_date
+         '_refln_wavelength_id'                                      .
+         '_pd_refln.wavelength_id'                                   2021-12-06
+         '_pd_refln_wavelength_id'                                   2021-12-06
+
+    _definition.update            2025-05-21
+    _description.text
+;
+    _pd_refln.wavelength_id is DEPRECATED. _refln.wavelength_id should
+    be used instead.
+;
+    _name.category_id             refln
+    _name.object_id               wavelength_id
+    _name.linked_item_id          '_diffrn_radiation_wavelength.id'
+    _type.purpose                 Link
+    _type.source                  Related
+    _type.container               Single
+    _type.contents                Word
+
+save_
+
+    loop_
+      _dictionary_audit.version
+      _dictionary_audit.date
+      _dictionary_audit.revision
+         2.0.1                    2014-06-20
+;
+       Initial conversion to DDLm (Syd Hall)
+;
+         2.0.2                    2016-10-21
+;
+       Substantial edits to conform to current DDLm, CIF2 syntax
+       and intended DDL1 usage (James Hester).
+;
+         2.0.3                    2016-11-03
+;
+       Removed pd_refln category and pd_refln.phase_id, remaining
+       datanames assigned to core REFLN category (James Hester).
+;
+         2.1.0                    2016-11-09
+;
+       Changed PD_PHASE to Set category. Multiple phases are now
+       covered by an extension dictionary. (James Hester)
+;
+         2.2.0                    2016-11-12
+;
+       Added _pd_calib_offset.detector_id to allow for per-detector
+       2 theta offsets (James Hester)
+;
+         2.3.0                    2017-01-26
+;
+       Returned pd_phase and pd_refln.phase_id to dictionary after
+       acceptance of _dictionary.formalism mechanism. Set
+       _dictionary.formalism to 'powder'.
+;
+         2.4.0                    2017-04-05
+;
+       Added definition for _refln.F_meas after consultation with
+       PD DMG. (James Hester)
+;
+         2.4.1                    2021-12-06
+;
+       Changed the content type of multiple data items from 'Count'
+       to 'Integer' and assigned the appropriate enumeration range
+       if needed.
+
+       Corrected the object id of the _pd_proc.2theta_range_inc data item.
+
+       Deprecated _pd_refln.wavelength_id after consultation with PDDMG.
+;
+         2.5.0                    2025-06-23
+;
+       ## Retain above version number and increment date until final
+       ## release
+
+       Added mass absorption coefficient and improved absorption
+       definitions. Added missing su definitions.
+
+       Corrected datetime examples to proper RFC3339 compliance.
+
+       Added pd_calib_d_to_tof.
+
+       Corrected a typo in the PD_CALIB_D_TO_TOF category description.
+
+       Add PD_DIFFRACTOGRAM category and linked data names.
+
+       Added PD_CALC_COMPONENT and related data names.
+
+       Updated many datanames from Number to Measurand.
+
+       Made PD_BLOCK a Loop category.
+
+       Created PD_PREF_ORIENT_MARCH_DOLLASE and
+       PD_PREF_ORIENT_SPHERICAL_HARMONICS to record preferred orientation
+       corrections.
+
+       Updated intensity/count definitions in PD_CALC, PD_MEAS, and PD_PROC.
+
+       Updated descriptions of _pd_meas.counts, _pd_meas.intensity_background,
+       _pd_meas.intensity_container, and _pd_meas.intensity_monitor.
+
+       Removed enumeration range for _pd_proc.intensity_net.
+
+       Added ability to record detector circle radius, both fixed and
+       varying by measurement point.
+
+       Updated many datanames from Number to Measurand.
+
+       Made PD_PHASE a Set category.
+
+       Created PD_QPA_EXTERNAL_STD and PD_QPA_INTERNAL_STD to record
+       quantitative phase analysis by the external and internal standard
+       approaches.
+
+       Changed _pd_meas.step_count_time and _pd_meas.time_of_flight from
+       Integer to Real.
+
+       Created PD_BACKGROUND.
+
+       Update definitions of _pd_phase.name, _pd_qpa_ext_std.phase_name, and
+       _pd_qpa_int_std.phase_name to better represent their contents.
+
+       Created PD_AMORPHOUS.
+
+       Deprecate _pd_calib.std_internal_mass_percent and
+       _pd_calib.std_internal_mass_percent_su.
+
+       Added phase_id and diffractogram_id to PD_PREF_ORIENT_MARCH_DOLLASE and
+       PD_PREF_ORIENT_SPHERICAL_HARMONICS.
+
+       Updated data items to hold block ID values to be of type Link, and to
+       link them formally to _pd_block.id
+
+       Added _pd_phase.id and/or _pd_diffractogram.id-linked data items to
+       PD_CALC_OVERALL, PD_CALIB_D_TO_TOF, PD_INSTR, PD_MEAS_INFO_AUTHOR,
+       PD_MEAS_OVERALL, PD_PREF_ORIENT, PD_PROC_INFO_AUTHOR, PD_PROC_OVERALL,
+       PD_SPEC
+
+       Created PD_QPA_OVERALL to record details about the overall quantitative
+       phase analysis method.
+
+       Update description of _pd_proc.info_datetime to maintain consistency
+       with its Set category.
+
+       Renamed _pd_char.mass_atten_coef_mu_obs to
+       _pd_char.mass_atten_coef_mu_meas.
+
+       Created PD_CALIB_XCOORD and PD_CALIB_XCOORD_OVERALL
+
+       Updated _pd_phase.name
+
+       Created PD_CALIB_DETECTED_INTENSITY
+
+       Created PD_CALIB_INCIDENT_INTENSITY
+
+       Created PD_CALIB_WAVELENGTH
+
+       Updated _pd_phase.name.
+
+       Created PD_QPA_INTENSITY_FACTOR.
+
+       Updated description of _pd_calibration.conversion_eqn.
+
+       Updated descriptions of PD_CHAR, PD_PREP, and PD_SPEC to clarify
+       differences between 'specimen', 'sample', and 'material'. Updated some
+       data item descriptions to maintain a consistent nomenclature.
+
+       Updated description of _pd_proc.wavelength.
+
+       Remove '_pd_phase_mass_percent' as an alias for '_pd_phase_mass.percent'.
+
+       Added _pd_spec.id and _pd_diffractogram.spec_id.
+
+       Added _pd_proc_ls.diffractogram_id
+
+       Added _pd_peak_overall.id.
+
+       Added child data names of _pd_peak_overall.id to PD_AMORPHOUS,
+       PD_BACKGROUND, and REFLN.
+
+       Created category keys for PD_CHAR and PD_PREP. Added link keys to join
+       PD_CHAR to PD_PREP, and PD_PREP to PD_SPEC.
+
+       Deprecated PD_CALIB, PD_CALIB_OFFSET, and PD_CALIB_STD.
+
+       Deprecated PD_MEAS_INFO_AUTHOR and PD_PROC_INFO_AUTHOR in favour of
+       AUDIT_AUTHOR and AUDIT_AUTHOR_ROLE.
+
+       Add _pd_calib_xcoord.diffractogram_id.
+
+       Add _pd_peak.diffractogram_id.
+
+       Altered PD_CALIB_INCIDENT_INTENSITY to be a Set category.
+
+       Redefined _pd_meas.detector_id in terms of _pd_instr_detector.id. Linked
+       all _pd_*.detector_id data names to _pd_instr_detector.id.
+
+       Switch to using multiblock dictionary as base dictionary.
+
+       Converted all 'Array' and 'Matrix'-type data items to be 'List', except
+       _pd_pref_orient_march_dollase.hkl.
+
+       Change units of _pd_calib_incident_intensity.incident_* to
+       counts_per_second and per_second.
+
+       Clarified description of _pd_meas.rocking_angle.
+
+       Changed the _type.source attribute of all SU data items to 'Related'.
+
+       Added _pd_diffractogram.diffrn_id.
+
+       Updated the CIF_CORE dictionary import statement with the new Head
+       category name.
+
+       Deprecated PD_BLOCK, PD_BLOCK_DIFFRACTOGRAM, PD_PHASE_BLOCK, and all
+       related data items in favour of PD_PHASE and PD_DIFFRACTOGRAM.
+
+       Explicitly deprecated the _pd_refln.wavelength_id and
+       _pd_refln_wavelength_id aliases.
+
+       Set DDL conformance to version 4.2.0.
+
+       Removed default values of _refln.f_complex and _refln.f_squared_meas.
+
+       Added child key data name of _pd_diffractogram.id to refln category.
+       Update refln category keys to match core.
+
+       Added children of _pd_phase.id as key data names of CHEMICAL_*
+       categories.
+
+       Added _pd_phase_mass.absolute and *.original to record absolute
+       mass percentages of phases. Clarified that *.percent was for
+       relative mass percentages only.
+
+       Updated descriptions of data items linked to _pd_data.point_id to
+       clarify that identical values refer to the same data point in each
+       disparate loop; they cannot be assigned values independently.
+
+       Added examples to PD_CALC_OVERALL, PD_CALIB_INCIDENT_INTENSITY, PD_CHAR,
+       PD_DIFFRACTOGRAM, PD_PEAK, _pd_phase.id, PD_PHASE_MASSS, PD_PREP,
+       PD_PROC_LS, PD_QPA_CALIB_FACTOR, PD_SPEC.
+
+       Add _pd_peak.overall_id
+
+       Created _pd_calc.intensity_bkg and updated description of
+       _pd_proc.intensity_bkg_calc.
+
+       Enhanced description of _pd_proc.info_excluded_region.
+
+       PD_CALIB_WAVELENGTH removed. _diffrn_radiation_wavelength.phase_id
+       and _diffrn_radiation_wavelength.diffractogram_id added to record
+       the source of a refined wavelength value.
+       _diffrn_radiation_wavelength.special_details added to record
+       information about the wavelength.
+
+       Added _pd_meas_overall.step_count_time
+;
