@@ -200,7 +200,9 @@ get_category(c::DataDictBlock, catname) = begin
 end
 
 """
-    Return a list of all categories present in `c`
+    get_categories(c::DataDictBlock)
+
+Return a list of all categories present in `c`
 """
 get_categories(c::DataDictBlock) = begin
     keys(c.cat_lookup)
@@ -265,20 +267,41 @@ end
 
 Return `true` if `block` contains data names from `catname`, defined in `dict`.
 """
-has_category(block,catname,dict) = begin
+has_category(block, catname, dict) = begin
 
     all_names = get_names_in_cat(dict,catname,aliases=true)
     any(x->x in keys(block), all_names)
     
 end
+"""
+    all_categories_in_block(block, dict)
 
+Return a list of all categories in the block. Where a loop does not
+contain any data names belonging to a known category, a data name
+from that loop is returned instead. Where an unlooped data name is
+
+"""
 all_categories_in_block(block, dict) = begin
 
-    fc = map( collect(keys(block))) do k
-        fc = find_category(dict, k)
-        isnothing(fc) ? missing : fc
+    cat_list = Union{String, Nothing}[]
+    
+    # First do looped names
+
+    for l in get_loop_names(block)
+        gc = guess_category(dict, l)
+        if isnothing(gc)
+            push!(cat_list, first(l))  #flag unknown with dataname
+        else
+            push!(cat_list, gc)
+        end
+        
     end
-    unique(skipmissing(fc))
+
+    for n in get_all_unlooped_names(block)
+        push!(cat_list, find_category(dict, n))
+    end
+
+    unique!(cat_list)
 end
 
 """

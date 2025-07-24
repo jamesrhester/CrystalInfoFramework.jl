@@ -54,6 +54,7 @@ export add_definition!    #add new definitions
 export replace_category!  #replace an attribute category for a definition
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
+export get_set_cats_for_cat, get_cats_for_sets  #Keyed set category fun
 
 # Editing
 export update_dict! #Update dictionary contents
@@ -216,7 +217,8 @@ Return a list of datanames defined by the dictionary, including
 any aliases.
 """
 keys(d::DDLm_Dictionary) = begin
-    native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))
+    native = lowercase.(parent(d.block[:definition])[!,:id])
+    #native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))
     extra = []
     if haskey(d.block,:alias)
         extra = lowercase.(parent(d.block[:alias])[!,:definition_id])
@@ -361,10 +363,19 @@ List aliases of `name` listed in `d`. If not `include_self`, remove
 `name` from the returned list.
 """
 list_aliases(d::DDLm_Dictionary,name;include_self=false) = begin
-    result = d[name][:definition][:,:id]
-    alias_block = get(d[name],:alias,nothing)
-    if !isnothing(alias_block) && nrow(d[name][:alias]) > 0
-        append!(result, alias_block[!,:definition_id])
+
+    # Avoid d[name] as it is expensive
+    lname = lowercase(name)
+    result = [d.block[:definition][(master_id = lname,)].id[]]
+
+    alias_block = nothing
+    try
+        alias_block = d.block[:alias][(master_id = lname,)]
+    catch KeyError
+    end
+
+    if !isnothing(alias_block) && nrow(alias_block) > 0
+        append!(result, alias_block.definition_id)
     end
     if !include_self filter!(!isequal(name),result) end
     return result
@@ -377,15 +388,38 @@ end
 Find the canonical name for `name` in `d`. If `name` is not
 present, return `name` unchanged.
 """
-find_name(d::DDLm_Dictionary,name) =  begin
+find_name(d::DDLm_Dictionary, name) =  begin
+
+    # For efficiency, first attempts assume everything case matches
+
+    if name == d[:dictionary].title[] return lowercase(name) end
+    
+    if haskey(d.block,:definition)
+        dd = d[:definition]
+        if name in dd[!,:master_id] return name end
+    end
+    
+    # Now try lowercase version
+    
     lname = lowercase(name)
+
     if lname == lowercase(d[:dictionary].title[]) return lname end
-    # A template etc. dictionary has no defs
-    if !haskey(d.block,:definition) return lname end
-    if !(:id in propertynames(d[:definition])) return lname end
-    if lname in lowercase.(d[:definition][!,:id]) return lname end
+    
+    if haskey(d.block,:definition)
+        dd = d[:definition]
+        if lname in dd[!,:master_id] return lname end
+    else
+
+        # A template etc. dictionary has no defs
+
+        return lname
+    end
+
+    # The slow path: checking aliases.
+    
     if !haskey(d.block,:alias) return lname end
-    potentials = d[:alias][lowercase.(d[:alias][!,:definition_id]) .== lname,:master_id]
+    da = d[:alias]
+    potentials = da[lowercase.(da[!,:definition_id]) .== lname,:master_id]
     if length(potentials) == 1 return potentials[] end
     # If something is in the keys it is OK.
     if lname in keys(d) return lname end
@@ -444,7 +478,7 @@ end
 
 _find_name(d::DDLm_Dictionary, cat::String, obj::String) = begin
 
-    # cat, obj guaranteed to be in lowercase
+    # cat, obj guaranteed to be in lowercase but dictionary values are not
     
     catcol = d[:name][!,:category_id]
     selector = map(x-> !isnothing(x) && lowercase(x) == cat,catcol)
@@ -464,8 +498,8 @@ end
 Return the category and object corresponding to the supplied data name, as symbols.
 """
 find_cat_obj(d::DDLm_Dictionary, dname::AbstractString) = begin
-    n = d[dname][:name]
-    return (Symbol(lowercase(n[!,:category_id][])), Symbol(lowercase(n[!,:object_id][])))
+    n = d.block[:name][(master_id = lowercase(dname),)]
+    return (Symbol(lowercase(n.category_id[])), Symbol(lowercase(n.object_id)))
 end
 
 """
@@ -474,11 +508,20 @@ end
 Find the category of `dataname` by looking up `d`.
 """
 find_category(d::DDLm_Dictionary, dataname) = begin
+
+    #Avoid use of d[dataname] as it constructs a complete definition
     try
-        return lowercase(d[dataname][:name][!,:category_id][])
+        return lowercase(d.block[:name][(master_id = dataname,)].category_id[])
+    catch KeyError
+    end
+
+    #use lowercase
+    try
+        return lowercase(d.block[:name][(master_id = lowercase(dataname),)].category_id[])
     catch KeyError
         return nothing
     end
+    
 end
 
 """
@@ -487,11 +530,21 @@ end
 Find the `object_id` of `dataname` by looking up `d`.
 """
 find_object(d::DDLm_Dictionary,dataname) = begin
+
+    #avoid d[dataname] as it is expensive
+    
     try
-        return lowercase(d[dataname][:name][!,:object_id][])
+        return d.block[:name][(master_id = dataname,)].object_id[]
+    catch KeyError
+    end
+
+    # try lowercase version
+    try
+        return d.block[:name][(master_id = lowercase(dataname),)].object_id[]
     catch KeyError
         return nothing
     end
+
 end
 
 
@@ -501,8 +554,22 @@ end
 Return true if `name` is a category according to `d`.
 """
 is_category(d::DDLm_Dictionary,name) = begin
-    definfo = d[name][:definition]
-    :scope in propertynames(definfo) ? definfo[!,:scope][] == "Category" : false
+
+    # Avoid d[dataname] as it is quite expensive
+
+    try
+        definfo = d.block[:definition][(master_id = name,)]
+        return :scope in propertynames(definfo) ? definfo.scope[] == "Category" : false
+    catch KeyError
+    end
+
+    try
+        definfo = d.block[:definition][(master_id = lowercase(name),)]
+        return :scope in propertynames(definfo) ? definfo.scope[] == "Category" : false
+    catch KeyError
+        return false
+    end
+
 end
 
 """
@@ -534,7 +601,12 @@ end
 
 The DDLm category class of `catname` as defined in DDLm Dictionary `d`
 """
-get_cat_class(d::DDLm_Dictionary,catname) = :class in propertynames(d[catname][:definition]) ? d[catname][:definition][!,:class][] : "Datum"
+get_cat_class(d::DDLm_Dictionary,catname) = begin
+
+    # For efficiency we don't create a full definition using getindex
+    p = d.block[:definition][(master_id = catname,)]
+    :class in propertynames(p) && !isnothing(p.class[]) ? p.class[] : "Datum"
+end
 
 """
     is_set_category(d::DDLm_Dictionary,catname)
@@ -579,13 +651,30 @@ get_objs_in_cat(d::DDLm_Dictionary,cat) = begin
     lowercase.(d[:name][selector,:object_id])
 end
 
+get_names_in_cat(d::DDLm_Dictionary, cat; aliases = false, only_items = true) = begin
+
+    # More efficient than generic method
+    temp = d[:name][!,:category_id]
+    selector = map(x -> !isnothing(x) && lowercase(x) == lowercase(cat), temp)
+    canonical_names = d[:name][selector, :master_id]
+    if only_items filter!(x->!is_category(d,x),canonical_names) end
+    if aliases
+        search_names = copy(canonical_names)
+        for n in search_names
+            append!(canonical_names,list_aliases(d,n))
+        end
+    end
+    return canonical_names
+
+end
+
 """
     get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false)
 
 List all category key data names for `cat` listed in `d`. If `aliases`, include alternative names
 for the key data names.
 """
-get_keys_for_cat(d::DDLm_Dictionary, cat;aliases=false) = begin
+get_keys_for_cat(d::DDLm_Dictionary, cat; aliases=false) = begin
     loop_keys = lowercase.(d[:category_key][lowercase.(d[:category_key][!,:master_id]) .== lowercase(cat),:name])
     key_aliases = String[]
     if aliases
@@ -655,7 +744,7 @@ get_loop_categories(d::DDLm_Dictionary) = begin
 end
 
 """
-    get_toplevel_cats(d::DDL2_Dictionary)
+    get_toplevel_cats(d::DDLm_Dictionary)
 
 Return a list of category names that appear outside the definition blocks.
 Typically these are lists of types, units, groups and methods.
@@ -663,6 +752,28 @@ Typically these are lists of types, units, groups and methods.
 get_toplevel_cats(d::DDLm_Dictionary) = begin
     w = d[get_dic_name(d)]
     [k for k in keys(w) if nrow(w[k])>0]
+end
+
+"""
+    get_set_cats_for_cat(d::DDLm_Dictionary, cat)
+
+Return the set categories that `cat` has linked keys for.
+"""
+get_set_cats_for_cat(d::DDLm_Dictionary, cat) = begin
+
+    final_keys = get_ultimate_link.(Ref(d), get_keys_for_cat(d, cat))
+    final_cats = find_category.(Ref(d), final_keys)
+    filter( x -> is_set_category(d, x), final_cats)
+end
+
+"""
+    get_cats_for_sets(d::DDLm_Dictionary, setcats)
+
+Get all categories for which the `setcats` provide keys
+"""
+get_cats_for_sets(d::DDLm_Dictionary, setcats) = begin
+    s = Set(setcats)
+    filter( x -> Set(get_set_cats_for_cat(d, x)) == s, get_categories(d))
 end
 
 # ***Dictionary functions***
@@ -807,18 +918,25 @@ end
     get_ultimate_link(d::DDLm_Dictionary,dataname::AbstractString)
 
 Find the ultimately-linked dataname for `dataname`, returning `dataname`
-if there are no links.
+if there are no links. For efficiency, `dataname` should be lower case.
 """
 get_ultimate_link(d::DDLm_Dictionary, dataname::AbstractString) = begin
-    if haskey(d,dataname)
-        #println("Searching for ultimate value of $dataname")
-        if :linked_item_id in propertynames(d[dataname][:name])
-            linkval = d[dataname][:name][!,:linked_item_id][]
+
+    # For efficiency we avoid creating a full definition using getindex
+    
+    try
+        p = d.block[:name][(master_id = dataname,)]
+        if :linked_item_id in propertynames(p)
+            linkval = p.linked_item_id[]
             if linkval != dataname && linkval != nothing
                 return get_ultimate_link(d,linkval)
             end
         end
+    catch e
+        @debug "Error for $dataname when looking for link" e 
+        return dataname
     end
+
     return dataname
 end
 

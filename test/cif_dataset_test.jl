@@ -9,6 +9,11 @@ prepare_system() = begin
     return t,r
 end
 
+@testset "Utility routines" begin
+    t, r = prepare_system()
+    @test CrystalInfoFramework.has_implicit_only(r["cr2cuo4_7K"], t, "_space_group.id")
+end
+
 @testset "CifSetProjection basics" begin
 
     t, r = prepare_system()
@@ -19,6 +24,7 @@ end
     csp = CifSetProjection(sig, t)
     @test haskey(csp, "_pd_phase.id")
     @test !(haskey(csp, "_pd_phase_mass.phase_id"))
+    @test !(is_allowed_cat(csp, "pd_phase_mass"))
     @test csp["_pd_phase.id"][] == "cr2cuo4"
     @test "_pd_phase.id" in keys(csp)
     @test length(csp, "pd_phase") == 1
@@ -54,6 +60,7 @@ end
     @test csp["_space_group_symop.space_group_id"] == fill("fddd", 3)
     @test is_allowed_cat(csp, "space_group_wyckoff")
     @test !is_allowed_cat(csp, "pd_phase")
+    @test !is_allowed_cat(csp, "structure")   #has a non-key link
 
     # Add some more values
 

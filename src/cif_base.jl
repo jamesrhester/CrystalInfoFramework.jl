@@ -296,7 +296,7 @@ end
 
 Base.show(io::IO,::MIME"text/plain",c::CifContainer) = begin
     write(io,"\n")
-    key_vals = setdiff(collect(keys(c)),get_loop_names(c))
+    key_vals = get_all_unlooped_names(c)
     for k in key_vals
         item = format_for_cif(first(c[k]))
         write(io,"$k\t$item\n")

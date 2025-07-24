@@ -30,6 +30,7 @@ using DataFrames
 using URIs
 using Lerche # for native parser
 using PrecompileTools #for fast startup
+using Combinatorics #for CifDataset
 
 # **Exports**
 

@@ -2,6 +2,7 @@
 # tables.
 export CifDataset, CifSetProjection
 export get_by_signature, has_signature, add_to_cat!, is_allowed_cat
+export sieve_block!
 
 """
    A CifSetProjection looks like a particular type of CifBlock, where all Set-valued
@@ -9,6 +10,7 @@ export get_by_signature, has_signature, add_to_cat!, is_allowed_cat
 """
 struct CifSetProjection <: CifContainer
     setkeys::Dict{String, String} #the set keys and values that are projected
+    top_cats::Set{String} # The categories corresponding to the keys
     equivalents::Dict{String, Vector{Tuple{String, String}}} #child data names (cat, name)
     cat_lookup::Dict{Union{String, Nothing}, Vector{String}} #names in categories
     values::Dict{String, Vector{Any}} #All the non-set-key values
@@ -16,19 +18,35 @@ end
 
 CifSetProjection(sig::Dict, d::AbstractCifDictionary) = begin
 
+    # We only want to handle categories that require all set categories from the
+    # sig. This includes the categories from the sig as well.
+
+    top_cats = find_category.(Ref(d), keys(sig))
     equivs = map( x -> (x, get_dataname_children(d, x)), collect(keys(sig)))
+    allowed_cats = get_cats_for_sets(d, top_cats)
+
+    @debug "Allowed cats for $sig" equivs allowed_cats
+    
     for (k, v) in equivs
         filter!(v) do one_link
             cat = find_category(d, one_link)
             catkeys = get_keys_for_cat(d, cat)
-            if !(one_link in catkeys)
+            if !(one_link in catkeys) || !(cat in allowed_cats)
+
+                @debug "Dropping $one_link"
                 false
+            elseif length(sig) > 1
+                !(cat in top_cats)
             else
-                finalkeys = get_ultimate_link.(Ref(d), catkeys)
-                finalcats = find_category.(Ref(d), finalkeys)
-                count( x->is_set_category(d, x), finalcats) == length(sig) || length(catkeys) == 1 && catkeys[] in keys(sig)
+                @debug "Accepting $one_link"
+                true
             end
         end
+    end
+
+    if length(first(equivs)[2]) == 0
+        @debug "Signature $sig does not refer to any categories"
+        return nothing
     end
     
     equivs = [k => map( c -> (find_category(d, c), c) , children) for (k, children) in equivs]
@@ -37,7 +55,7 @@ CifSetProjection(sig::Dict, d::AbstractCifDictionary) = begin
     
     equivs = Dict(equivs)
     cl = Dict{Union{String,Nothing}, Vector{String}}(map( x -> (find_category(d, x) => [x]), collect(keys(sig))))
-    CifSetProjection(sig, equivs, cl, Dict{String, Vector{Any}}())
+    CifSetProjection(sig, Set(top_cats), equivs, cl, Dict{String, Vector{Any}}())
 end
 
 haskey(c::CifSetProjection, k::String) = begin
@@ -80,9 +98,7 @@ end
 
 length(c::CifSetProjection, catname) = begin
 
-    topcats = (v[1][1] for (k, v) in c.equivalents)
-
-    if catname in topcats return 1 end
+    if catname in c.top_cats return 1 end
     
     if has_category(c, catname)
         n = get_category_names(c, catname, non_set = true)
@@ -100,8 +116,12 @@ Return true if `catname` is allowed for `cp`.
 """
 is_allowed_cat(cp::CifSetProjection, catname) = begin
 
+    catname in allowed_categories(cp)
+end
+
+allowed_categories(cp::CifSetProjection) = begin
     all_info = Iterators.flatten(values(cp.equivalents))
-    catname in (cat for (cat,k) in all_info)
+    (cat for (cat, k) in all_info)
 end
 
 """
@@ -124,26 +144,22 @@ end
 has_category(c::CifSetProjection, catname) = catname in keys(c.cat_lookup)
 
 get_loop_names(c::CifSetProjection) = [v for (cat,v) in c.cat_lookup if length(c, cat) > 1]
-get_data_values(c::CifSetProjection) = c.values
-
-"""
-    Get all values for the specified category key, including children
-"""
-collect_values(c::CifContainer, d::DDLm_Dictionary, keyname) = begin
-
-    child_dns = get_dataname_children(d, keyname)
-    all_vals = []
-
-    for cd in child_dns
-        if haskey(c, cd)
-            append!(all_vals, c[cd])
-        end
-    end
-
-    return unique!(all_vals)
+get_all_unlooped_names(c::CifSetProjection) = begin
+    mostly = setdiff(keys(c.values), Iterators.flatten(get_loop_names(c)))
+    Iterators.flatten((mostly, keys(c.setkeys)))
 end
 
+get_data_values(c::CifSetProjection) = c.values
+
 get_signature(cp::CifSetProjection) = cp.setkeys
+get_dataname_children(cp::CifSetProjection, key) = begin
+
+    if !(key in keys(get_signature(cp)))
+        throw(error("Cannot work out children for $key"))
+    end
+
+    return (k for (_, k) in cp.equivalents[key])
+end
 
 """
     add_to_cat!(cp::CifSetProjection, catname, catcontents)
@@ -172,9 +188,17 @@ add_to_cat!(cp::CifSetProjection, catname, datanames, datavalues) = begin
     all_info = Iterators.flatten(values(cp.equivalents))
     equiv_keys = (k for (_,k) in all_info)
     bad = intersect(datanames, equiv_keys)
-    if length(bad) > 0
-        throw(error("Changing set key data values not allowed: $bad"))
+    ii = indexin(bad, datanames)
+    for one_nasty in ii
+        dname = datanames[one_nasty]
+        dval = datavalues[one_nasty]
+        if get(get_signature(cp), dname, nothing) == dval[] continue end
+        throw(error("Changing set key data values not allowed: $dname = $dval"))
     end
+
+    # Now remove equivalent datanames from further consideration
+
+    setdiff!(datanames, bad)
     
     # Work out overlap of names and lengths
     
@@ -257,8 +281,9 @@ add_to_cat!(cp::CifSetProjection, ::Nothing, datanames, datavalues) = begin
     
 end
 
-
 """
+    add_new_cat!(cp::CifSetProjection, catname, datanames, datavalues)
+
     Add category `catname` to `cp`. `datavalues` contains the values in the
     same order as `datanames`. This should not be called directly. If `catname`
     already exists, an error is thrown.
@@ -281,6 +306,51 @@ add_new_cat!(cp::CifSetProjection, catname, datanames, datavalues) = begin
 end
 
 """
+    Add relevant contents of block `c`. Currently will only work if category
+    relies on implicit values of Set category keys. Returns true if anything
+    was added to the block.
+
+"""
+sieve_block!(csp::CifSetProjection, c::CifContainer, d::DDLm_Dictionary) = begin
+
+    keynames = keys(get_signature(csp))
+    can_do = all( x -> has_implicit_only(csp, c, x), keynames)
+    if !can_do
+        throw(error("Unable to sieve block if children of key-valued data names $keynames are present"))
+    end
+
+    block_sig = Dict((k => c[k][] for k in keynames))
+    if block_sig != get_signature(csp)
+
+        @debug "$block_sig != $(get_signature(csp)), no additions"
+        
+        return false
+    end
+
+    added_sthing = false
+    for one_cat in all_categories_in_block(c, d)
+        if is_allowed_cat(csp, one_cat)
+
+            @debug "Adding $one_cat"
+
+            # Following gymnastics so that unknown names looped together are included
+            
+            n = any_name_in_cat(c, one_cat, d)
+            all_names = get_loop_names(c, n)
+            if length(all_names) == 0
+                all_names = get_loop_names(c, one_cat, d)
+            end
+            
+            all_values = [c[n] for n in all_names]
+            add_to_cat!(csp, one_cat, all_names, all_values)
+            added_sthing = true
+        end
+    end
+
+    return added_sthing
+end
+
+"""
     A CifDataset provides a relational view of a collection of Cif blocks
 """
 struct CifDataset <: CifContainer
@@ -294,40 +364,60 @@ CifDataset(cf::CifContainer, d::DDLm_Dictionary) = begin
 
     # Work out which Set keys are in play
     
-    all_categories = get_categories(cf)
     all_sets = get_set_categories(d)
-    all_keyed_sets = filter( x -> size(d[x][:category_key], 1) == 1, all_sets)
-    key_data_names = Iterators.flatten(get_keys_for_cat.(Ref(d), all_keyed_sets))
-    all_vals = collect_values.(Ref(cf), Ref(d), key_data_names)
-
-    # For each combination of keys and values, create a CifSetProjection block
-
-    proto_dataset = CifDataset(d)
-
-    for one_cat in all_categories
-        ak = get_keys_for_cat(d, one_cat)
-        set_rel = get_ultimate_link.(Ref(d), ak)
-        key_loc = indexin(set_rel, key_data_names)
-        all_vals = map(1:length(ak)) do kl
-            if key_loc[kl] != nothing
-                (key_data_names[key_loc[kl]], unique(cf[ak[kl]]))
-            end
-        end
-
-        # all vals is now list of (set key, all vals) tuples
-
-        child_set_keys = (first(x) for x in all_vals)
-        all_poss_vals = (second(x) for x in all_vals)
-        for combo in Iterators.product(all_poss_vals...)
-            
-            sig = Dict{String, Vector{String}}(collect(zip(child_set_keys, combo)))
-            new_cat = filter_on_values(cf, one_cat, sig)
-            if isnothing(new_cat) continue end
-            
-            csp = get_by_signature!(proto_dataset, sig)
-            add_to_cat!(csp, one_cat, new_cat) 
+    all_keyed_sets = filter( all_sets ) do x
+        k = d.block[:category_key]
+        try
+            size(k[(master_id = x,)],1) == 1
+        catch KeyError
+            false
         end
     end
+    
+    key_data_names = Iterators.flatten(get_keys_for_cat.(Ref(d), all_keyed_sets))
+
+    # List keys that are implicit in this block
+    
+    implicit_keys = filter( x -> has_implicit_only(cf, d, x), collect(key_data_names))
+    all_vals = collect_values.(Ref(cf), Ref(d), key_data_names)
+    key_data_names = filter( x -> length(x[2]) > 0, collect(zip(key_data_names, all_vals)))
+
+    all_implicit = length(key_data_names) == length(implicit_keys)
+
+    @debug "Keys with values $key_data_names" implicit_keys all_implicit
+    
+    # For each combination of keys and values, create a CifSetProjection block
+
+    all_categories = all_categories_in_block(cf, d)
+    key_data_names = Dict(key_data_names)
+    
+    all_key_combos = powerset(collect(keys(key_data_names)), 1)
+    proto_dataset = CifDataset(d)
+
+    if !all_implicit
+        throw(error("Currently unable to create Dataset from non-implicit blocks"))
+    end
+    
+    for akc in all_key_combos
+        all_value_combos = Iterators.product(key_data_names[x][1] for x in akc)
+        sig = Dict(zip(akc, (a[1] for a in all_value_combos)))
+
+        csp = CifSetProjection(sig, d)
+        if isnothing(csp)
+
+            @debug "$sig rejected"
+            continue
+        end
+        
+        @debug "Created signature $sig"
+
+        if sieve_block!(csp, cf, d)
+            @debug "Added to block"
+            proto_dataset[sig] = csp
+        end
+    end
+
+    return proto_dataset
 end
 
 iterate(c::CifDataset) = iterate(c.blocks)
@@ -337,3 +427,102 @@ haskey(c::CifDataset, sig::Dict) = haskey(c.blocks, sig)
 
 getindex(c::CifDataset, sig::Dict) = c.blocks[sig]
 setindex!(c::CifDataset, val::CifSetProjection, sig) = c.blocks[sig] = val
+
+"""
+    merge_into_dataset(c::CifDataset, cb::CifContainer)
+
+Add the contents of `cb` to `c`.
+"""
+merge_into_dataset!(c::CifDataset, cb::CifContainer) = begin
+
+    merge_datasets!(c, CifDataset(cb, c.reference_dict))
+end
+
+merge_datasets!(base::CifDataset, new::CifDataset; noverify = true) = begin
+
+    if base.reference_dict != new.reference_dict
+        throw(error("Can only combine datasets based on identical dictionaries"))
+    end
+
+    for (sig, contents) in new
+        if haskey(base, sig)
+            continue
+        end
+        base[sig] = new[sig]
+    end
+    
+end
+
+CifDataset(cf::Cif, d::DDLm_Dictionary) = begin
+
+    base = CifDataset(first(cf).second, d)
+    if length(cf) > 1
+        for (i, entry) in enumerate(cf)
+            if i == 1 continue end
+
+            bname, contents = entry
+            @debug "Now merging block $bname"
+            merge_into_dataset!(base, contents)
+        end
+    end
+
+    return base
+end
+
+#== Utility routines ==#
+
+"""
+    has_implicit_only(c::CifContainer, d::DDLm_Dictionary, keyname)
+
+Returns true if the only values for set-valued keys are implicit, i.e. there are
+no child keys of `keyname` in the block. This would be the normal situation for legacy
+CIFs. If `keyname` is absent returns false. If more than one value is present,
+return false.
+"""
+has_implicit_only(c::CifContainer, d::DDLm_Dictionary, keyname) = begin
+
+    if !haskey(c, keyname) return false end
+    if length(c[keyname]) != 1 || ismissing(c[keyname]) return false end
+    
+    ch = get_dataname_children(d, keyname)
+    filter!( x -> x != keyname && haskey(c, x), ch)
+    filter!( x -> x in get_keys_for_cat(d, find_category(d, x)), ch)
+    return length(ch) == 0
+end
+
+"""
+    Use dictionary information in `csp` to deduce implicit key behaviour in `c`.
+"""
+has_implicit_only(csp::CifSetProjection, c::CifContainer, keyname) = begin
+
+    topkeys = keys(get_signature(csp))
+    if !all( x -> haskey(c, x), topkeys) return false end
+    if !all( x -> length(c[x]) == 1 || ismissing(c[x]), topkeys) return false end
+    dc = get_dataname_children(csp, keyname)
+    return all( x -> x == keyname || !haskey(c, x), dc)
+end
+
+"""
+    collect_values(c::CifContainer, d::DDLm_Dictionary, keyname; keys_only = true)
+
+Get all values for the specified category key, including children. If `keys_only`
+is true, ignore values for non-key data names.
+"""
+collect_values(c::CifContainer, d::DDLm_Dictionary, keyname; keys_only = true) = begin
+
+    child_dns = get_dataname_children(d, keyname)
+    if keys_only
+        filter!( x -> x in get_keys_for_cat(d, find_category(d, x)), child_dns)
+    end
+    
+    all_vals = []
+
+    for cd in child_dns
+        if haskey(c, cd)
+            append!(all_vals, c[cd])
+        end
+    end
+
+    return unique!(all_vals)
+end
+
