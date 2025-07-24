@@ -65,6 +65,7 @@ jobs:
             mv core/templ_attr.cif .
             mv ms/cif_ms.dic .
             mv imgcif/ddl2/cif_img.dic .
+            ln -s ../mini_cif_pow.dic .
             cd ../..
             
       - name: Dictionary directory contents
