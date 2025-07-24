@@ -324,6 +324,8 @@ get_loop_names(block, catname, dict; children = false) = begin
     
 end
 
+get_loop_names(block, ::Nothing, dict; kwargs...) = []
+
 count_rows(block, catname, dict) = begin
     ln = get_loop_names(block, catname, dict)
     if length(ln) == 0 return 0 end

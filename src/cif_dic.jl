@@ -42,6 +42,8 @@ get_names_in_cat(d::AbstractCifDictionary,catname;aliases=false,only_items=true)
     return canonical_names
 end
 
+get_names_in_cat(d::AbstractCifDictionary, ::Nothing; aliases = false, only_items = true) = []
+
 """
     convert_to_julia(cdic,cat,obj,value::Array)
 
