@@ -70,19 +70,23 @@ end
 """
    Guess the category looped datanames belong to based on friends in
    the same loop. Useful when non-dictionary data names are included
-   in a loop.
+   in a loop. If a category is merged, choose the closest common parent
+   in the hierarchy that exists in the loop.
 """
 guess_category(d::DDLm_Dictionary, loopnames) = begin
 
+    current_parent = nothing   #for tracking joinable categories
     for l in loopnames
         fc = find_category(d, l)
         if isnothing(fc) continue
-        else return fc
+        elseif !is_joinable_category(d, fc) return fc
+        else
+            current_parent = closest_common_parent(d, current_parent, fc)
         end
         
     end
 
-    return nothing
+    return current_parent
 
 end
 
@@ -279,7 +283,7 @@ end
 Return a list of all categories in the block. Where a loop does not
 contain any data names belonging to a known category, a data name
 from that loop is returned instead. Where an unlooped data name is
-
+not found, it is assigned category `nothing`.
 """
 all_categories_in_block(block, dict) = begin
 
@@ -307,7 +311,7 @@ end
 """
     get_loop_names(block, catname, dict; children = false)
 
-Return a list of data names from `catname` in `block`, using
+Return a list of looped data names from `catname` in `block`, using
 `dict` for reference. If `children` is `true`, include data
 names from child categories
 """
@@ -320,11 +324,11 @@ get_loop_names(block, catname, dict; children = false) = begin
         end
     end
     
-    filter!(x -> x in keys(block), all_names)
+    filter!(x -> x in keys(block) && length(block[x]) > 1, all_names)
     
 end
 
-get_loop_names(block, ::Nothing, dict; kwargs...) = []
+get_loop_names(block, ::Nothing, dict; kwargs...) = String[]
 
 count_rows(block, catname, dict) = begin
     ln = get_loop_names(block, catname, dict)
@@ -332,7 +336,33 @@ count_rows(block, catname, dict) = begin
     return length(block[ln[1]])
 end
 
-any_name_in_cat(block, catname, dict) = get_loop_names(block, catname, dict)[1]
+any_name_in_cat(block, catname, dict) = begin
+
+    all_names = get_names_in_cat(dict, catname, aliases = true)
+    x = findfirst( x -> x in keys(block), all_names)
+    return all_names[x]
+end
+
+any_name_in_cat(block, ::Nothing, dict) = begin
+
+    # "nothing" category includes any data name that isn't in a dictionary and
+    # can't be guessed from neighbours in a loop
+
+    for n in get_all_unlooped_names(block)
+        if find_category(dict, n) == nothing
+            return n
+        end
+    end
+
+    for l in get_loop_names(block)
+        gc = guess_category(dict, l)
+        if isnothing(gc)
+            return first(l)
+        end
+    end
+
+    return nothing
+end
 
 """
     get_dropped_keys(block, catname, dict)

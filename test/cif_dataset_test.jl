@@ -80,5 +80,8 @@ end
 
 @testset "CifDataset from block" begin
 
-    
+    t, r = prepare_system()
+    cd = CifDataset(r, t)
+    @test confirm_all_present(r, cd, t)
+
 end

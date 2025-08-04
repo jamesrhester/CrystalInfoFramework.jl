@@ -4280,6 +4280,24 @@ save_refln.wavelength_id
 
 save_
 
+save_structure.phase_id
+
+    _definition.id                '_structure.phase_id'
+    _definition.update            2025-08-04
+    _description.text
+;
+    A code which identifies the powder phase to which this structure relates.
+;
+    _name.category_id             structure
+    _name.object_id               phase_id
+    _name.linked_item_id          '_pd_phase.id'
+    _type.purpose                 Link
+    _type.source                  Assigned
+    _type.container               Single
+    _type.contents                Text
+
+save_
+
     loop_
       _dictionary_audit.version
       _dictionary_audit.date

@@ -21,6 +21,7 @@ using Printf,Dates
 
 export DDLm_Dictionary
 export find_category, guess_category, get_categories, get_set_categories
+export get_keyed_set_categories
 export list_aliases
 export find_object,find_name,filter_def, find_cat_obj
 export get_single_key_cats
@@ -30,7 +31,7 @@ export get_parent_dataname              #Next one up
 export get_objs_in_cat
 export get_dict_funcs                   #List the functions in the dictionary
 export get_parent_category,get_child_categories
-export is_set_category,is_loop_category
+export is_set_category,is_loop_category, is_joinable_category
 export get_func,get_func_text,set_func!,has_func,load_func_text
 export has_default_methods,remove_methods!
 export get_def_meth,get_def_meth_txt,has_def_meth    #Methods for calculating defaults
@@ -55,6 +56,7 @@ export replace_category!  #replace an attribute category for a definition
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
 export get_set_cats_for_cat, get_cats_for_sets  #Keyed set category fun
+export get_non_set_keys_for_cat #Keyed set category fun
 
 # Editing
 export update_dict! #Update dictionary contents
@@ -641,6 +643,22 @@ end
 is_loop_category(d::AbstractCifDictionary, n::Nothing) = false
 
 """
+    is_joinable_category(d::DDLm_Dictionary, catname)
+
+True if `catname` can be joined with another category using the category
+keys. This is indicated by a parent/child relationship between object_id
+and category_id in the definitions of the categories.
+"""
+is_joinable_category(d::DDLm_Dictionary, catname) = begin
+    if !is_loop_category(d, catname) return false end
+    if is_loop_category(d, find_category(d, catname)) return true end
+
+    # Look at child categories
+        
+    return length(get_child_categories(d, catname)) > 0
+end
+
+"""
     get_objs_in_cat(d::DDLm_Dictionary,catname)
 
 List all object_ids defined for `catname` in `d`.
@@ -690,6 +708,8 @@ get_keys_for_cat(d::DDLm_Dictionary, cat::Symbol; kwargs...) = begin
     get_keys_for_cat(d, String(cat); kwargs...)
 end
 
+get_keys_for_cat(d::DDLm_Dictionary, ::Nothing; kwargs...) = []
+
 """
     get_linked_names_in_cat(d::DDLm_Dictionary,cat)
 
@@ -726,6 +746,23 @@ get_set_categories(d::DDLm_Dictionary) = begin
         lowercase.(d[:definition][d[:definition][!,:class] .== "Set",:id])
     else
         ["dictionary"]
+    end
+end
+"""
+    get_keyed_set_categories(d::DDLm_Dictionary)
+
+Return those set categories that have keys defined.
+"""
+get_keyed_set_categories(d::DDLm_Dictionary) = begin
+
+    all_sets = get_set_categories(d)
+    return filter( all_sets ) do x
+        k = d.block[:category_key]
+        try
+            size(k[(master_id = x,)],1) == 1
+        catch KeyError
+            false
+        end
     end
 end
 
@@ -766,6 +803,8 @@ get_set_cats_for_cat(d::DDLm_Dictionary, cat) = begin
     filter( x -> is_set_category(d, x), final_cats)
 end
 
+get_set_cats_for_cat(d::DDLm_Dictionary, ::Nothing) = []
+
 """
     get_cats_for_sets(d::DDLm_Dictionary, setcats)
 
@@ -774,6 +813,20 @@ Get all categories for which the `setcats` provide keys
 get_cats_for_sets(d::DDLm_Dictionary, setcats) = begin
     s = Set(setcats)
     filter( x -> Set(get_set_cats_for_cat(d, x)) == s, get_categories(d))
+end
+
+"""
+    get_non_set_keys_for_cat(d::DDLm_Dictionary, cat)
+
+Return the key data names that are not linked to Set categories
+"""
+get_non_set_keys_for_cat(d::DDLm_Dictionary, cat) = begin
+
+    gkfc = get_keys_for_cat(d, cat)
+    final_keys = get_ultimate_link.(Ref(d), gkfc) 
+    final_cats = find_category.(Ref(d), final_keys)
+    non_sets = filter( x -> !is_set_category(d, x[end]), collect(zip(gkfc, final_cats)))
+    return [first(x) for x in non_sets]
 end
 
 # ***Dictionary functions***
@@ -805,7 +858,7 @@ is contained in a dictionary that is not imported).
 """
 get_parent_category(d::DDLm_Dictionary,child; default_cat = nothing) = begin
     try
-        lowercase(d[child][:name][!,:category_id][])
+        lowercase(d.block[:name][(master_id = lowercase(child),)][!,:category_id][])
     catch
         if isnothing(default_cat)
             return child
@@ -834,6 +887,43 @@ is_parent(d::DDLm_Dictionary,parent,child) = begin
     return p == parent
 end
 
+"""
+    closest_common_parent(d::DDLm_Dictionary, cat1, cat2; loopable_only = true)
+
+Find the category which is a common parent of `cat` and `cat2`. If `loopable_only`,
+do not look for non-looping parents.
+"""
+closest_common_parent(d::DDLm_Dictionary, cat1, cat2; loopable_only = true) = begin
+
+    # Deal with trivial cases
+    
+    if cat1 == cat2 return cat1 end
+    if isnothing(cat1) return cat2 end
+    if isnothing(cat2) return cat1 end
+    if is_parent(d, cat1, cat2) return cat1 end
+    if is_parent(d, cat2, cat1) return cat2 end
+
+    # Now search among parents, looking for a match
+
+    all_parents = []
+    hc = find_head_category(d)
+    next_p = cat1
+    while (loopable_only && is_loop_category(d, next_p)) || next_p != hc
+
+        push!(all_parents, next_p)
+        next_p = get_parent_category(d, next_p)
+    end
+
+    next_p = cat2
+    while (loopable_only && is_loop_category(d, next_p)) || next_p != hc
+        if next_p in all_parents
+            return next_p
+        end
+        next_p = get_parent_category(d, next_p)
+    end
+
+    return nothing # no common parents
+end
 
 """
     get_child_categories(d::DDLm_Dictionary,parent)
@@ -842,7 +932,11 @@ Find the child categories of `parent` according to `d`.
 TODO: more than one level down.
 """
 get_child_categories(d::DDLm_Dictionary, parent) = begin
-    [c for c in get_categories(d) if get_parent_category(d,c) == lowercase(parent)]
+
+    catcol = d[:name][!, :category_id]
+    selector = map( x -> !isnothing(x) && lowercase(x) == parent, catcol)
+    cnames = d[:name][selector, :master_id]
+    filter( x -> is_loop_category(d, x), cnames)
 end
 
 """
