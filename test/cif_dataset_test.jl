@@ -82,8 +82,13 @@ end
 
     t, r = prepare_system()
     cd = CifDataset(r, t)
-    rd = find_mismatches(r, cd, t)
-    print(rd)   #for CI debug output
+    for rk in keys(r)
+        rd = find_mismatches(r[rk], cd, t)
+        if length(rd) > 0
+            print(rd)   #for CI debug output
+        end
+    end
+    
     @test confirm_all_present(r, cd, t)
 
 end
