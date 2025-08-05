@@ -82,6 +82,8 @@ end
 
     t, r = prepare_system()
     cd = CifDataset(r, t)
+    rd = find_mismatches(r, cd, t)
+    print(rd)   #for CI debug output
     @test confirm_all_present(r, cd, t)
 
 end

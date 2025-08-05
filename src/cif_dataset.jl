@@ -2,7 +2,7 @@
 # tables.
 export CifDataset, CifSetProjection
 export get_by_signature, has_signature, add_to_cat!, is_allowed_cat
-export sieve_block!, confirm_all_present
+export sieve_block!, confirm_all_present, find_mismatches
 
 """
    A CifSetProjection looks like a particular type of CifBlock, where all Set-valued
@@ -692,12 +692,13 @@ get_implicits_for_block(cc::CifContainer, d::DDLm_Dictionary) = begin
 end
 
 """
-    confirm_all_present(cc::CifContainer, cd::CifDataset, dict::DDLm_Dictionary)
+    find_mismatches(cc::CifContainer, cd::CifDataset, dict::DDLm_Dictionary)
 
-Check that all items in `cc` are found somewhere in `cd`.
+Find mismatching data values.
 """
-confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begin
+find_mismatches(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begin
 
+    results_dict = Dict{String, String}()
     key_data_names = Dict(get_implicits_for_block(cc, d))
     for dn in keys(cc)
 
@@ -713,12 +714,14 @@ confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begi
 
         if ismissing(target_block[dn])
             @debug "$dn is missing"
-            return false
+            results_dict[dn] = "Missing"
+            continue
         end
         
         if length(cc[dn]) != length(target_block[dn])
             @debug "Lengths don't match for $dn, category $cat, in $want_sig"
-            return false
+            results_dict[dn] = "Lengths don't match for category $cat, in $want_sig"
+            continue
         end
         
         # Get any other keys
@@ -732,7 +735,8 @@ confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begi
         if length(non_set_keys) == 0   #simple value
             if !haskey(target_block, dn) || target_block[dn] != cc[dn]
                 @debug "Non-matched value for $dn" target_block[dn] cc[dn]
-                return false
+                results_dict[dn] = "Non-matched value: $(target_block[dn]) $(cc[dn])"
+                continue
             else
                 @debug "$dn all values found"
                 continue
@@ -774,13 +778,14 @@ confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begi
         bad = findfirst( x -> cc[dn][x] != target_block[dn][positions[x]], 1:length(cc[dn]))
         if !isnothing(bad)
             @debug "Found mismatching value for $dn at position $bad" cc[dn][bad] target_block[dn][positions[bad]]
-            return false
+            results_dict[dn] = "Found mismatching value at position $bad: $(cc[dn][bad]) $(target_block[dn][positions[bad]])"
+            continue
         end
 
         @debug "$dn all values found in correct order"
     end
 
-    return true
+    return results_dict
 end
 
 confirm_all_present(cf::Cif, cd::CifDataset, d::DDLm_Dictionary) = begin
@@ -792,4 +797,14 @@ confirm_all_present(cf::Cif, cd::CifDataset, d::DDLm_Dictionary) = begin
         end
     end
     return true
+end
+
+"""
+    confirm_all_present(cc::CifContainer, cd::CifDataset, dict::DDLm_Dictionary)
+
+Confirm all items in `cc` are present somewhere in `cd` with correct values.
+"""
+confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begin
+    rd = find_mismatches(cc, cd, d)
+    return length(rd) == 0
 end
