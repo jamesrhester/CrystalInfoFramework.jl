@@ -85,7 +85,8 @@ end
     for rk in keys(r)
         rd = find_mismatches(r[rk], cd, t)
         if length(rd) > 0
-            print(rd)   #for CI debug output
+            println("Problem for $rk")
+            println(rd)   #for CI debug output
         end
     end
     
