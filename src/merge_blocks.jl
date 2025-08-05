@@ -65,8 +65,8 @@ merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
 
         # Get a name to refer to the category
 
-        csc_name = get_loop_names(base, csc, dict)[1]
-        add_name = get_loop_names(addition, csc, dict)[1]
+        csc_name = get_loop_names(base, csc, dict, even_single = true)[1]
+        add_name = get_loop_names(addition, csc, dict, even_single = true)[1]
         
         # Check for keys and add if necessary
 
@@ -153,8 +153,8 @@ in `dict`. Any missing key values cause an error
 """
 merge_loop!(base, addition, catname, dict) = begin
     
-    base_names = get_loop_names(base, catname, dict)
-    add_names  = get_loop_names(addition, catname, dict)
+    base_names = get_loop_names(base, catname, dict, even_single = true)
+    add_names  = get_loop_names(addition, catname, dict, even_single = true)
 
     kk = get_keys_for_cat(dict, catname)
     if intersect(kk, base_names) != kk || intersect(kk, add_names) != kk

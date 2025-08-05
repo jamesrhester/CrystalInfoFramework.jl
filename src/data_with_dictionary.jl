@@ -313,10 +313,12 @@ end
 
 Return a list of looped data names from `catname` in `block`, using
 `dict` for reference. If `children` is `true`, include data
-names from child categories
+names from child categories. If `even_single` is true, one-item
+loops (which could be presented unlooped) are counted as looped.
 """
-get_loop_names(block, catname, dict; children = false) = begin
+get_loop_names(block, catname, dict; children = false, even_single = false) = begin
 
+    min_length = even_single ? 0 : 1
     all_names = get_names_in_cat(dict, catname, aliases = true)
     if children
         for c in get_child_categories(dict, catname)
@@ -324,14 +326,14 @@ get_loop_names(block, catname, dict; children = false) = begin
         end
     end
     
-    filter!(x -> x in keys(block) && length(block[x]) > 1, all_names)
+    filter!(x -> x in keys(block) && length(block[x]) > min_length, all_names)
     
 end
 
 get_loop_names(block, ::Nothing, dict; kwargs...) = String[]
 
 count_rows(block, catname, dict) = begin
-    ln = get_loop_names(block, catname, dict)
+    ln = get_loop_names(block, catname, dict, even_single = true)
     if length(ln) == 0 return 0 end
     return length(block[ln[1]])
 end
@@ -350,6 +352,7 @@ Return only those names from `catname` that appear in `block`.
 """
 get_names_in_cat(block::CifContainer, catname, dict::AbstractCifDictionary) = begin
     all_names = get_names_in_cat(dict, catname, aliases = true)
+    all_names = unique(lowercase.(all_names))
     filter!( x -> haskey(block, x), all_names)
 end
 
