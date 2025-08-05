@@ -711,6 +711,11 @@ confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begi
         want_sig = Dict( x => key_data_names[x][] for x in sk)
         target_block = cd.blocks[want_sig]
 
+        if ismissing(target_block[dn])
+            @debug "$dn is missing"
+            return false
+        end
+        
         if length(cc[dn]) != length(target_block[dn])
             @debug "Lengths don't match for $dn, category $cat, in $want_sig"
             return false
