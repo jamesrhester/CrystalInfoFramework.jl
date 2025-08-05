@@ -343,6 +343,16 @@ any_name_in_cat(block, catname, dict) = begin
     return all_names[x]
 end
 
+"""
+    get_names_in_cat(block::CifContainer, catname, dict::AbstractCifDictionary)
+
+Return only those names from `catname` that appear in `block`.
+"""
+get_names_in_cat(block::CifContainer, catname, dict::AbstractCifDictionary) = begin
+    all_names = get_names_in_cat(dict, catname, aliases = true)
+    filter!( x -> haskey(block, x), all_names)
+end
+
 any_name_in_cat(block, ::Nothing, dict) = begin
 
     # "nothing" category includes any data name that isn't in a dictionary and
@@ -480,17 +490,13 @@ add_child_keys!(block, k, dict) = begin
 end
 
 """
-    make_set_loops(block,dict)
+    make_set_loops!(block,dict)
 
 Use information in `dict` to put any single-valued data names in `block` into loops.
 """
 make_set_loops!(block,dict) = begin
 
-    all_names = collect(keys(block))
-
-    # Find unlooped by removing looped names
-
-    setdiff!(all_names, get_loop_names(block)...)
+    all_names = get_all_unlooped_names(block)
 
     # Collect remainder into loops
     
@@ -498,7 +504,7 @@ make_set_loops!(block,dict) = begin
         nm = pop!(all_names)
         cat = find_category(dict, nm)
         if isnothing(cat) continue end
-        ct_names = get_loop_names(block, cat, dict)
+        ct_names = get_names_in_cat(block, cat, dict)
 
         @debug "Creating loop" ct_names
         
