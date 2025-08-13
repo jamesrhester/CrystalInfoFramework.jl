@@ -979,7 +979,7 @@ get_single_key_cats(d::DDLm_Dictionary) = begin
     candidates = get_categories(d)
     k = [(c,get_keys_for_cat(d,c)[]) for c in candidates if length(get_keys_for_cat(d,c)) == 1]
     filter!(k) do x
-        linkval = d[:name][(master_id = x[2],)].linked_item_id[]
+        linkval = d.block[:name][(master_id = x[2],)].linked_item_id[]
         linkval == nothing || linkval == x[2]
     end
 end
