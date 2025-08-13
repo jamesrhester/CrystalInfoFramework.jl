@@ -466,7 +466,14 @@ validate_set_values(csp::CifSetProjection, one_cat::String, names, values, d::DD
     
 end
 
-            # Bail if we are adding to a non-keyed Set category which already has values
+Block(csp::CifSetProjection) = begin
+    b = Block(get_loop_names(csp),get_data_values(csp),"synthetic")
+    for (k,v) in get_signature(csp)
+        b[k] = [v]
+    end
+    return b
+end
+
 
 
 """
@@ -527,6 +534,7 @@ iterate(c::CifDataset) = iterate(c.blocks)
 iterate(c::CifDataset, s) = iterate(c.blocks, s)
 
 haskey(c::CifDataset, sig::Dict) = haskey(c.blocks, sig)
+keys(c::CifDataset) = keys(c.blocks)
 
 getindex(c::CifDataset, sig::Dict) = c.blocks[sig]
 setindex!(c::CifDataset, val::CifSetProjection, sig) = c.blocks[sig] = val
@@ -807,4 +815,25 @@ Confirm all items in `cc` are present somewhere in `cd` with correct values.
 confirm_all_present(cc::CifContainer, cd::CifDataset, d::DDLm_Dictionary) = begin
     rd = find_mismatches(cc, cd, d)
     return length(rd) == 0
+end
+
+"""
+    collect_values(cd::CifDataset, setcat)
+
+Return a list of all values taken by the key of `setcat`.
+"""
+collect_values(cd::CifDataset, setcat) = begin
+
+    refdic = cd.reference_dict
+    refkey = get_keys_for_cat(refdic, setcat)[]
+    final_vals = []
+    for k in keys(cd)
+        for (kk, vv) in k
+            if kk == refkey
+                push!(final_vals, vv)
+            end
+        end
+    end
+
+    return final_vals
 end

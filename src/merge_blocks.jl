@@ -26,7 +26,7 @@ end
 """
 Merge `addition` into `base`.
 """
-merge_block!(base::CifBlock, addition::CifBlock, dict; ids = ("1", "2")) = begin
+merge_block!(base::CifContainer, addition::CifContainer, dict; ids = ("1", "2")) = begin
 
     # Regularise
     

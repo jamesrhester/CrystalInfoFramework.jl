@@ -716,8 +716,17 @@ get_keys_for_cat(d::DDLm_Dictionary, ::Nothing; kwargs...) = []
 List all data names in `cat` that are children of other data names.
 """
 get_linked_names_in_cat(d::DDLm_Dictionary,cat) = begin
-    names = [n for n in get_names_in_cat(d,cat) if d[n][:name][!,:linked_item_id][] != nothing]
-    [n for n in names if d[n][:type][!,:purpose][] != "SU"]
+    p = d.block[:definition][(master_id = cat,)]
+    names = []
+    for n in get_names_in_cat(d, cat)
+        c = d.block[:name][(master_id = n,)]
+        t = d.block[:type][(master_id = n,)]
+        if :linked_item_id in propertynames(c) && c.linked_item_id[] != nothing && t.purpose[] != "SU"
+            push!(names, n)
+        end
+    end
+
+    return names
 end
 
 """
@@ -726,10 +735,11 @@ end
 Return any name linked to `name` that is not a SU, returning `name` if none found
 """
 get_linked_name(d::DDLm_Dictionary,name) = begin
-    info = d[name][:name]
+    info = d.block[:name][(master_id = name,)]
+    typeinfo = d.block[:type][(master_id = name,)]
     poss = :linked_item_id in propertynames(info) ? info.linked_item_id[] : name
     if isnothing(poss) return name end
-    link_type = :purpose in propertynames(d[name][:type]) ? d[name][:type].purpose[] : "Datum"
+    link_type = :purpose in propertynames(typeinfo) ? typeinfo.purpose[] : "Datum"
     if link_type != "SU" return poss end
     return name
 end
@@ -969,7 +979,7 @@ get_single_key_cats(d::DDLm_Dictionary) = begin
     candidates = get_categories(d)
     k = [(c,get_keys_for_cat(d,c)[]) for c in candidates if length(get_keys_for_cat(d,c)) == 1]
     filter!(k) do x
-        linkval = d[x[2]][:name][!,:linked_item_id][]
+        linkval = d[:name][(master_id = x[2],)].linked_item_id[]
         linkval == nothing || linkval == x[2]
     end
 end
