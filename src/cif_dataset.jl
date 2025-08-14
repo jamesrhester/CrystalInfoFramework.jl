@@ -603,7 +603,45 @@ CifDataset(cf::Cif, d::DDLm_Dictionary) = begin
     return base
 end
 
+# And the reverse...
+Cif(cd::CifDataset) = begin
+    cf = Cif()
+    for (b, contents) in cd
+        newb = Block()
+
+        for (k, v) in b
+            @debug "Now processing $k $v"
+            newb[k] = [v]
+        end
+
+        for (k, v) in get_data_values(contents)
+            newb[k] = v
+        end
+
+        for ln in get_loop_names(contents)
+            create_loop!(newb, ln)
+        end
+        cf[make_bname(b)] = newb
+    end
+
+    return cf
+end
+
 #== Utility routines ==#
+
+"""
+    Make a nice blockname from a CifDataset key
+"""
+make_bname(d::Dict) = begin
+    s = ""
+    for (k,v) in d
+        s *= "$(k)_$(v)_"
+    end
+    if s == ""   #empty dict
+        s = "general_"
+    end
+    return s[1:end-1]
+end
 
 # Debug block contents
 _block_census(c::CifDataset) = begin

@@ -1,55 +1,5 @@
 
 """
-    A CifDataBlock holds data that have been described by a CIF dictionary, offering
-    efficient per-category access to data.
-"""
-struct DataDictBlock <: CifContainer
-    underlying::Block
-    cat_lookup::Dict{Union{String, Nothing}, Vector{String}}
-    reference_dict::DDLm_Dictionary   # when new names are added
-end
-
-DataDictBlock(c::CifContainer, d::AbstractCifDictionary) = begin
-
-    # We carry out routine operations during construction that would otherwise be performed for every
-    # category-based lookup
-
-    ac = all_categories_in_block(c, d)
-    cat_lookup = Dict{Union{String, Nothing}, Vector{String}}()
-    found_names = []
-    cat_lookup[nothing] = []
-    
-    for one_cat in ac
-        names_in_cat = get_loop_names(c, one_cat, d)
-        append!(found_names, names_in_cat)
-        cat_lookup[one_cat] = names_in_cat
-    end
-
-    # Now handle unknowns
-
-    unknown_cat = setdiff(collect(keys(c)), found_names)
-
-    @debug "Have $(length(unknown_cat)) data names without categories" unknown_cat
-    
-    for uc in unknown_cat
-        g = guess_category(uc, c, d)
-        push!(cat_lookup[g], uc)
-    end
-
-    DataDictBlock(c, cat_lookup, d)
-end
-
-Cif{DataDictBlock}(c::Cif, d::AbstractCifDictionary) = begin
-
-    new_contents = Dict{String, DataDictBlock}()
-    for b in keys(c)
-        new_contents[b] = DataDictBlock(c[b], d)
-    end
-    
-    Cif(new_contents, c.original_file, c.header_comments)
-end
-
-"""
     Guess the category that `dname` belongs to.
 """
 guess_category(dname::String, c::CifContainer, d::AbstractCifDictionary) = begin
@@ -61,10 +11,6 @@ guess_category(dname::String, c::CifContainer, d::AbstractCifDictionary) = begin
     if length(ln) == 0 return nothing end
     guess_category(d, ln)
     
-end
-
-guess_category(dname::String, c::DataDictBlock) = begin
-    guess_category(dname, c, c.reference_dict)
 end
 
 """
@@ -90,181 +36,46 @@ guess_category(d::DDLm_Dictionary, loopnames) = begin
 
 end
 
-# Standard methods for CifContainers
-
-get_loop_names(c::DataDictBlock) = get_loop_names(c.underlying)
-get_data_values(c::DataDictBlock) = get_data_values(c.underlying)
-
-setindex!(c::DataDictBlock, v, s) = begin
-
-    s = lowercase(s)
-    need_to_update = !haskey(c, s)
-    c.underlying[s] = v
-    if need_to_update
-        cat = guess_category(s, c)
-        push!(c.cat_lookup[cat], s)
-    end
-end
-
-delete!(b::DataDictBlock, name) = begin
-
-    name = lowercase(name)
-    old_cat = guess_category(name, b)
-    delete!(b.underlying, name)
-    b.cat_lookup[old_cat] = filter( x-> x != name, b.cat_lookup[old_cat])
-    if length(b.cat_lookup[old_cat]) == 0
-        delete!(b.cat_lookup, old_cat)
-    end
-    
-end
-
-rename!(b::DataDictBlock, old, new) = begin
-
-    old = lowercase(old)
-    cat = guess_category(old, b)
-    
-    new = lowercase(new)
-
-    rename!(b.underlying, old, new)
-    idx = indexin([old], b.cat_lookup[cat])[]
-    if isnothing(idx)
-        throw(error("Missing dataname $old in list of names for $cat when renaming to $new"))
-    end
-
-    b.cat_lookup[cat][idx] = new
-    
-end
-
-add_to_loop!(b::DataDictBlock, tgt, newname) = begin
-
-    old_cat = guess_category(newname, b)
-    add_to_loop!(b.underlying, tgt, newname)
-    new_cat = guess_category(newname, b)
-    move_category!(b, newname, old_cat, new_cat)    
-    
-end
-
-create_loop!(b::DataDictBlock, names) = begin
-
-    # Re-grouping names could change the categories they are assigned to
-    old_cats = [guess_category(n, b) for n in names]
-
-    @debug "Old categories for $names" old_cats
-    
-    create_loop!(b.underlying, names)
-    for (o, n) in zip(old_cats, names)
-        new_cat = guess_category(n, b)
-        if !(n in b.cat_lookup[new_cat])
-            move_category!(b, n, old_cat, new_cat)
-        end
-    end
-    
-end
-
-# Category-based methods for DataDictBlocks
-
-"""
-Move dataname from `old_cat` to `new_cat`. Internal method. If dname not
-present in old_cat, just add to new_cat. dname is already lower case.
-"""
-move_category!(c::DataDictBlock, dname, old_cat, new_cat) = begin
-
-    old_cat_list = get(c.cat_lookup, old_cat, [])
-    
-    if dname in old_cat_list
-        if old_cat == new_cat return end
-        c.cat_lookup[old_cat] = filter( x -> x != dname, old_cat_list)
-        if length(c.cat_lookup[old_cat]) == 0
-            delete!(c.cat_lookup, old_cat)
-        end
-        
-    end
-
-    new_cat_list = get(c.cat_lookup, new_cat, [])
-    if !(dname in new_cat_list)
-        push!(new_cat_list, dname)
-        c.cat_lookup[new_cat] = new_cat_list
-    end
-    
-end
-
-
-"""
-    get_category_names(c::DataDictBlock, catname)
-
-Return all data names thought to belong to `catname` in `c`. 
-"""
-get_category_names(c::DataDictBlock, catname) = begin
-    c.cat_lookup[catname]
-end
-
-get_category(c::DataDictBlock, catname) = begin
-
-    get_loop(c.underlying, first(get_category_names(c, catname)))
-end
-
-"""
-    get_categories(c::DataDictBlock)
-
-Return a list of all categories present in `c`
-"""
-get_categories(c::DataDictBlock) = begin
-    keys(c.cat_lookup)
-end
-
-"""
-    filter_category(c::DataDictBlock, catname, key_spec)
-
-Return a DataFrame where only those rows of `catname` specified by `key_spec` are
-present. `key_spec` is a `Dict` of data name - value pairs.
-"""
-filter_category(c::DataDictBlock, catname, key_spec) = begin
-
-    df = get_category(c, catname)
-    cat_keys = collect(keys(key_spec))
-    
-    # Now filter data frame
-
-    filter!(df) do r
-        for ck in cat_keys
-            if getproperty(r, ck) != key_spec[ck]
-                return false
-            end
-        end
-        true
-    end
-
-    return df
-end
-
-filter_category(c::DataDictBlock, catname, key_spec::Dict{String}) = begin
-
-    if !(catname in keys(c.cat_lookup)) return DataFrame() end
-         
-    cat_keys = collect(keys(key_spec))
-    key_loc = indexin(cat_keys, get_category_names(c, catname))
-
-    if any(isnothing, key_loc)
-        throw(error("Not all datanames in $key_spec found in data block"))
-    end
-
-    newdict = map( x -> Symbol(x.first) => x.second, collect(pairs(key_spec)))
-    filter_category(c, catname, Dict(newdict))
-end
-
-length(c::DataDictBlock, catname) = begin
-
-    if catname in keys(c.cat_lookup)
-        n = get_category_names(c, catname)
-        return length(c[first(n)])
-    else
-        return 0
-    end
-    
-end
-
 # Utility routines for interrogating/updating data blocks based on dictionary information
 # We should be aware that some non-dictionary-defined data names may be present.
+
+"""
+    make_canonical!(d::DDLm_Dictionary, cb::CifContainer)
+
+Change data names in `cb` to unaliased form
+"""
+make_canonical!(d::DDLm_Dictionary, cb::CifContainer) = begin
+
+    old_names = keys(cb)
+
+    # Set up new names
+    
+    for on in old_names
+        nn = on
+        try
+            nn = find_name(d, on)
+        catch KeyError
+            continue
+        end
+        
+        if nn == on continue end
+        rename!(cb, on, nn)
+    end
+
+end
+
+"""
+    make_canonical!(d::DDLm_Dictionary, cf::Cif)
+
+Change data names in `cf` to unaliased form
+"""
+make_canonical!(d::DDLm_Dictionary, cf::Cif) = begin
+
+    for (k,v) in cf
+        make_canonical!(d, v)
+    end
+    
+end
 
 """
     has_category(block,catname,dict)

@@ -53,6 +53,8 @@ end
     @test length(setdiff(unique(f["_cell.structure_id"]),dids)) == 0
 end
 
+#== Replace with CifDataset tests
+
 @testset "DataDictBlock tests" begin
     c = Cif(joinpath(@__DIR__,"nick1.cif"))
     t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
@@ -75,3 +77,4 @@ end
     @test !("_cell.length_a" in ddb.cat_lookup["cell"])
 
 end
+==#

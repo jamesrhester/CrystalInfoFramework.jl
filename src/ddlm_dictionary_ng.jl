@@ -63,13 +63,13 @@ export update_dict! #Update dictionary contents
 export make_cats_uppercase! #Conform to style guide
 
 # With data
-export DataDictBlock  # category-based data access
 export has_category   # check if a data block has a category
 export get_category_names, get_category, filter_category
 export all_categories_in_block # list all categories
 export count_rows     # how many rows in a category in a datablock
 export add_child_keys! # add any missing keys
 export make_set_loops! # make sure block loops everything
+export make_canonical! # unalias data names
     
 # Displaying
 import Base.show

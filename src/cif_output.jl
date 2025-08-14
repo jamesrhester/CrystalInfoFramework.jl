@@ -870,18 +870,24 @@ end
     show(io::IO,::MIME"text/cif",c::Cif; ordering = [])
 
 Write the contents of `c` as a CIF file to `io`, ordering each of
-the CifContainers according to `ordering`.
+the CifContainers according to `ordering`. Output is always CIF2.0
+conformant.
 """
-Base.show(io::IO,::MIME"text/cif",c::Cif; ordering=[]) = begin
+Base.show(io::IO,::MIME"text/cif",c::Cif; block_ordering = [], kwargs...) = begin
 
-    for k in keys(c)
-        write(io,"data_$k\n")
-        show(io,MIME("text/cif"),c[k], ordering=ordering)
+    write(io, "#\\#CIF_2.0\n")
+    if length(block_ordering) == 0
+        block_ordering = sort(collect(keys(c)))
+    end
+    
+    for k in block_ordering
+        write(io,"\ndata_$k\n")
+        show(io,MIME("text/cif"),c[k], kwargs...)
     end
 
 end
 
-Base.show(io::IO,::MIME"text/cif",c::CifContainer;ordering=[]) = begin
+Base.show(io::IO,::MIME"text/cif",c::CifContainer; ordering=[]) = begin
     write(io,"\n")
     if length(ordering) == 0
         ordering = sort(collect(keys(c)))
