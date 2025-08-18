@@ -1567,6 +1567,8 @@ links.
 find_head_category(df::DataFrame) = begin
     # get first and follow it up
     old_cat = lowercase(df.category_id[1])
+
+    @debug "Starting search for head category from $old_cat"
     even_older_cat = old_cat
     new_cat = old_cat
     while true
