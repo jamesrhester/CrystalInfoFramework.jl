@@ -129,16 +129,63 @@ unless `import_dir` is specified, in which case the search is relative to
 that directory.
 
 """
-DDLm_Dictionary(a; kwargs...) = begin
-    c = Cif(a)
-    DDLm_Dictionary(c; kwargs...)
+DDLm_Dictionary(somepath; kwargs...) = begin
+
+    #c = Cif(a)
+    #DDLm_Dictionary(c; kwargs...)
+
+    ## get the full filename and make sure we have a string.
+    full = convert(String, realpath(somepath))
+    DDLm_Dictionary(open(full); source = full, kwargs...)
+end
+
+DDLm_Dictionary(io::IO; source = nothing, kwargs...) = begin
+    full_contents = read(io, String)
+    if isnothing(source) source = "$io" end
+    ddlm_dictionary_from_string(full_contents; source = source, kwargs...)
+end
+
+ddlm_dictionary_from_string(s::AbstractString; source="", ignore_imports=:None, header="",cache_imports=true, import_dir="") = begin
+    
+    if length(s) > 1 && s[1] == '\ufeff'
+        s = s[(nextind(s,1)):end]
+    end
+
+    ct = TreeToDDLm(Dict(), source, get_header_comments(s))
+    all_dict_info, nspace = Lerche.transform(ct, Lerche.parse(cif2_parser, s))
+
+    # process imports
+
+    if import_dir == "" import_dir = dirname(source) end
+    if cache_imports || ignore_imports != :All
+        cache = import_cache(all_dict_info,import_dir)
+    end
+    if ignore_imports != :All
+        resolve_imports!(all_dict_info,import_dir,cache, ignore_imports)
+    end
+    
+    # Apply default values if not a template dictionary
+
+    if all_dict_info[:dictionary][!,:class][] != "Template"
+        enter_defaults(all_dict_info)
+    end
+    if all_dict_info[:dictionary].class[] == "Reference"
+        extra_reference!(all_dict_info)
+    end
+
+    DDLm_Dictionary(all_dict_info, nspace, header=header, origin=import_dir,
+                    imports=cache)
 end
 
 DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin
+
     all_dict_info = Dict{Symbol,DataFrame}()
+
     # Namespace
+
     nspace = get(b,"_dictionary.namespace",[""])[]
     title = lowercase(b["_dictionary.title"][])
+
     # loop over all blocks, storing information
     defs = get_frames(b)
     bnames = keys(defs)
@@ -1729,16 +1776,16 @@ import_cache(d,original_dir) = begin
         import_table = one_row.get
         for one_entry in import_table
             import_def = missing
-#           println("one import instruction: $one_entry")
+            @debug "one import instruction: $one_entry"
     (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
             end
             # Now carry out the import
             if !(location in keys(cached_dicts))
-                #println("Now trying to import $location")
+                @debug "Now trying to import $location"
                 try
-                    cached_dicts[location] = DDLm_Dictionary(location,import_dir=original_dir)
+                    cached_dicts[location] = DDLm_Dictionary(location, import_dir=original_dir)
                 catch y
                     println("Error $y, backtrace $(backtrace())")
                     if if_miss == "Exit"
