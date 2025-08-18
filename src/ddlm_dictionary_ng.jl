@@ -1612,8 +1612,16 @@ Find the category that is at the top of the category tree by following object->c
 links.
 """
 find_head_category(df::DataFrame) = begin
-    # get first and follow it up
-    old_cat = lowercase(df.category_id[1])
+
+    # find a normal definition (has parent) and follow it up
+    n = 1
+    old_cat = lowercase(df.category_id[n])
+    search_space = lowercase.(df.object_id)
+    while !(old_cat in search_space) && n < length(search_space)
+        n += 1
+        old_cat = lowercase(df.category_id[n])
+    end
+
     even_older_cat = old_cat
     new_cat = old_cat
     while true
