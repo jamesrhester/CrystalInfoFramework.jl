@@ -520,7 +520,6 @@ Read in filename `s` as a CIF file.  `version` may be `1`, `2` or
 Cif(somepath; version=0) = begin
     ## get the full filename and make sure we have a string.
     full = convert(String, realpath(somepath))
-    pathstring = URI(full).path
     Cif(open(full), version = version, source = full)
 end
 
@@ -547,7 +546,7 @@ cif_from_string(s::AbstractString; version=0, source="") = begin
     else
         actual_version = version
     end
-    ct = TreeToCif(source,get_header_comments(s))
+    ct = TreeToCifData(source,get_header_comments(s))
     if actual_version == 2
         return Lerche.transform(ct,Lerche.parse(cif2_parser,s))
     else

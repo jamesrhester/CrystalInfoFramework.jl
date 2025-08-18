@@ -28,9 +28,11 @@ this file transform the parse tree into a Cif.
 The transformer methods will assume that any interior nodes have
 already been processed.
 
+We create an abstract subtype so that we can share many of the below methods with the DDLm parser.
 ==#
-
-struct TreeToCif <: Transformer
+abstract type TreeToCif <: Transformer end
+    
+struct TreeToCifData <: TreeToCif
     source_name::AbstractString
     header_comments::AbstractString
 end
@@ -163,7 +165,7 @@ end
 
 @inline_rule block_content(t::TreeToCif,arg) = arg
 
-@rule save_frame(t::TreeToCif,args) = begin
+@rule save_frame(t::TreeToCifData, args) = begin
     loop_list = Vector{Vector{String}}()
     contents = Dict{String,Vector}()
     b = Block(loop_list,contents,t.source_name)
@@ -175,7 +177,7 @@ end
     name=>b
 end
 
-@rule dblock(t::TreeToCif,args) = begin
+@rule dblock(t::TreeToCifData,args) = begin
     save_frames = Dict{String,Block}()
     loop_names = Vector{Vector{String}}()
     data_values = Dict{String,Vector}()
@@ -219,6 +221,6 @@ end
 
 add_to_block(::Nothing,cb) = cb
 
-@rule input(t::TreeToCif,args) = begin
+@rule input(t::TreeToCifData,args) = begin
     Cif{CifBlock}(Dict{String,CifBlock}(args),t.source_name,t.header_comments)
 end
