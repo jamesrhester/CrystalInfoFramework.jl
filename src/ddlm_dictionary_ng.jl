@@ -260,6 +260,21 @@ DDLm_Dictionary(attr_dict::Dict{Symbol,DataFrame},nspace;header="",origin="",imp
 end
 
 """
+    A VirtualDictDef appears like a Dict{Symbol, DataFrame} but delays creating
+the actual dictionary, preferring to access the particular information when
+called using getindex.
+"""
+struct VirtualDictDef <: AbstractDict{String, DataFrame}
+    from_dict::DDLm_Dictionary
+    defname::String
+end
+
+getindex(v::VirtualDictDef, cat::Symbol) = begin
+    v.from_dict.block[cat][(master_id = v.defname,)]
+end
+
+keys(v::VirtualDictDef) = keys(v.from_dict.block)
+"""
     keys(d::DDLm_Dictionary)
 
 Return a list of datanames defined by the dictionary, including
@@ -285,7 +300,8 @@ where `Symbol` is the attribute category (e.g. `:name`).
 """
 getindex(d::DDLm_Dictionary,k) = begin
     canonical_name = find_name(d,k)
-    return filter_on_name(d.block,canonical_name)
+    #return filter_on_name(d.block,canonical_name)
+    VirtualDictDef(d, canonical_name)
 end
 
 # If a symbol is passed we access the block directly.
@@ -1777,9 +1793,9 @@ Return an array with all import template files as DDLm dictionaries
 ready for use. This routine is intended to save time re-reading
 the imported files.
 """
-import_cache(d,original_dir) = begin
+import_cache(d, original_dir) = begin
     cached_dicts = Dict()
-    if !haskey(d,:import) return cached_dicts end
+    if !haskey(d, :import) return cached_dicts end
     for one_row in eachrow(d[:import])
         import_table = one_row.get
         for one_entry in import_table
