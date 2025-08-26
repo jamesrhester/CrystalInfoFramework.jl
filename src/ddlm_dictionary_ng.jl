@@ -262,7 +262,7 @@ end
 """
     A VirtualDictDef appears like a Dict{Symbol, DataFrame} but delays creating
 the actual dictionary, preferring to access the particular information when
-called using getindex.
+called using getindex. It is created by calling getindex on a DDLm_Dictionary.
 """
 struct VirtualDictDef <: AbstractDict{String, DataFrame}
     from_dict::DDLm_Dictionary
@@ -270,7 +270,18 @@ struct VirtualDictDef <: AbstractDict{String, DataFrame}
 end
 
 getindex(v::VirtualDictDef, cat::Symbol) = begin
-    v.from_dict.block[cat][(master_id = v.defname,)]
+    df = v.from_dict.block[cat]
+    try
+        return df[(master_id = v.defname,)]
+    catch KeyError
+        return DataFrame()
+    end
+end
+
+setindex!(v::VirtualDictDef, newval, cat::Symbol) = begin
+    @error "Attempted to set a VirtualDictDef"
+    throw(error("Changing dictionary definition not allowed: attempted to set $cat to $newval for definition $v.defname"))
+    
 end
 
 keys(v::VirtualDictDef) = keys(v.from_dict.block)
@@ -280,6 +291,35 @@ keys(v::VirtualDictDef) = keys(v.from_dict.block)
 Return a list of datanames defined by the dictionary, including
 any aliases.
 """
+
+iterate(v::VirtualDictDef) = begin
+    n = iterate(v.from_dict.block)
+    if isnothing(n) return n end
+    cat, df = first(n)
+    filt = DataFrame()
+    try
+        filt = df[(master_id = v.defname,)]
+    catch KeyError
+    end
+    
+    return (cat, filt), n[2]
+end
+
+iterate(v::VirtualDictDef, s) = begin
+    n = iterate(v.from_dict.block, s)
+    if isnothing(n) return n end
+    cat, df = first(n)
+    filt = DataFrame()
+    try
+        filt = df[(master_id = v.defname,)]
+    catch KeyError
+    end
+
+    return (cat, filt), n[2]
+end
+
+length(v::VirtualDictDef) = length(keys(v))
+
 keys(d::DDLm_Dictionary) = begin
     native = lowercase.(parent(d.block[:definition])[!,:id])
     #native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))
@@ -298,7 +338,7 @@ haskey(d::DDLm_Dictionary,k::AbstractString) = lowercase(k) in keys(d)
 d[k] returns the  definition for data name `k` as a `Dict{Symbol,DataFrame}`
 where `Symbol` is the attribute category (e.g. `:name`).
 """
-getindex(d::DDLm_Dictionary,k) = begin
+getindex(d::DDLm_Dictionary, k) = begin
     canonical_name = find_name(d,k)
     #return filter_on_name(d.block,canonical_name)
     VirtualDictDef(d, canonical_name)
@@ -461,6 +501,11 @@ find_name(d::DDLm_Dictionary, name) =  begin
     
     if haskey(d.block,:definition)
         dd = d[:definition]
+        if findfirst(ismissing, dd.master_id) != nothing
+            j = findfirst(ismissing, dd.master_id)
+            @debug "==**== We have missing values in master_id, should not happen" j dd[j,:]
+        end
+        
         if name in dd[!,:master_id] return name end
     end
     
@@ -1491,7 +1536,7 @@ end
 
 Update dictionary information `all_dict_info` with the contents of `new_def`
 """
-add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def::Dict{Symbol,DataFrame}) = begin
+add_definition!(all_dict_info::Dict{Symbol,DataFrame}, new_def::Dict{Symbol,DataFrame}) = begin
     if !haskey(new_def,:definition)
         throw(error("Cannot update definition without data name: given $new_def"))
     end
@@ -1506,20 +1551,38 @@ add_definition!(all_dict_info::Dict{Symbol,DataFrame},new_def::Dict{Symbol,DataF
     return all_dict_info
 end
 
+add_definition!(all_dict_info::Dict{Symbol, DataFrame}, new_def::VirtualDictDef) = begin
+
+    if !haskey(new_def,:definition) || nrow(new_def[:definition]) == 0
+        throw(error("Cannot update definition without data name: given $new_def"))
+    end
+    defname = lowercase(new_def[:definition].id[])
+    for (k,df) in new_def
+        if nrow(df) == 0 continue end
+        if !haskey(all_dict_info,k)
+            all_dict_info[k] = DataFrame()
+        end
+        sdf = DataFrame(df)
+        sdf[!,:master_id] = fill(defname,nrow(sdf))
+        all_dict_info[k] = vcat(all_dict_info[k], sdf, cols=:union)
+    end
+    return all_dict_info
+end
+
 """
-    add_definition!(d::DDLm_Dictionary,new_def)
+    add_definition!(d::DDLm_Dictionary, new_def)
 
 Update DDLm Dictionary `d` with the contents of `new_def`.
 """
-add_definition!(d::DDLm_Dictionary,new_def) = begin
+add_definition!(d::DDLm_Dictionary, new_def) = begin
     underlying = as_jdict(d)
-    updated = add_definition!(underlying,new_def)
+    updated = add_definition!(underlying, new_def)
     # Apply default values if not a template dictionary
     if underlying[:dictionary][!,:class][] != "Template"
         enter_defaults(underlying)
     end
     for t in keys(updated)         #re-sort
-        d.block[t] = groupby(updated[t],:master_id)
+        d.block[t] = groupby(updated[t], :master_id)
     end
     return d
 end
@@ -1530,7 +1593,7 @@ end
 Add an additional key data name `key_name` to dictionary `ddlm_dict`. `key_name` should
 have the form `_<cat>.<obj>`
 """
-add_key!(ddlm_dict::DDLm_Dictionary,key_name) = begin
+add_key!(ddlm_dict::DDLm_Dictionary, key_name) = begin
     cat,obj = split(key_name,".")
     cat = cat[2:end]
     if !haskey(ddlm_dict,cat)
@@ -1550,7 +1613,7 @@ add_key!(ddlm_dict::DDLm_Dictionary,key_name) = begin
     end
     ddlm_dict.block[:category_key] = groupby(underlying[:category_key],:master_id)
     # register the update
-    include_date(ddlm_dict,cat)
+    include_date(ddlm_dict, cat)
 end
 
 """
@@ -1561,7 +1624,7 @@ include_date(ddlm_dict,dataname) = begin
 end
 
 """
-    rename_category!(d::DDLm_Dictionary,old,new)
+    rename_category!(d::DDLm_Dictionary, old, new)
 
 Change all appearances of category `old` to `new`. This includes renaming datanames
 and changing `_name.category_id` attributes. It cannot change references to datanames
@@ -1570,7 +1633,7 @@ in definition text or dREL methods (yet).
 rename_category!(d::DDLm_Dictionary,old,new) = begin
     if !is_category(d,old) return end
     # Collect information
-    dnames = get_names_in_cat(d,old)
+    dnames = get_names_in_cat(d, old)
     # Change category definition itself
     update_dict!(d,old,"_name.object_id",new)
     update_dict!(d,old,"_definition.id",new)
@@ -1800,14 +1863,14 @@ import_cache(d, original_dir) = begin
         import_table = one_row.get
         for one_entry in import_table
             import_def = missing
-            @debug "one import instruction: $one_entry"
+            #@debug "one import instruction: $one_entry"
     (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
             end
             # Now carry out the import
             if !(location in keys(cached_dicts))
-                @debug "Now trying to import $location"
+                #@debug "Now trying to import $location"
                 try
                     cached_dicts[location] = DDLm_Dictionary(location, import_dir=original_dir)
                 catch y
@@ -1884,7 +1947,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
                 try
                     cached_dicts[location] = DDLm_Dictionary(location,import_dir=original_dir)
                 catch y
-                    println("Error $y, backtrace $(backtrace())")
+                    @debug "Error $y" backtrace()
                     if if_miss == "Exit"
                         throw(error("Unable to find import for $location"))
                     end
@@ -1893,18 +1956,18 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
             end
             # now find the data block
             try
+                @debug "Looking for $block in $location"
                 import_def = cached_dicts[location][block]
             catch KeyError
-                @error "Error $y, backtrace $(backtrace())"
+                @error "Error, backtrace $(backtrace())"
                 if if_miss == "Exit"
                     throw(error("When importing frame: Unable to find save frame $block in $location"))
                 end
                 continue
             end
             definition = one_row.master_id
-            prior_contents = filter_on_name(d,definition)
-            #println("Already present for $definition:")
-            #println("$prior_contents")
+            prior_contents = filter_on_name(d, definition)
+            @debug "Already present for $definition:" prior_contents
 
 #
 # Merging each category. There are two cases where the category
@@ -1930,45 +1993,51 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
                 # drop old master id
                 #println("Dropping :master_id from $k")
                 #println("Processing $k for $definition")
-                select!(import_def[k],Not(:master_id))
-                if haskey(prior_contents,k) && nrow(prior_contents[k]) > 0
-#                    println("$k already present for $definition")
-#                    println("intersecting $(propertynames(prior_contents[k])) , $(propertynames(import_def[k]))")
-                    dupls = intersect(propertynames(prior_contents[k]),propertynames(import_def[k]))
-                    filter!(x->!(all(ismissing,prior_contents[k][!,x])) && !(all(ismissing,import_def[k][!,x])),dupls)
-                    import_def[k][!,:master_id] .= definition
+
+                # Make a separate copy
+                idk = DataFrame(import_def[k])
+                select!(idk, Not(:master_id))
+                if haskey(prior_contents, k) && nrow(prior_contents[k]) > 0
+                    #@debug "$k already present for $definition"
+                    dupls = intersect(propertynames(prior_contents[k]),propertynames(idk))
+                    #@debug "Dupls: $dupls"
+                    filter!( x -> any(!ismissing,prior_contents[k][!,x]) && any(!ismissing,idk[!,x]),dupls)
+                    
+                    idk[!,:master_id] .= definition
+                    #@debug "After update:" idk[!,:master_id]
                     if length(dupls) > 0
-#                       println("For $k handling duplicate defs $dupls")
+                        @debug "For $k handling duplicate defs $dupls"
                         if if_dupl == "Exit"
                             throw(error("Keys $dupls duplicated when importing from $block at $location in category '$k' for definition '$definition'"))
                         end
                         if if_dupl == "Ignore"
-                            select!(import_def[k],Not(dupls))
+                            select!(idk, Not(dupls))
                         elseif if_dupl == "Replace"
-                            if nrow(import_def[k]>1)
-                                d[k] = import_def[k]
+                            if nrow(idk > 1)
+                                d[k] = idk   #Will fail
                                 continue
                             else
-                                import_def[k][!,Not(dupls)] = prior_contents[k][!,Not(dupls)]
+                                idk[!, Not(dupls)] = prior_contents[k][!,Not(dupls)]
                             end
                         end
                     else
-#                       println("imports were $(import_def[k])\n, updating with $(prior_contents[k])...")
+                        #@debug "imports were $idk\n, updating with $(prior_contents[k])..."
                         for n in propertynames(prior_contents[k])
-                            if !all(ismissing,prior_contents[k][!,n])
-                                import_def[k][!,n] .= prior_contents[k][!,n]
+                            if any(!ismissing, prior_contents[k][!,n])
+                                idk[!,n] .= prior_contents[k][!,n]
                             end
                         end
-#                       println("imports now $(import_def[k])")
+                        #@debug "imports now $idk"
                     end
                 end
-                import_def[k][!,:master_id] .= definition
+                idk[!,:master_id] .= definition
                 if haskey(d,k)
                     deleteat!(d[k],d[k][!,:master_id] .== definition)
                 else
                     d[k] = DataFrame()
                 end
-                d[k] = vcat(d[k],import_def[k],cols=:union)
+                d[k] = vcat(d[k], idk, cols=:union)
+                #@debug "Finally" d[k]
             end
         end   #of import list cycle
     end #of loop over blocks

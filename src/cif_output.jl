@@ -389,7 +389,7 @@ alphabetical order for anything not in `order`. If `pretty` is true,
 multi-line data values have line-breaks and spaces inserted to create a
 pleasing layout.
 """
-format_for_cif(df::DataFrame;catname=nothing,indent=[text_indent,value_col],
+format_for_cif(df::Union{DataFrame, SubDataFrame};catname=nothing,indent=[text_indent,value_col],
                order=(),kwargs...) = begin
     outstring = IOBuffer()
     inpad = " "^indent[1]
@@ -1009,11 +1009,12 @@ Base.show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = 
         if haskey(ddlm_dic, one_cat)
             cat_info = ddlm_dic[one_cat]
             # Remove "master_id" as an explicit key
-            ck = cat_info[:category_key]
+            #== ck = cat_info[:category_key]
             if nrow(ck) > 0
                 ck = filter(row -> !occursin("master_id",row.name),ck)
                 cat_info[:category_key] = ck
             end
+            ==#
             @debug "Output definition for $one_cat"
             show_one_def(io,uppercase(one_cat),cat_info)
         end

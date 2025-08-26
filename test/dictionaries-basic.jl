@@ -62,14 +62,20 @@ end
     update_dict!(t,"_name.object_id","_newcat.whichever","hello")
     @test t["_name.object_id"][:newcat].whichever[] == "hello"
     # adding a definition
-    old_def = t["_definition.class"]
+
+    # No longer acceptable to build off pre-existing, as the
+    # pre-existing one will be altered
+    
+    new_def = Dict{Symbol, DataFrame}()
+    new_def[:name] = DataFrame()
+    new_def[:definition] = DataFrame()
     new_def_name = "_onetwothree.four"
-    old_def[:name].object_id = ["four"]
-    old_def[:name].category_id = ["onetwothree"]
-    old_def[:definition].id = [new_def_name]
-    old_def[:definition].update = ["2022-01-11"]
-    old_def[:definition].text = ["Please edit me"]
-    add_definition!(t,old_def)
+    new_def[:name].object_id = ["four"]
+    new_def[:name].category_id = ["onetwothree"]
+    new_def[:definition].id = [new_def_name]
+    new_def[:definition].update = ["2022-01-11"]
+    new_def[:definition].text = ["Please edit me"]
+    add_definition!(t,new_def)
     @test t[new_def_name][:name].category_id[] == "onetwothree"
     @test t[new_def_name][:definition].text[] == "Please edit me"
     @test t["_definition.class"][:name].category_id[] == "definition"
