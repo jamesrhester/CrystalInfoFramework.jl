@@ -89,8 +89,8 @@ using information in `cdic` for `dataname`, unless value is `missing`
 or `nothing`, which are returned unchanged.  This only handles one
 level of arrays.  
 """
-convert_to_julia(cdic,dataname::AbstractString,value) = begin
-    return convert_to_julia(cdic,find_category(cdic,dataname),find_object(cdic,dataname),value)
+convert_to_julia(cdic, dataname::AbstractString, value) = begin
+    return convert_to_julia(cdic, find_category(cdic,dataname), find_object(cdic,dataname), value)
 end
 
 """

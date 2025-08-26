@@ -18,6 +18,11 @@ end
 
 @testset "DDLm_Dictionaries" begin
     t = prepare_system()
+    @test find_category(t, "_cell.formula_units_Z") == "cell"
+    @test find_object(t, "_cell.formula_units_Z") == "formula_units_z"
+    @test find_category(t, "_cell_volume") == "cell"
+    @test find_object(t, "_cell_formula_units_Z") == "formula_units_z"
+    @test "_cell_formula_units_Z" in list_aliases(t, "_cell.formula_units_Z")
     @test "_audit_conform.dict_name" in get_names_in_cat(t,"audit_conform")
     @test "_atom_site.label" in get_keys_for_cat(t,"atom_site")
     @test "_atom_site_moment_crystalaxis" in get_names_in_cat(t,"atom_site_moment",aliases=true)
@@ -45,6 +50,7 @@ end
     c = get_dataname_children(t,"_atom_site.label")
     @test "_atom_site_aniso.label" in c
     @test "_geom_hbond.atom_site_label_a" in c
+    @test find_cat_obj(t, "_atom_site.label") == (:atom_site, :label)
 end
 
 @testset "Dictionary updating" begin

@@ -151,9 +151,9 @@ get_child_categories(d::DDL2_Dictionary,catname) = []
 get_parent_category(d::DDL2_Dictionary, catname) = nothing
 
 # And no Set categories
-is_set_category(d::DDL2_Dictionary,catname) = false
-is_loop_category(d::DDL2_Dictionary,catname::String) = true
-is_loop_category(d::DDL2_Dictionary,n) = false
+is_set_category(d::DDL2_Dictionary,  catname) = false
+is_loop_category(d::DDL2_Dictionary, catname::String) = true
+is_loop_category(d::DDL2_Dictionary, n::Nothing) = false
 
 find_object(d::DDL2_Dictionary,dataname) = begin
     if occursin(".",dataname)

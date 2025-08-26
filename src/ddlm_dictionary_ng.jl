@@ -467,15 +467,13 @@ end
 List aliases of `name` listed in `d`. If not `include_self`, remove
 `name` from the returned list.
 """
-list_aliases(d::DDLm_Dictionary,name;include_self=false) = begin
+list_aliases(d::DDLm_Dictionary,name; include_self=false) = begin
 
     # Avoid d[name] as it is expensive
-    lname = lowercase(name)
-    result = [d.block[:definition][(master_id = lname,)].id[]]
-
+    result = [find_name(d, name)]
     alias_block = nothing
     try
-        alias_block = d.block[:alias][(master_id = lname,)]
+        alias_block = d.block[:alias][(master_id = result[],)]
     catch KeyError
     end
 
@@ -609,7 +607,7 @@ Return the category and object corresponding to the supplied data name, as symbo
 """
 find_cat_obj(d::DDLm_Dictionary, dname::AbstractString) = begin
     n = d.block[:name][(master_id = lowercase(dname),)]
-    return (Symbol(lowercase(n.category_id[])), Symbol(lowercase(n.object_id)))
+    return (Symbol(lowercase(n.category_id[])), Symbol(lowercase(n.object_id[])))
 end
 
 """
@@ -626,12 +624,19 @@ find_category(d::DDLm_Dictionary, dataname) = begin
     end
 
     #use lowercase
+    lname = lowercase(dataname)
     try
-        return lowercase(d.block[:name][(master_id = lowercase(dataname),)].category_id[])
+        return lowercase(d.block[:name][(master_id = lname,)].category_id[])
     catch KeyError
-        return nothing
     end
-    
+
+    # use aliases
+    if haskey(d.block,:alias)
+        da = d[:alias]
+        potentials = da[lowercase.(da[!,:definition_id]) .== lname,:master_id]
+        if length(potentials) == 1 return find_category(d, potentials[]) end
+    end
+        
 end
 
 """
@@ -644,15 +649,22 @@ find_object(d::DDLm_Dictionary,dataname) = begin
     #avoid d[dataname] as it is expensive
     
     try
-        return d.block[:name][(master_id = dataname,)].object_id[]
+        return lowercase(d.block[:name][(master_id = dataname,)].object_id[])
     catch KeyError
     end
 
     # try lowercase version
+    lname = lowercase(dataname)
     try
-        return d.block[:name][(master_id = lowercase(dataname),)].object_id[]
+        return lowercase(d.block[:name][(master_id = lowercase(dataname),)].object_id[])
     catch KeyError
-        return nothing
+    end
+    
+    # use aliases
+    if haskey(d.block,:alias)
+        da = d[:alias]
+        potentials = da[lowercase.(da[!,:definition_id]) .== lname,:master_id]
+        if length(potentials) == 1 return find_object(d, potentials[]) end
     end
 
 end
