@@ -163,7 +163,7 @@ ddlm_dictionary_from_string(s::AbstractString; source="", ignore_imports=:None, 
     if ignore_imports != :All
         resolve_imports!(all_dict_info,import_dir,cache, ignore_imports)
     end
-    
+
     # Apply default values if not a template dictionary
 
     if all_dict_info[:dictionary][!,:class][] != "Template"
@@ -855,6 +855,7 @@ end
 Return any name linked to `name` that is not a SU, returning `name` if none found
 """
 get_linked_name(d::DDLm_Dictionary,name) = begin
+
     info = d.block[:name][(master_id = name,)]
     typeinfo = d.block[:type][(master_id = name,)]
     poss = :linked_item_id in propertynames(info) ? info.linked_item_id[] : name
@@ -1171,15 +1172,20 @@ Return a list of all datanames that have `dataname` as a direct or indirect
 parent. `dataname` is the first entry in the list.
 """
 get_dataname_children(d::DDLm_Dictionary, dataname::AbstractString) = begin
-    
+
     full_list = [dataname]
     next_level = full_list
     while next_level != []
+        @debug "Another cycle" next_level full_list
         new_level = []
         for nl in next_level
             selector = map( x -> !isnothing(x) && x == nl, d[:name][!,:linked_item_id])
             append!(new_level, d[:name][selector,:master_id])
         end
+        if any( x -> x == dataname, new_level)
+            throw(error("Dictionary error: loop in dataname links for $dataname"))
+        end
+        
         append!(full_list, new_level)
         next_level = new_level
     end
@@ -2089,9 +2095,13 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             end
             old_head = lowercase(importee_head[:name][!,:object_id][])
             new_head = d[:name][d[:name].master_id .== block_id,:].object_id[]
+
             # find duplicates
+
             all_defs = importee[:definition][!,:master_id]
+
             @debug "All imported defs:" all_defs
+
             prior_defs = d[:definition][!,:master_id]
             dups = filter(x-> count(isequal(x),all_defs)>0, prior_defs)
             if length(dups) > 0
@@ -2132,6 +2142,7 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
             DataFrames.rename!(d[:name],:xxx => :category_id)
         end
     end
+
     return d
 end
 
@@ -2234,37 +2245,64 @@ extra_reference!(t::Dict{Symbol,DataFrame})
 Add identifier for definition data block to all relevant DDLm categories
 """
 extra_reference!(t::Dict{Symbol,DataFrame}) = begin
+
     # add category key information
+
     cats = get_categories(t)
     head_cat = find_head_category(t)
+
     @debug "Head category is $head_cat"
+
     for one_cat in cats
         if one_cat == head_cat continue end #no head category
         target_name = "_$one_cat.master_id"
-        push!(t[:category_key],Dict(:name => target_name,
-                                    :master_id => one_cat),cols=:union)
-        push!(t[:definition],Dict(:id => target_name,
-                                  :class => "Attribute",
-                                  :scope => "Item",
-                                  :master_id => target_name),cols=:union)
-        push!(t[:type],Dict(:contents => "Text",
-                            :purpose => "Link",
-                            :source => "Related",
-                            :container => "Single",
-                            :master_id => target_name),cols=:union)
-        push!(t[:description],Dict(:text=> "Auto-generated dataname to satisfy relational model",
-                                  :master_id => target_name),cols=:union)
+        if !(target_name in t[:category_key][!,:name])
+            push!(t[:category_key],Dict(:name => target_name,
+                                        :master_id => one_cat),cols=:union)
+        end
+
+        if !(target_name in t[:definition][!,:id])
+            push!(t[:definition],Dict(:id => target_name,
+                                      :class => "Attribute",
+                                      :scope => "Item",
+                                      :master_id => target_name),cols=:union)
+        end
+
+        if !(target_name in t[:type][!,:master_id])
+            push!(t[:type],Dict(:contents => "Text",
+                                :purpose => "Link",
+                                :source => "Related",
+                                :container => "Single",
+                                :master_id => target_name),cols=:union)
+        end
+
+        if !(target_name in t[:description][!,:master_id])
+            push!(t[:description],Dict(:text=> "Auto-generated dataname to satisfy relational model",
+                                       :master_id => target_name),cols=:union)
+        end
 
         if Symbol(one_cat) in [:dictionary,:dictionary_audit,:dictionary_valid]
-            push!(t[:name],Dict(:object_id => "master_id",
-                                :category_id => one_cat,
-                                :linked_item_id => "_dictionary.master_id",
-                                :master_id => "_$one_cat.master_id"),cols=:union)
+            if !("_$one_cat.master_id" in t[:name][!, :master_id])
+                push!(t[:name],Dict(:object_id => "master_id",
+                                    :category_id => one_cat,
+                                    :linked_item_id => (one_cat == "dictionary" ? missing : "_dictionary.master_id"),
+                                    :master_id => "_$one_cat.master_id"),cols=:union)
+            end
+
+            # Add derivation method for key data name
+            if !(:master_id in propertynames(t[:method])) || !("_$one_cat.master_id" in t[:method][!, :master_id])
+                push!(t[:method], Dict(:purpose => "Evaluation",
+                                       :expression => "\n$one_cat.master_id = dictionary.title\n",
+                                       :master_id => "_$one_cat.master_id"), cols = :union
+                      )
+            end
         else
-            push!(t[:name],Dict(:object_id => "master_id",
-                                :category_id => one_cat,
-                                :linked_item_id => "_definition.master_id",
-                                :master_id => target_name),cols=:union)
+            if !(target_name in t[:name][!, :master_id])
+                push!(t[:name],Dict(:object_id => "master_id",
+                                    :category_id => one_cat,
+                                    :linked_item_id => "_definition.master_id",
+                                    :master_id => target_name),cols=:union)
+            end
         end
     end
     unique!(t[:name])   #importing dictionaries may cause duplicate rows
@@ -2278,7 +2316,7 @@ end
 Mapping of DDLm types to Julia types
 """
 const type_mapping = Dict( "Text" => String,        
-                           "Code" => Symbol("CaselessString"),                                                
+                           "Code" => CaselessString,                                                
                            "Name" => String,        
                            "Tag"  => String,         
                            "Uri"  => String,         
