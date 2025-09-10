@@ -53,6 +53,7 @@ export get_julia_type_name,get_dimensions
 export conform_capitals!  #Capitalise according to style guide
 export add_definition!    #add new definitions
 export replace_category!  #replace an attribute category for a definition
+export rename_dictionary! #change dictionary name and head category
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
 export get_set_cats_for_cat, get_cats_for_sets  #Keyed set category fun
@@ -1466,15 +1467,17 @@ Update the dictionary entry for `dname`, changing or adding the value of `attr` 
 """
 update_dict!(d::DDLm_Dictionary, dname, attr, new_val) = begin
     old_val = get_attribute(d, dname, attr)
-    if ismissing(old_val)
-        dcat,dobj = split(attr,".")
+    if ismissing(old_val) || ismissing(old_val[])
+        dcat, dobj = split(attr,".")
         dcat = Symbol(dcat[2:end])
         dobj = Symbol(dobj)
         underlying = as_jdict(d)   #operate on underlying all-definition structure
-        if !haskey(underlying,dcat)
+        if !haskey(underlying, dcat)
+            @debug "Missing $dcat, adding"
             underlying[dcat] = DataFrame(:master_id=>[lowercase(dname)])
         end
         if !(dobj in propertynames(underlying[dcat]))
+            @debug "Missing column $dobj, adding to category $dcat"
             insertcols!(underlying[dcat],(dobj=>missing))
         end
         
@@ -1482,20 +1485,27 @@ update_dict!(d::DDLm_Dictionary, dname, attr, new_val) = begin
 
         check = filter(x->x.master_id == lowercase(dname),underlying[dcat],view=:true)
         if size(check,1) == 1
+            @debug "Updating previous value for $dname" check new_val
             check[!,dobj] = [new_val]
         elseif size(check,1) == 0
-            @debug "Updating $dname $dcat.$dobj to $new_val"
+            @debug "Adding $dname $dcat.$dobj to $new_val"
             push!(underlying[dcat],Dict(:master_id=>lowercase(dname),
                                         dobj => new_val),
                   cols=:subset)
         else
             throw(error("Ambiguous row for updating $attr in $dname"))
         end
+        @debug "Finished updating $dcat"
         d.block[dcat] = groupby(underlying[dcat],:master_id)
         return d
     elseif length(old_val) != 1
         throw(error("Cannot replace a value for $dname/$attr (ambiguous)"))
     end
+    if old_val[] == new_val
+        @debug "No need for update, skipping" old_val[] new_val
+        return
+    end
+    @debug "Updating $dname" attr old_val new_val
     return update_dict!(d,dname,attr,old_val[],new_val)
 end
 
@@ -1807,6 +1817,69 @@ add_head_category!(df,head_name) = begin
     update_row!(df,new_info,"master_id",hn)
 end
 
+"""
+    rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true)
+
+Change the title for the dictionary (dictionary.title). If `head_as_well` is true,
+change the head category name to `new_title_HEAD`.
+"""
+rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true) = begin
+
+    # Renaming a dictionary means changing all the master_ids to match the new title
+    # And then re-sorting.
+
+    # Adjust title
+    unt = uppercase(new_title)
+    d[:dictionary].title = [unt]
+    d[:dictionary].master_id = [lowercase(new_title)]
+    for one_cat in (:dictionary_audit, :dictionary_valid)
+        if haskey(d.block, one_cat)
+            s = size(d[one_cat],1)
+            d[one_cat].master_id = fill(lowercase(new_title), s)
+        end
+    end
+
+    if !head_as_well return end
+
+    # Adjust head category and referents. The convention is that the save frame
+    # name, definition.id and object_id are title_HEAD. The category id is the
+    # title.
+    
+    new_head_name = unt * "_HEAD"
+    new_master_id = lowercase(new_head_name)
+    hc = lowercase(find_head_category(d))
+
+    # Fix specific values
+
+    d[hc][:name].category_id = [uppercase(unt)]
+    d[hc][:name].object_id = [new_head_name]
+    d[hc][:definition].id = [new_head_name]
+
+    # Fix all :master_id values
+    
+    for one_cat in keys(d.block)
+        tbc = parent(d.block[one_cat])   #not grouped
+        s = size(tbc, 1)
+        if s == 0 continue end
+
+        @debug "Changing master_id for $one_cat from $hc to $new_master_id"
+        
+        transform!(tbc, :master_id => ByRow(x -> if lowercase(x) == hc new_master_id else x end) => :xxx)
+        select!(tbc, Not(:master_id))
+        DataFrames.rename!(tbc, :xxx => :master_id)
+
+        # And resort
+        d.block[one_cat] = groupby(tbc, :master_id)
+    end
+
+    # Now fix the category names using the new master_ids
+
+    tbc = parent(d.block[:name])
+    transform!(tbc, :category_id => ByRow( x -> if lowercase(x) == hc new_head_name else x end) => :xxx)
+    select!(tbc, Not(:category_id))
+    DataFrames.rename!(tbc, :xxx => :category_id)
+    
+end
 
 """
 All DDLm categories.

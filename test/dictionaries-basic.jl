@@ -102,6 +102,19 @@ end
     @test size(t["_import.get"][:method], 1) == 1
     @test t["_import.get"][:method].expression == ["test expression"]
 
+    # Renaming dictionary
+
+    t = prepare_system()
+    test_title = "my_fav"
+    rename_dictionary!(t, test_title)
+    @test t[:dictionary].title == [uppercase(test_title)]
+    @test unique(t[:dictionary_audit].master_id) == [test_title]
+    head_cat = find_head_category(t)
+    @test head_cat == test_title * "_head"
+    @test t[head_cat][:name].object_id == [uppercase(head_cat)]
+    @test t[head_cat][:definition].id == [uppercase(head_cat)]
+    @test t[head_cat][:name].category_id == [uppercase(test_title)]
+    
 end
 
 # process imports

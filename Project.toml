@@ -1,7 +1,7 @@
 name = "CrystalInfoFramework"
 uuid = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
 authors = ["James.Hester <jxh@ansto.gov.au>"]
-version = "1.1.0"
+version = "2.0.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
