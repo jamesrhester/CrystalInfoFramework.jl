@@ -286,12 +286,6 @@ setindex!(v::VirtualDictDef, newval, cat::Symbol) = begin
 end
 
 keys(v::VirtualDictDef) = keys(v.from_dict.block)
-"""
-    keys(d::DDLm_Dictionary)
-
-Return a list of datanames defined by the dictionary, including
-any aliases.
-"""
 
 iterate(v::VirtualDictDef) = begin
     n = iterate(v.from_dict.block)
@@ -321,6 +315,12 @@ end
 
 length(v::VirtualDictDef) = length(keys(v))
 
+"""
+    keys(d::DDLm_Dictionary)
+
+Return a list of datanames defined by the dictionary, including
+any aliases.
+"""
 keys(d::DDLm_Dictionary) = begin
     native = lowercase.(parent(d.block[:definition])[!,:id])
     #native = lowercase.(unique(first.(Iterators.flatten(values.(keys(v) for v in values(d.block))))))

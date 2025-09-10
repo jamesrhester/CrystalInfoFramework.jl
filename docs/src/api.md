@@ -81,6 +81,7 @@ get_categories(d::DDLm_Dictionary)
 get_keys_for_cat(d::DDLm_Dictionary,cat;aliases=false)
 get_default(d::DDLm_Dictionary,s)
 lookup_default(dict::DDLm_Dictionary,dataname::String,cp)
+rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true)
 show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="")
 ```
 
