@@ -1032,13 +1032,24 @@ Base.show(io::IOContext,::MIME"text/cif",ddlm_dic::DDLm_Dictionary;header="") = 
     #
     # And the looped top-level stuff at the end
     #
+    done = []
     for (c,objs) in ddlm_toplevel_order
         if !(c in keys(top_level)) continue end
         if nrow(top_level[c]) > 1
             write(io,"\n")
             @debug "Formatting $c"
             show_loop(io,String(c),top_level[c],order=objs,reflow=true)
+            push!(done, c)
         end
+    end
+
+    # And any leftover unofficial categories (e.g. for ddl2 fidelity)
+
+    for c in keys(top_level)
+        if c in done || nrow(top_level[c]) < 2 continue end  #already done
+        write(io, "\n")
+        @debug "Formatting $c"
+        show_loop(io, String(c), top_level[c], reflow = true)
     end
 end
 

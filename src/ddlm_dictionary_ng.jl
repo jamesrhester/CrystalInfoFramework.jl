@@ -1830,14 +1830,16 @@ rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true) = begin
 
     # Adjust title
     unt = uppercase(new_title)
-    d[:dictionary].title = [unt]
-    d[:dictionary].master_id = [lowercase(new_title)]
-    for one_cat in (:dictionary_audit, :dictionary_valid)
-        if haskey(d.block, one_cat)
-            s = size(d[one_cat],1)
-            d[one_cat].master_id = fill(lowercase(new_title), s)
-        end
+    lnt = lowercase(new_title)
+    old_id = d[:dictionary].master_id[]
+    old_defs = d[old_id]
+    for one_cat in keys(old_defs)
+        s = size(old_defs[one_cat], 1)
+        if s == 0 continue end
+        old_defs[one_cat].master_id = fill(lnt, s)
     end
+
+    d[:dictionary].title = [unt]
 
     if !head_as_well return end
 
@@ -2420,7 +2422,7 @@ const type_mapping = Dict( "Text" => String,
 Find the Julia type corresponding to `cat.obj` in `cdic`
 """
 get_julia_type_name(cdic::DDLm_Dictionary,cat::AbstractString,obj::AbstractString) = begin
-    if obj == "master_id" return AbstractString,"Single" end
+    if obj == "master_id" return CaselessString,"Single" end
     definition = cdic[find_name(cdic,cat,obj)]
     base_type = definition[:type][!,:contents][]
     cont_type = definition[:type][!,:container][]
