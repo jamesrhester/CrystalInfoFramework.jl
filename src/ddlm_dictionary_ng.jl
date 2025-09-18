@@ -1834,9 +1834,11 @@ rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true) = begin
     old_id = d[:dictionary].master_id[]
     old_defs = d[old_id]
     for one_cat in keys(old_defs)
+
         s = size(old_defs[one_cat], 1)
         if s == 0 continue end
         old_defs[one_cat].master_id = fill(lnt, s)
+
     end
 
     d[:dictionary].title = [unt]
@@ -2195,24 +2197,38 @@ resolve_full_imports!(d::Dict{Symbol,DataFrame},original_dir) = begin
                     filter!(x-> !(x.master_id in dups), parent(table))
                 end
             end
+
             # Remove old head category
+
             delete!(importee,block)
+
             # Remove old dictionary information
-            oldname = importee[:dictionary].title[]
+
+            oldname = lowercase(importee[:dictionary].title[])
             delete!(importee.block,:dictionary)
             for k in keys(importee.block)
+
                 filter!(x->x.master_id != oldname,parent(importee.block[k]))
             end
+
             # Concatenate them all
+
             for k in keys(importee.block)
                 if !haskey(d,k)
                     d[k] = DataFrame()
                 end
+
+                @debug "$k: Adding $(size(parent(importee.block[k]),1)) rows"
+                
                 d[k] = vcat(d[k],parent(importee.block[k]),cols=:union)
             end
+
             # And reparent
+
             transform!(d[:name],:category_id => ByRow(x -> if lowercase(x) == old_head new_head else x end) => :xxx)
+
             # And rename
+
             select!(d[:name],Not(:category_id))
             DataFrames.rename!(d[:name],:xxx => :category_id)
         end
