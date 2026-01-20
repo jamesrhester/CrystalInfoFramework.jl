@@ -64,13 +64,19 @@ jobs:
       - name: Add magnetic dictionaries
         uses: actions/checkout@v4
         with:
-                repository: COMCIFS/magnetic_dic
+                repository: COMCIFS/cif_mag
                 path: test/dictionaries/magnetic
 
+      - name: Add twinning dictionary
+        uses: actions/checkout@v4
+        with:
+                repository: COMCIFS/cif_twin
+                path: test/dictionaries/cif_twin
+                
       - name: Add msCIF dictionaries
         uses: actions/checkout@v4
         with: 
-              repository: COMCIFS/Modulated_Structures
+              repository: COMCIFS/cif_ms
               path: test/dictionaries/ms
 
       - name: Add imgCIF dictionary
@@ -88,6 +94,7 @@ jobs:
             mv enum/templ_enum.cif .
             mv attr/templ_attr.cif .
             mv ms/cif_ms.dic .
+            mv cif_twin/cif_twin.dic .
             mv imgcif/ddl2/cif_img.dic .
             cd ../..
             
