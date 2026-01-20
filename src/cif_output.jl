@@ -949,8 +949,9 @@ const ddlm_toplevel_order = (:dictionary => (:title,:formalism,:class,:version,:
                                         :namespace),
                         :description => (:text,),
                         :dictionary_valid => (:scope,:option,:attributes),
+                        :dictionary_author => (:id, :name, :orcid, :email),
                         :dictionary_audit => (:version,:date,:revision)
-                        )
+                         )
 
 """
     show(io::IOContext,MIME("text/cif"),ddlm_dic::DDLm_Dictionary;header="")
