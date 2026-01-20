@@ -43,6 +43,23 @@ jobs:
         with:
                 repository: COMCIFS/cif_core
                 path: test/dictionaries/core
+      - name: Add enumerations
+        uses: actions/checkout@v4
+        with:
+              repository: COMCIFS/Enumeration_Templates
+              path: test/dictionaries/enum
+
+      - name: Add DDL dictionary
+        uses: actions/checkout@v4
+        with:
+              repository: COMCIFS/DDLm
+              path: test/dictionaries/ddlm
+              
+      - name: Add attribute templates
+        uses: actions/checkout@v4
+        with:
+              repository: COMCIFS/Attribute_Templates
+              path: test/dictionaries/attr
 
       - name: Add magnetic dictionaries
         uses: actions/checkout@v4
@@ -67,9 +84,9 @@ jobs:
             cd test/dictionaries
             mv magnetic/cif_mag.dic .
             mv core/cif_core.dic .
-            mv core/ddl.dic .
-            mv core/templ_enum.cif .
-            mv core/templ_attr.cif .
+            mv ddlm/ddl.dic .
+            mv enum/templ_enum.cif .
+            mv attr/templ_attr.cif .
             mv ms/cif_ms.dic .
             mv imgcif/ddl2/cif_img.dic .
             cd ../..
