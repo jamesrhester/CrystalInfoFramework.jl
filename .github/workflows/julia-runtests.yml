@@ -119,11 +119,16 @@ jobs:
         with:
               github-token: ${{ secrets.GITHUB_TOKEN }}
               path-to-lcov: './lcov.info'
+      - name: Build documentation - install dependencies
+        if: matrix.julia-version == 'lts' && matrix.os == 'ubuntu-latest'
+        shell: julia --color=yes --project=docs {0}
+        run: |
+          using Pkg
+          Pkg.develop(PackageSpec(path=pwd()))
+          Pkg.instantiate()
       - name: Build documentation
         if: matrix.julia-version == 'lts' && matrix.os == 'ubuntu-latest'
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # For authentication with SSH deploy key
-        run: |
-           julia --project=docs/ -e 'using Pkg; Pkg.instantiate()'
-           julia --project=docs/ docs/make.jl
+        run: julia --project=docs/ docs/make.jl
