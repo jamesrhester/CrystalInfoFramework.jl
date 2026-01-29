@@ -119,6 +119,8 @@ if `pretty` is true.
 As a simple heuristic, the string is assumed to be pre-formatted if at least
 one line contains a sequence of 5 '#' characters, or five spaces not at
 the end of a line.
+
+An empty first line is enforced.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=false,kwargs...) = begin
     tgtval = val
@@ -148,8 +150,10 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
             return format_cif_text_string(tgtval,indent;prefix=prefix,kwargs...)
         elseif prefix != ""
             return delim*apply_prefix_protocol(tgtval,prefix=prefix)*delim
+        else
+            @debug "Not pretty for $tgtval"
+            return delim*blank_first_line(tgtval)*delim
         end
-        @debug "Not pretty for $tgtval"
     end
     return delim*tgtval*delim
 end
@@ -371,12 +375,21 @@ reduce_line(line,max_length) = begin
     return line[cut+1:end],rstrip(line[1:cut-1])
 end
 
-# Insert a prefix or blank first line
+# Insert a prefix
 apply_prefix_protocol(val::AbstractString;prefix="") = begin
     if prefix != ""
         return "$prefix\\\n$prefix"*replace(val, "\n"=>"\n$prefix")
     else return val
     end
+end
+
+# Ensure first line is blank, assuming no line folding or prefix
+# operators. Should not be used if there is a prefix, see above
+blank_first_line(val::AbstractString) = begin
+    if val[1] != '\n'
+        return "\n"*val
+    end
+    val
 end
 
 """
@@ -949,7 +962,7 @@ const ddlm_toplevel_order = (:dictionary => (:title,:formalism,:class,:version,:
                                         :namespace),
                         :description => (:text,),
                         :dictionary_valid => (:scope,:option,:attributes),
-                        :dictionary_author => (:id, :name, :orcid, :email),
+                        :dictionary_author => (:id, :name, :id_orcid, :email),
                         :dictionary_audit => (:version,:date,:revision)
                          )
 
