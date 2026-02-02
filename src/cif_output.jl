@@ -151,6 +151,12 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
         elseif prefix != ""
             return delim*apply_prefix_protocol(tgtval,prefix=prefix)*delim
         else
+            # catch purely numeric values
+            if match(r"^[0-9.+-][0-9.+Ee-]*$", tgtval) !== nothing
+                @debug "$tgtval is numeric with ; delimiter"
+                return delim*tgtval*delim
+            end
+
             @debug "Not pretty for $tgtval"
             return delim*blank_first_line(tgtval)*delim
         end
@@ -285,13 +291,13 @@ end
 """
     format_cif_text_string(value,indent,width=line_length,prefix="",justify=false)
 
-Format string `value` as a CIF semicolon-delimited string, adjusted
-so that no lines are greater than `line_length`, and each line starts with
-`indent` spaces.
-If `justify` is true, each line will be filled as 
-close as possible to the maximum length and all spaces replaced by 
-a single space, which could potentially spoil formatting like centering, tabulation
-or ASCII equations. 
+Format string `value` as a CIF semicolon-delimited string, adjusted so
+that no lines are greater than `line_length`, and each line starts
+with `indent` spaces.  If `justify` is true, each line will be filled
+as close as possible to the maximum length and all spaces replaced by
+a single space, which could potentially spoil formatting like
+centering, tabulation or ASCII equations.
+
 """
 format_cif_text_string(value::AbstractString,indent;width=line_length,justify=false,prefix="",kwargs...) = begin
     # catch pathological all whitespace values

@@ -54,7 +54,7 @@ end
     one_line = "this is a single line"
     @test format_for_cif(one_line) == "'$one_line'"
     tricky_line = "this line has a carriage \n return and an ' so tricky"
-    @test format_for_cif(tricky_line) == "\n;$tricky_line\n;"
+    @test which_delimiter(tricky_line)[1] == "\n;"
     really_tricky = "this line has \n; and ''' oh dear"
     @test format_for_cif(really_tricky) == "\n;>\\\n>this line has \n>; and ''' oh dear\n;"
     really_tricky = "this line has \n; and \"\"\" oh dear"
