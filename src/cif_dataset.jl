@@ -2,7 +2,7 @@
 # tables.
 export CifDataset, CifSetProjection
 export get_by_signature, has_signature, add_to_cat!, is_allowed_cat
-export sieve_block!, confirm_all_present, find_mismatches
+export sieve_block!, confirm_all_present, find_mismatches, merge_sigs, merge_sigs!
 
 """
    A CifSetProjection looks like a particular type of CifBlock, where all Set-valued
@@ -467,14 +467,12 @@ validate_set_values(csp::CifSetProjection, one_cat::String, names, values, d::DD
 end
 
 Block(csp::CifSetProjection) = begin
-    b = Block(get_loop_names(csp),get_data_values(csp),"synthetic")
+    b = Block(get_loop_names(csp), get_data_values(csp), "synthetic")
     for (k,v) in get_signature(csp)
         b[k] = [v]
     end
     return b
 end
-
-
 
 """
     A CifDataset provides a relational view of a collection of Cif blocks
@@ -625,6 +623,47 @@ Cif(cd::CifDataset) = begin
     end
 
     return cf
+end
+
+"""
+    merge_sigs(cd::CifDataset, sig1, sig2)
+
+Return a Block composed of the combined contents of the two blocks specified by
+`sig1` and `sig2`
+"""
+merge_sigs(cd::CifDataset, sig1, sig2) = begin
+
+    newb = Block(cd[sig1])
+    merge_sigs!(newb, cd, sig2)
+
+end
+
+"""
+    merge_sigs!(b::Block, cd::CifDataset, sig)
+
+Add the contents of `cd[sig]` to `b`, returning `b`.
+"""
+merge_sigs!(b::Block, cd::CifDataset, sig) = begin
+
+    mergee = cd[sig]
+    for (k, v) in mergee
+        #@debug "Now processing $k $v"
+        b[k] = [v]
+    end
+
+    for (k, v) in get_data_values(mergee)
+        b[k] = v
+    end
+
+    @debug "Loop names to be merged" sig get_loop_names(mergee)
+
+    for ln in get_loop_names(mergee)
+        create_loop!(b, ln)
+    end
+    
+    @debug "Loop names after" get_loop_names(mergee)
+
+    return b
 end
 
 #== Utility routines ==#

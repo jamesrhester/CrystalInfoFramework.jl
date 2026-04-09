@@ -108,6 +108,38 @@ end
     end
 end
 
+# Purely for easy access for testing
+semi_string_test(args) = begin
+    line_folding = false
+    prefix = ""
+    all_chars = length(args[1])
+    as_string = String(args[1])
+    semi = findfirst(';',as_string)
+    no_semi = semi == all_chars ? "" : as_string[semi+1:end]
+    if length(no_semi) > 0 && match(r"\\\s*$",no_semi) !== nothing
+        no_semi = strip(no_semi)
+        line_folding = length(no_semi) == 1 || no_semi[end-1] == '\\'
+        if length(no_semi) > 1
+            prefix = no_semi[1:prevind(no_semi,findfirst('\\',no_semi))]
+        end
+        no_semi = ""
+    end
+    if length(args) == 2 final = no_semi
+    else
+        if !line_folding && prefix == ""
+            final = no_semi*join(String.(args[2:end-1]))
+        else
+            final = no_semi*unfold(unprefix(args[2:end-1],prefix))
+        end
+    end
+    # chop off the very last line terminator if present
+    if length(final)>1 && final[end-1:end] == "\r\n"
+        return final[1:end-2]
+    else
+        return final[1:end-1]
+    end
+end
+
 @inline_rule table_entry(t::TreeToCif,key,value) = begin
     return strip_string(String(key))=>value
 end

@@ -54,8 +54,10 @@ export conform_capitals!  #Capitalise according to style guide
 export add_definition!    #add new definitions
 export replace_category!  #replace an attribute category for a definition
 export rename_dictionary! #change dictionary name and head category
+export remove_attribute!  #remove an attribute from a definition
 export add_key!           #add a key data name to a category
 export check_import_block #inspect an import block
+export get_import_attribute #get an attribute without importation
 export get_set_cats_for_cat, get_cats_for_sets  #Keyed set category fun
 export get_non_set_keys_for_cat #Keyed set category fun
 
@@ -105,12 +107,11 @@ DDLm_Dictionary(c::Cif;kwargs...) = begin
 end
 
 """
-    DDLm_Dictionary(a; ignore_imports="None",
-    cache_imports=false)
+    DDLm_Dictionary(a; ignore_imports=:None, cache_imports=false, add_defaults=true)
 
 Create a `DDLm_Dictionary` given filename `a`.`ignore_imports = :None` will ignore
 any `import` attributes. Other options are `:Full` and `:Contents` to ignore
-imports with the respective `mode`, and `:all` to ignore all imports.
+imports with the respective `mode`, and `:All` to ignore all imports.
 `cache_imports` will store the contents of imported
 files (`Contents` mode only) but will not merge the contents into the
 importing definition.
@@ -129,6 +130,9 @@ searched for relative to the same directory as the importing dictionary,
 unless `import_dir` is specified, in which case the search is relative to
 that directory.
 
+Where values for an attribute are missing, default values as specified in
+the DDLm reference dictionary are inserted. To stop this behaviour, specify
+`add_defaults` = false.
 """
 DDLm_Dictionary(somepath; kwargs...) = begin
 
@@ -146,7 +150,7 @@ DDLm_Dictionary(io::IO; source = nothing, kwargs...) = begin
     ddlm_dictionary_from_string(full_contents; source = source, kwargs...)
 end
 
-ddlm_dictionary_from_string(s::AbstractString; source="", ignore_imports=:None, header="",cache_imports=true, import_dir="") = begin
+ddlm_dictionary_from_string(s::AbstractString; source="", ignore_imports=:None, cache_imports=true, import_dir="", add_defaults=true) = begin
     
     if length(s) > 1 && s[1] == '\ufeff'
         s = s[(nextind(s,1)):end]
@@ -167,18 +171,19 @@ ddlm_dictionary_from_string(s::AbstractString; source="", ignore_imports=:None, 
 
     # Apply default values if not a template dictionary
 
-    if all_dict_info[:dictionary][!,:class][] != "Template"
+    if add_defaults && all_dict_info[:dictionary][!,:class][] != "Template"
         enter_defaults(all_dict_info)
     end
     if all_dict_info[:dictionary].class[] == "Reference"
         extra_reference!(all_dict_info)
     end
 
-    DDLm_Dictionary(all_dict_info, nspace, header=header, origin=import_dir,
+    DDLm_Dictionary(all_dict_info, nspace, origin=import_dir, header = ct.header_comments,
                     imports=cache)
 end
 
-DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="") = begin
+DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,import_dir="",
+                add_defaults=true) = begin
 
     all_dict_info = Dict{Symbol,DataFrame}()
 
@@ -233,7 +238,7 @@ DDLm_Dictionary(b::CifBlock;ignore_imports=:None,header="",cache_imports=true,im
         resolve_imports!(all_dict_info,import_dir,cache, ignore_imports)
     end
     # Apply default values if not a template dictionary
-    if all_dict_info[:dictionary][!,:class][] != "Template"
+    if add_defaults && all_dict_info[:dictionary][!,:class][] != "Template"
         enter_defaults(all_dict_info)
     end
     if all_dict_info[:dictionary].class[] == "Reference"
@@ -674,21 +679,34 @@ end
 """
     is_category(d::DDLm_Dictionary,name)
 
-Return true if `name` is a category according to `d`.
+Return true if `name` is a category according to `d`. As default is `Datum`, `missing`
+means `name` is not a category.
 """
-is_category(d::DDLm_Dictionary,name) = begin
+is_category(d::DDLm_Dictionary, name) = begin
 
     # Avoid d[dataname] as it is quite expensive
 
     try
         definfo = d.block[:definition][(master_id = name,)]
-        return :scope in propertynames(definfo) ? definfo.scope[] == "Category" : false
+        if :scope in propertynames(definfo)
+            if !ismissing(definfo.scope[])
+                return definfo.scope[] == "Category"
+            else
+                return false
+            end
+        end
     catch KeyError
     end
 
     try
         definfo = d.block[:definition][(master_id = lowercase(name),)]
-        return :scope in propertynames(definfo) ? definfo.scope[] == "Category" : false
+        if :scope in propertynames(definfo)
+            if !ismissing(definfo.scope[])
+                return definfo.scope[] == "Category"
+            else
+                return false
+            end
+        end
     catch KeyError
         return false
     end
@@ -704,10 +722,11 @@ for which data names are defined, but no category is defined, are also included.
 """
 get_categories(d::Union{DDLm_Dictionary,Dict{Symbol,DataFrame}}; referred = false, head = true) = begin
 
+    dfm = dropmissing(d[:definition], Cols(:scope, :class), view = true)
     if head
-        defed_cats = lowercase.(d[:definition][d[:definition][!,:scope] .== "Category",:id])
+        defed_cats = lowercase.(dfm[dfm[!,:scope] .== "Category",:id])
     else
-        defed_cats = lowercase.(d[:definition][d[:definition][!, :scope] .== "Category" .&& d[:definition][!, :class] .!= "Head", :id])
+        defed_cats = lowercase.(dfm[dfm[!, :scope] .== "Category" .&& dfm[!, :class] .!= "Head", :id])
     end
     if !referred return defed_cats end
 
@@ -860,7 +879,7 @@ get_linked_name(d::DDLm_Dictionary,name) = begin
     info = d.block[:name][(master_id = name,)]
     typeinfo = d.block[:type][(master_id = name,)]
     poss = :linked_item_id in propertynames(info) ? info.linked_item_id[] : name
-    if isnothing(poss) return name end
+    if isnothing(poss) || ismissing(poss) return name end
     link_type = :purpose in propertynames(typeinfo) ? typeinfo.purpose[] : "Datum"
     if link_type != "SU" return poss end
     return name
@@ -970,7 +989,8 @@ Return `(func_catname, all_funcs)`, where `func_catname` is the single category 
 in `d`, and `all_funcs` is a list of all object_ids for that category.
 """
 get_dict_funcs(d::DDLm_Dictionary) = begin
-    func_cat = d[:definition][d[:definition][!,:class] .== "Functions",:id]
+    dfm = dropmissing(d[:definition], :class, view = true)
+    func_cat = dfm[dfm[!,:class] .== "Functions",:id]
     func_catname = nothing
     if length(func_cat) > 0
         func_catname = lowercase(d[func_cat[]][:name][!,:object_id][])
@@ -1774,7 +1794,8 @@ end
 Find the category that is at the top of the category tree of `d`.
 """
 find_head_category(df::DDLm_Dictionary) = begin
-    explicit_head = df[:definition][df[:definition].class .== "Head",:master_id]
+    dfm = dropmissing(df[:definition], :class, view = true)
+    explicit_head = dfm[dfm.class .== "Head",:master_id]
     if length(explicit_head) == 1
         return explicit_head[]
     elseif length(explicit_head) > 1
@@ -1883,6 +1904,38 @@ rename_dictionary!(d::DDLm_Dictionary, new_title; head_as_well = true) = begin
     select!(tbc, Not(:category_id))
     DataFrames.rename!(tbc, :xxx => :category_id)
     
+end
+
+"""
+    remove_attribute!(d::DDLm_Dictionary, name, cat, obj)
+
+Remove attribute _cat.obj from the definition of `name` in `d`. In effect `missing` is
+assigned to the attribute, unless all attributes of the category are missing, in which
+case the row is removed.
+"""
+remove_attribute!(d::DDLm_Dictionary, name, cat::Symbol, obj::Symbol) = begin
+    target_cat = d[name][cat]
+    if !(obj in propertynames(target_cat))
+        return   #nothing to do
+    end
+    target_obj = target_cat[!,obj]
+    if ismissing(target_obj) || all(ismissing, target_obj)
+        return   #nothing to do
+    end
+
+    target_cat[!,obj] = fill(missing, length(target_obj))
+
+    # Check to see if we can completely remove this category
+    pn = setdiff(propertynames(target_cat), (:master_id,))
+    can_remove = all( x -> ismissing(target_cat[!,x]) || all(ismissing, target_cat[!,x]), pn)
+
+    # Drop down to underlying structure
+    if can_remove
+        @debug "Removing category $cat from $name"
+        canonical_name = find_name(d, name)
+        deleteat!(parent(d.block[cat]), parent(d.block[cat])[!,:master_id] .== canonical_name)
+        d.block[cat] = groupby(parent(d.block[cat]), :master_id)
+    end
 end
 
 """
@@ -2244,8 +2297,33 @@ Check if the definition for `name` contains `attribute` equal
 to `val` within an import block. `val` should be a single value.
 """
 check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
+    v = get_import_attribute(d, name, cat, obj)
+    ismissing(v) ? false : val in v
+end
+
+check_import_block(d::DDLm_Dictionary,name,attribute,val) = begin
+    cat,obj = split(attribute,".")
+    cat = Symbol(cat[2:end])
+    obj = Symbol(obj)
+    check_import_block(d,name,cat,obj,val)
+end
+
+"""
+    get_import_attribute(d::DDLm_Dictionary, name, attribute)
+
+Return the value of `attribute` for `name` if imports have not been
+resolved and inserted into the definition.
+"""
+get_import_attribute(d::DDLm_Dictionary, name, attribute) = begin
+    cat,obj = split(attribute,".")
+    cat = Symbol(cat[2:end])
+    obj = Symbol(obj)
+    get_import_attribute(d,name,cat,obj)
+end
+
+get_import_attribute(d::DDLm_Dictionary, name, cat, obj) = begin
     x = d[name]
-    if !haskey(x,:import) || nrow(x[:import])!=1 return false end
+    if !haskey(x,:import) || nrow(x[:import])!=1 return missing end
     spec = x[:import].get[]
     for one_spec in spec
         if get(one_spec,"mode","Contents") == "Full" continue end
@@ -2260,21 +2338,14 @@ check_import_block(d::DDLm_Dictionary,name,cat,obj,val) = begin
         if haskey(target_block,cat)
             df = target_block[cat]
             if obj in propertynames(df)
-                v = df[:,obj]
-                return val in v
+                return df[:,obj]
             end
         end
     end
-    return false
+    return missing
+
 end
 
-check_import_block(d::DDLm_Dictionary,name,attribute,val) = begin
-    cat,obj = split(attribute,".")
-    cat = Symbol(cat[2:end])
-    obj = Symbol(obj)
-    check_import_block(d,name,cat,obj,val)
-end
-    
 """
 Default values for DDLm attributes
 """

@@ -123,16 +123,20 @@ the end of a line.
 An empty first line is enforced.
 """
 format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=false,kwargs...) = begin
-    tgtval = val
+    tgtval = String(val)
+
+    # Try and detect if there is basic formatting in the string
+    # Only relevant for semicolon-delimited
+    
+    is_preformat = match(r"#####",tgtval) != nothing
+    is_preformat |= match(r"     ", tgtval) != nothing
+
     if delim === nothing
         # Figure out the best delimiter
-        if pretty
-            tgtval = strip(val)
+        if pretty && !is_preformat
+            tgtval = strip(tgtval)
         end
         delim,_ = which_delimiter(tgtval)
-        if delim == "\n;" && pretty   #Stripping didn't simplify
-            tgtval = strip(val,'\n')
-        end
     end
     prefix,_ = which_prefix(tgtval)
     if delim == "\n;" && occursin("\n;",tgtval) && cif1
@@ -140,8 +144,6 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
     end
     if delim == "\n;"
         
-        is_preformat = match(r"#####",tgtval) != nothing
-        is_preformat |= match(r"     ", tgtval) != nothing
         if pretty && !is_preformat  #
             if loop == :short indent = loop_align - 1
             elseif loop == :long indent = text_indent + loop_indent + 1
@@ -160,6 +162,7 @@ format_for_cif(val::AbstractString;delim=nothing,pretty=false,cif1=false,loop=fa
             @debug "Not pretty for $tgtval"
             return delim*blank_first_line(tgtval)*delim
         end
+        @debug "Not pretty for |$tgtval|"
     end
     return delim*tgtval*delim
 end
@@ -291,18 +294,22 @@ end
 """
     format_cif_text_string(value,indent,width=line_length,prefix="",justify=false)
 
-Format string `value` as a CIF semicolon-delimited string, adjusted so
-that no lines are greater than `line_length`, and each line starts
-with `indent` spaces.  If `justify` is true, each line will be filled
-as close as possible to the maximum length and all spaces replaced by
-a single space, which could potentially spoil formatting like
-centering, tabulation or ASCII equations.
-
+Format string `value` as a CIF semicolon-delimited string, adjusted
+so that no lines are greater than `line_length`, and each line starts with
+`indent` spaces.
+If `justify` is true, each line will be filled as 
+close as possible to the maximum length and all spaces replaced by 
+a single space, which could potentially spoil formatting like centering, tabulation
+or ASCII equations. If `word` is true, no extra whitespace is introduced.
 """
-format_cif_text_string(value::AbstractString,indent;width=line_length,justify=false,prefix="",kwargs...) = begin
+format_cif_text_string(value::AbstractString,indent;width=line_length, justify=false, prefix="", word = false, kwargs...) = begin
+    
     # catch pathological all whitespace values
+
     if match(r"^\s+$",value) !== nothing return "\n;$value\n;" end
+
     # catch empty string
+
     if value == "" return "''" end
     if occursin("\n",value)
         lines = split(value,"\n")
@@ -312,16 +319,24 @@ format_cif_text_string(value::AbstractString,indent;width=line_length,justify=fa
     reflowed = []
     remainder = ""
     while strip(lines[1]) == "" lines = lines[2:end] end
+
     # remove empty lines at bottom
+
     while strip(lines[end]) == "" pop!(lines) end
+
     # find minimum current indent
+
     have_indent = filter(x->match(r"\S+",x)!== nothing,lines)
     old_indent = min(map(x->length(match(r"^\s*",x).match),have_indent)...)
+
     # remove trailing whitespace
+
     lines = map(x->rstrip(x),lines)
+
     #
+
     if justify   # all one line
-        #println("Request to justify:\n$value")
+        @debug("Request to justify:\n$value")
         t = map(lines) do x
             # remove all multi-spaces
             r = replace(strip(x),r"\s+"=>s" ")
@@ -329,6 +344,7 @@ format_cif_text_string(value::AbstractString,indent;width=line_length,justify=fa
         # add on old indent as it is assumed present below
         lines = [" "^old_indent*join(t," ")]    #one long line
     end
+
     for l in lines
         sl = strip(l)
         if length(sl) == 0
@@ -339,21 +355,29 @@ format_cif_text_string(value::AbstractString,indent;width=line_length,justify=fa
             remainder=""
             continue
         end
+        
         # remove old indent, add new one
+
         longer_line = " "^indent*(remainder=="" ? "" : remainder*" ")*rstrip(l)[old_indent+1:end]
         remainder, final = reduce_line(longer_line,width)
-        #println("rem, final: '$remainder', '$final'")
+
+        @debug("rem, final: '$remainder', '$final'")
+
         push!(reflowed,final)
     end
+    
     while remainder != ""
         remainder,final = reduce_line(" "^indent*remainder,width)
         push!(reflowed,final)
     end
+
     # Now apply prefix
+
     prefix,_ = which_prefix(reflowed)
     assembled = join(reflowed,"\n"*prefix)
+    no_lf = word ? "\\" : ""
     if prefix == ""
-        return "\n;\n"*assembled*"\n;"
+        return "\n;"*no_lf*"\n"*assembled*"\n;"
     else
         return "\n;"*prefix*"\\\n"*prefix*assembled*"\n;"
     end
@@ -369,7 +393,7 @@ line has any final whitespace removed.
 reduce_line(line,max_length) = begin
     if length(line) <= max_length return "",line end
     cut = length(line)
-    while cut > line_length && cut != nothing
+    while cut != nothing && cut > line_length
         cut = findprev(' ',line,cut-1)
     end
     if cut === nothing return "",line end
@@ -722,6 +746,8 @@ const ddlm_no_justify = (:method,:description,:description_example, :nx_mapping)
 const ddl2_no_justify = (:category,:category_examples,:item,:item_examples)
 # Always use semicolon delimiters
 const ddlm_semicolons = Dict(:description=>(:text,),:method=>(:expression,))
+# Never introduce whitespace of any kind
+const ddlm_words = Dict(:alias=>(:dictionary_uri,))
 """
     show_one_def(io,def_name,info_dic;implicits=[])
 
@@ -853,7 +879,11 @@ show_set(io,cat,df;implicits=[],indents=[text_indent,value_col],order=(),
             elseif this_val isa Vector || this_val isa Dict #already laid out for us
                 write(io,"\n"*" "^(value_indent-1)*val_as_string*"\n")
             else
-                write(io,format_cif_text_string(this_val,text_indent;pretty=reflow,justify=justify)*"\n")
+                if cl in get(ddlm_words,:alias,())
+                    write(io, format_cif_text_string(this_val, 0; pretty=false, justify=false, word=true)*"\n")
+                else
+                    write(io, format_cif_text_string(this_val,text_indent;pretty=reflow,justify=justify)*"\n")
+                end
             end
         end
     end
@@ -1110,10 +1140,14 @@ end
     their primary data names.
 """
 sort_item_names(d,cat) = begin
+    @debug "Sorting names for $cat"
     start_list = sort(get_names_in_cat(d,cat))
     # now find any su values
     sus = filter(start_list) do x
         direct = :purpose in propertynames(d[x][:type]) && d[x][:type].purpose[] in ("SU","su")
+        if ismissing(direct)
+            direct = false
+        end
         direct || haskey(d[x],:import) && check_import_block(d,x,:type,:purpose,"SU")
     end
     @debug "All sus for $cat:" sus

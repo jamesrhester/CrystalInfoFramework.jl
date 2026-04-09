@@ -63,7 +63,9 @@ end
 """
     get_loop_names(b::CifContainer,n::AbstractString)
 
-Return all names in the loop that also contains `n`.
+Return all names in the loop that also contains `n`. For efficiency this list points to
+the internal data structure so should be copied if you do not want edits reflected in
+`b`.
 """
 get_loop_names(b::CifContainer,n::AbstractString) = begin
 
@@ -267,8 +269,11 @@ set_data_values(b::CifBlock,v) = begin b.data_values = v end
 
 get_loop_names(b::Block) = b.loop_names
 get_loop_names(b::CifBlock) = b.loop_names
-set_loop_names(b::Block,n) = begin b.loop_names = n end
-set_loop_names(b::CifBlock,n) = begin b.loop_names = n end
+
+# Note - no copy!
+
+set_loop_names(b::Block, n) = begin b.loop_names = n end
+set_loop_names(b::CifBlock, n) = begin b.loop_names = n end
 
 get_source_file(b::Block) = b.original_file
 get_source_file(f::CifBlock) = f.original_file
@@ -355,10 +360,15 @@ create_loop!(b::CifContainer, names) = begin
     if length(l) > 1
         throw(error("Attempt to create loop with mismatching data name lengths: $l"))
     end
-    # drop names from other loops
-    set_loop_names(b, map(x -> filter!(y -> !(y in names),x), get_loop_names(b)))
+    
+    # drop names from other loops. Note that get_loop_names points directly to the
+    # internal data structure so we must be careful when changing.
+
+    set_loop_names(b, map(x -> filter(y -> !(y in names),x), get_loop_names(b)))
+
     # drop empty loops
-    set_loop_names(b,filter!(x->!isempty(x),get_loop_names(b)))
+
+    set_loop_names(b, filter(x->!isempty(x),get_loop_names(b)))
     push!(get_loop_names(b),names)
 end
 
