@@ -1239,28 +1239,11 @@ end
     lookup_default(dict::DDLm_Dictionary,dataname::String,cp)
 
 Index into any default lookup table defined in `dict` for `dataname` using an index value from
-`cp`. `cp` is any object with a property name as specified by `def_index_id` in the definition of 
-`dataname` such that `cp.<def_index_id>` returns a single value
+`cp`. The old system used def_index_id and enumeration_default; the new system
+uses def_index_ids and enumeration_defaults.
+`cp` is any object with a property name as specified by `def_index_id(s)` in the definition of 
+`dataname` such that `cp.<def_index_id(s)>` returns a single value
 """
-old_lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
-    definition = dict[dataname][:enumeration]
-    index_name = :def_index_id in propertynames(definition) ? definition[!,:def_index_id][] : missing
-    @debug "Lookup default" dataname index_name
-    if ismissing(index_name) return missing end
-    object_name = find_object(dict,index_name)
-    # Note non-deriving form of getproperty
-    @debug "Looking for $object_name in $(getfield(getfield(cp,:source_cat),:name))"
-    current_val = getproperty(cp,Symbol(object_name))
-    @debug "Indexing $dataname using $current_val to get"
-    # Now index into the information. ddl.dic states that this is of type 'Code'
-    # so we apply the CaselessString constructor
-    indexlist = CaselessString.(dict[dataname][:enumeration_default][!,:index])
-    pos = findfirst(x -> x==current_val, indexlist)
-    @debug "Result of indexing" pos typeof(current_val) current_val indexlist
-    if pos == nothing return missing end
-    return dict[dataname][:enumeration_default][!,:value][pos]
-end
-
 lookup_default(dict::DDLm_Dictionary, dataname::String, cp) = begin
 
     definition = dict[dataname][:enumeration]
@@ -1268,7 +1251,7 @@ lookup_default(dict::DDLm_Dictionary, dataname::String, cp) = begin
         index_names = definition[!,:def_index_id]
         table_name = :enumeration_default
     elseif :def_index_ids in propertynames(definition)
-        index_names = definition[!,:def_index_ids]
+        index_names = definition[!,:def_index_ids][]
         table_name = :enumeration_defaults
     else
         return missing
