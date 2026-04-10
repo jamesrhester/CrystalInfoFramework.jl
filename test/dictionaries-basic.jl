@@ -137,7 +137,8 @@ end
     @test !check_import_block(ud,"_atom_site_rotation.label",:type,:purpose,"Junk")
     # Check enums
     ud = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "small_core_test.dic"), ignore_imports=:All)
-    @test check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_defaults.index",["Mn4+"])
+    
+    @test (check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_defaults.index",["Mn4+"]) || check_import_block(ud, "_atom_type_scat.cromer_mann_a1","_enumeration_default.index", "Mn4+") ) #cover both old and new cases 
 end
 
 @testset "Function-related tests for DDLm" begin
