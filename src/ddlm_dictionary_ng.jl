@@ -1242,7 +1242,7 @@ Index into any default lookup table defined in `dict` for `dataname` using an in
 `cp`. `cp` is any object with a property name as specified by `def_index_id` in the definition of 
 `dataname` such that `cp.<def_index_id>` returns a single value
 """
-lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
+old_lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     definition = dict[dataname][:enumeration]
     index_name = :def_index_id in propertynames(definition) ? definition[!,:def_index_id][] : missing
     @debug "Lookup default" dataname index_name
@@ -1261,6 +1261,39 @@ lookup_default(dict::DDLm_Dictionary,dataname::String,cp) = begin
     return dict[dataname][:enumeration_default][!,:value][pos]
 end
 
+lookup_default(dict::DDLm_Dictionary, dataname::String, cp) = begin
+
+    definition = dict[dataname][:enumeration]
+    if :def_index_id in propertynames(definition)
+        index_names = definition[!,:def_index_id]
+        table_name = :enumeration_default
+    elseif :def_index_ids in propertynames(definition)
+        index_names = definition[!,:def_index_ids]
+        table_name = :enumeration_defaults
+    else
+        return missing
+    end
+    
+    @debug "Lookup default" dataname index_names table_name
+    object_names = find_object.(Ref(dict), index_names)
+
+    # Note non-deriving form of getproperty
+    # TODO: enforce type of each list member e.g. caseless string
+    test_index = map( x -> "$(getproperty(cp, Symbol(x)))", object_names)
+
+    if table_name == :enumeration_default #old style, single entry
+        test_index = test_index[]
+    end
+    
+    indexlist = dict[dataname][table_name][!,:index]
+    pos = findfirst( x -> x == test_index, indexlist)
+
+    @debug "Result of indexing" pos test_index
+
+    if pos == nothing return missing end
+    return dict[dataname][table_name][!,:value][pos]
+end
+                                                    
 # ***Methods for setting and retrieving evaluated functions
 
 """
