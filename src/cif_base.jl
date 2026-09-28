@@ -41,14 +41,24 @@ in which they occur.
 function get_loop_names end
 
 """
-    get_loop(b::CifContainer,s)
+    get_loop(b::CifContainer,s; try_harder = false)
 
 A `DataFrame` built from data items in the same loop as `s`. If no data are available,
-an empty `DataFrame` is returned.
+an empty `DataFrame` is returned. If `try_harder` is `true` and an empty `DataFrame`
+would be returned, all non-looped data names that contain a period character and
+have the same characters prior to the period are considered to be looped and returned
+as a one-row `DataFrame`.
 """
-get_loop(b::CifContainer,s) = begin
+get_loop(b::CifContainer,s; try_harder=false) = begin
     loop_names = [l for l in get_loop_names(b) if s in l]
-    # Construct a DataFrame
+
+    if length(loop_names) == 0 && try_harder && '.' in s
+        # Find non-looped data names with the same starting values
+        cat = s[1:findfirst('.', s)]
+        loop_names = [filter( x -> startswith(x, cat), get_all_unlooped_names(b))]
+    end
+
+    # Populate a Dataframe
     df = DataFrame()
     if length(loop_names) == 1
         for n in loop_names[1]
