@@ -2085,14 +2085,51 @@ get_import_info(original_dir,import_entry) = begin
     @debug "URI is $(url.scheme), $(url.path)"
     if url.scheme != "file"
         @debug "Looking in dir $original_dir, URI = $url"
-        @error "Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])"
+        #@error "Non-file URI cannot be handled: $(url.scheme) from $(import_entry["file"])"
+        location = external_import_as_artifact(url)
+    else
+        location = to_path(url)
     end
-    location = to_path(url)
     block = import_entry["save"]
     mode = get(import_entry,"mode","Contents")
     if_dupl = get(import_entry,"dupl","Exit")
     if_miss = get(import_entry,"miss","Exit")
     return location,block,mode,if_dupl,if_miss
+end
+
+"""
+    Download external dictionary files once per installation as artefacts.
+"""
+external_import_as_artifact(uri) = begin
+
+    artifact_toml = joinpath(pkgdir(@__MODULE__), "Artifacts.toml")
+
+    # Check to see if we have it
+
+    uri_as_string = "$uri"
+    this_hash = artifact_hash(uri_as_string, artifact_toml)
+
+    # Download if missing
+    if this_hash == nothing || !artifact_exists(this_hash)
+
+        @debug "No artifact stored for $uri_as_string, downloading" uri
+
+        try
+            this_hash = create_artifact() do artifact_dir
+                Downloads.download(uri_as_string, joinpath(artifact_dir, basename(uri.path)))
+            end
+        catch e
+            @error "Failed to download $uri. Try manually fixing by creating
+            entry in $artifact_toml file for $uri with correct hash."
+            rethrow(e)
+        end
+        bind_artifact!(artifact_toml, uri_as_string, this_hash)
+    end
+
+    final_path = joinpath(artifact_path(this_hash), basename(uri.path))
+    @debug "Path for $uri is $final_path"
+    return final_path     
+    
 end
 
 resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) = begin

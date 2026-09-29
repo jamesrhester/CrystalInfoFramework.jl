@@ -31,6 +31,8 @@ using URIs
 using Lerche # for native parser
 using PrecompileTools #for fast startup
 using Combinatorics #for CifDataset
+using Pkg.Artifacts #for storing imported dictionaries
+using Downloads     #for downloading URIs for imports
 
 # **Exports**
 
