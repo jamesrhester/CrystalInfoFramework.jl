@@ -33,6 +33,11 @@ _diffrn_radiation.probe                x-ray
 _reflns.apply_dispersion_to_Fcalc       Yes
 _dodgy.mcdodgy                        "random unknown dataname"
 
+# So that extra key data name can be added
+loop_
+_diffrn_detector.id
+    "my_detector"
+
 loop_
 _atom_type.symbol
 _atom_type.atomic_mass

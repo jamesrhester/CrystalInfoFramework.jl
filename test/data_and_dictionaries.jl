@@ -1,7 +1,7 @@
 # Test combinations of data and dictionaries
 
 prepare_dd() = begin
-    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core_multiblock.dic"))
     n = first(Cif(joinpath(@__DIR__,"nick1.cif"))).second
     return t,n
 end
@@ -35,12 +35,12 @@ is_looped(b, n) = any(x -> n in x, CrystalInfoFramework.get_loop_names(b))
 
     n["_diffrn.id"] = ["xyz"]
     add_child_keys!(n, "_diffrn.id", t)
-    @test n["_cell.diffrn_id"] == ["xyz"]
+    @test n["_diffrn_detector.diffrn_id"] == ["xyz"]
 
 end
 
 @testset "Merging blocks" begin
-    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "multi_block_core.dic"))
+    t = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "cif_core_multiblock.dic"))
     n = Cif(joinpath(@__DIR__,"nick1_mergeable.cif"))
     println("About to merge blocks")
     merge_blocks!(n,t)

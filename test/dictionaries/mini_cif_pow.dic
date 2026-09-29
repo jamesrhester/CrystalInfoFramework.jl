@@ -44,8 +44,8 @@ save_PD_GROUP
     _import.get
         [
           {
-           'dupl':Ignore  'file':multi_block_core.dic  'mode':Full
-           'save':MULTIBLOCK_CORE
+           'dupl':Ignore  'file':cif_core_multiblock.dic  'mode':Full
+           'save':CIF_CORE_MULTIBLOCK_HEAD
           }
         ]
 
