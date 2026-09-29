@@ -2028,11 +2028,12 @@ import_cache(d, original_dir) = begin
         for one_entry in import_table
             import_def = missing
             #@debug "one import instruction: $one_entry"
-    (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
+            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
             end
             # Now carry out the import
+            @debug "Import info for caching" location block
             if !(location in keys(cached_dicts))
                 #@debug "Now trying to import $location"
                 try
@@ -2048,6 +2049,7 @@ import_cache(d, original_dir) = begin
 
         end
     end
+    @debug "All cached:" keys(cached_dicts)
     return cached_dicts
 end
 
@@ -2138,7 +2140,7 @@ resolve_templated_imports!(d::Dict{Symbol,DataFrame},original_dir,cached_dicts) 
         for one_entry in import_table
             import_def = missing
 #           println("one import instruction: $one_entry")
-    (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
+            (location,block,mode,if_dupl,if_miss) = get_import_info(original_dir,one_entry)
             if mode == "Full"
                 continue   # these are done separately
             end
@@ -2380,7 +2382,7 @@ get_import_attribute(d::DDLm_Dictionary, name, cat, obj) = begin
     spec = x[:import].get[]
     for one_spec in spec
         if get(one_spec,"mode","Contents") == "Full" continue end
-        templ_file_name = joinpath(d.import_dir, one_spec["file"])
+        templ_file_name,_,_,_ = get_import_info(d.import_dir, one_spec)
         if !(templ_file_name in keys(d.cached_imports))
             println("Warning: cannot find $templ_file_name when checking imports for $name")
             continue
