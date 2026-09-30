@@ -202,26 +202,52 @@ format_compound(val::Array;indent=value_col,max_length=line_length,level=1,ideal
     outstring = IOBuffer()
     @debug "Format array" indent level ideal
     if level > 2
-        @debug "Array: Writing out newline + indent"
+        @debug "Array: Writing out newline + $(indent+level) spaces"
         write(outstring,"\n"*' '^(indent + level))
     end
     line_pos = indent + level - 1
-    did_new_line = false
-    close_new_line = false               
+    close_new_line = false
+    multiline_value = false
     for (i,item) in enumerate(val)
         @debug "Array: Item $i" item
         value = format_for_cif(item;level=level+1,max_length=max_length,indent=indent,ideal=ideal)
         if '\n' in value
-            line_pos = length(value) - findlast(isequal('\n'),value)
+
+            multiline_value = true
+            # line_pos = length(value) - findlast(isequal('\n'),value)
             @debug "Array: Writing $value"
             write(outstring, value)
+
+            # always start on a new line after a multi-line value
+            if i != length(val)
+                write(outstring, "\n"*' '^indent)
+                line_pos = indent + level - 1
+            else
+                line_pos = length(value) - findlast(isequal('\n'), value)
+            end
         else
             # We need to count the closing bracket if the whole value is on a
             # single line
+
+            # need_new_line flags that our list of values has reached the end
+            # of the line and needs to emit a newline before the next value is
+            # output. This should not flag the newline before the first value
+            # or after the last value
+
+            # final_bracket flags whether a bracket is included in the length
+            # calculation - only true if we have a single line
+
+            # close_new_line flags that either an array or dict was the first
+            # or last item...not sure why we need this
+            
             need_new_line = false
-            final_bracket = (i == length(val) && !did_new_line) ? 1 : 0 
+            final_bracket = (i == length(val) && !multiline_value) ? 1 : 0 
             if i == 1
                 need_new_line = length(value) + line_pos + final_bracket > max_length
+                if (!ideal)
+                    @warn "Cannot fit first value of array on single line" value (length(value) + line_pos + final_bracket)
+                    throw(error("Cannot fit first value on single line"))
+                end
                 close_new_line = (typeof(item) <: Dict || typeof(item) <: Array) && need_new_line
             elseif i > 1 && i < length(val)
                 need_new_line = length(value) + line_pos + min_whitespace > max_length
@@ -236,30 +262,30 @@ format_compound(val::Array;indent=value_col,max_length=line_length,level=1,ideal
                 @debug "Array: Writing newline because need_new_line true" i final_bracket close_new_line
                 write(outstring,"\n")
                 this_indent = indent+level
-                @debug "Array: Adding indent and value" this_indent value
+                @debug "Array: Adding $(this_indent-1) spaces and value" this_indent value
                 write(outstring,' '^(this_indent-1)*value)
                 line_pos = length(value)+ this_indent - 1
-                did_new_line = true
+                multiline_value = true
             else
                 if i > 1  #not the first value
-                    @debug "Array: Adding whitespace"
+                    @debug "Array: Adding $min_whitespace whitespace"
                     write(outstring, ' '^min_whitespace)
                     line_pos = line_pos + length(value) + min_whitespace
                 else
                     line_pos = line_pos + length(value)
                 end
-                @debug "Array: Writing value" value
+                @debug "Array: Writing value" value line_pos
                 write(outstring,value)
             end
         end
     end
-    if level > 2 || close_new_line
+    if level > 2 || close_new_line || multiline_value
         @debug "Array: Writing newline + indent" level close_new_line
         write(outstring,"\n"*' '^(indent-1  + level - 1))
     end
     @debug "Array: Closing list bracket"
     write(outstring,']')
-    if level > 2 #|| close_new_line
+    if level > 2 || multiline_value#|| close_new_line
         @debug "Array: Prepend open list bracket, newline, indent, stored value" level close_new_line
         return "[\n"*' '^(indent-1 + level)*String(take!(outstring))
     else
@@ -274,7 +300,11 @@ format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,ide
                    outstring = IOBuffer()
     @debug "format dict:" indent level ideal
     write(outstring,"{")
-    line_pos = indent
+
+    # line_pos is the character position for the next character emitted, counting from
+    # 1 as the first character in the line
+    
+    line_pos = indent + 2
     key_order = sort(collect(keys(val)))
     for (cnt,k) in enumerate(key_order)
         v = val[k]
@@ -282,7 +312,7 @@ format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,ide
         need_space = cnt > 1 ? min_whitespace : 0
         if '\n' in mini_val
             line_pos = length(mini_val) - findlast(isequal('\n'),mini_val) + need_space
-            @debug "Dict: write whitespace and $mini_val"
+            @debug "Dict: write $need_space whitespace and $mini_val" line_pos
             write(outstring, ' '^need_space)
             write(outstring,mini_val)
         else
@@ -290,15 +320,17 @@ format_compound(val::Dict;indent=value_indent,max_length=line_length,level=1,ide
                 if ideal && level > 1
                     throw(error("Pos $line_pos, value $mini_val, choose a better indent"))
                 end
-                @debug "Dict: write newline, indent, $mini_val"
+                @debug "Dict: write newline, indent, $mini_val" line_pos
                 write(outstring,"\n")
                 write(outstring," "^(indent+level-1)*mini_val)
-                line_pos = length(mini_val)+indent+level-1
+                line_pos = length(mini_val)+indent+level
+                @debug "Dict: line_pos now $line_pos"
             else
-                @debug "Dict: write whitespace, $mini_val"
+                @debug "Dict: write whitespace, $mini_val" line_pos
                 write(outstring, ' '^need_space)
                 write(outstring, mini_val)
                 line_pos = line_pos + length(mini_val)+ need_space
+                @debug "Dict: line_pos after write $line_pos"
             end
         end
     end
