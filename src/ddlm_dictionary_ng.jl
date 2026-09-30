@@ -1990,14 +1990,14 @@ fix_url(s::String, parent) = begin
     scheme = match(r"^[a-zA-Z]+:",s)
     if scheme == nothing
         if s[1]=='/'
-            return URI(path = s, scheme = "file")
+            return URI(path = escapeuri(s), scheme = "file")
         elseif s[1]=="."  # really shouldn't accept this
-            return URI(path = joinpath(parent,s), scheme = "file")
+            return URI(path = escapeuri(joinpath(parent,s)), scheme = "file")
         else
-            return URI(path = joinpath(parent,s), scheme = "file")
+            return URI(path = escapeuri(joinpath(parent,s)), scheme = "file")
         end
     end
-    return URI(s)
+    return URI(escapeuri(s))
 end
 
 """

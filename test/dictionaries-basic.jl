@@ -126,6 +126,7 @@ end
     @test nrow(ud[:definition][ismissing.(ud[:definition].id),:]) == 0
     @test get_parent_category(ud,"structure") == "cif_mag_head"
     # try importing through alternative directory, we've changed update date.
+    # note use of spaces to catch poor URL handling
     uf = DDLm_Dictionary(joinpath(@__DIR__, "dictionaries", "small_core_test.dic"),
                          import_dir=joinpath(@__DIR__,"other import dir"))
     @test String(uf["_diffrn_orient_matrix.UB_11"][:definition][!,:update][]) == "2021-12-07" 
